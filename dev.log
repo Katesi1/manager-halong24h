@@ -1,0 +1,444 @@
+
+> webhalong24h-manager@0.1.0 dev
+> next dev -p 3001
+
+   ▲ Next.js 15.5.18
+   - Local:        http://localhost:3001
+   - Network:      http://192.168.1.3:3001
+   - Environments: .env.local
+   - Experiments (use with caution):
+     · serverActions
+
+ ✓ Starting...
+ ✓ Ready in 3.2s
+ ✓ Compiled /middleware in 307ms (115 modules)
+ ○ Compiling / ...
+ ✓ Compiled / in 1727ms (677 modules)
+ GET / 307 in 3186ms
+ GET / 307 in 133ms
+ ○ Compiling /host ...
+ ✓ Compiled /host in 2.4s (976 modules)
+[api-client] GET /dashboard/stats → 401 Token không hợp lệ 
+[api-client] GET /bookings → 401 Token không hợp lệ 
+[api-client] GET /properties → 401 Token không hợp lệ 
+ ⨯ Error [UnauthorizedError]: Token không hợp lệ
+    at mapApiErrorToDomain (src\infrastructure\http\api-error.ts:68:16)
+    at toResult (src\app\actions\_helpers.ts:30:71)
+    at async HostDashboardPage (src\app\(host)\host\page.tsx:46:5)
+  66 |         return new ValidationError(friendly, fieldErrors);
+  67 |       case 401:
+> 68 |         return new UnauthorizedError(friendly);
+     |                ^
+  69 |       case 403:
+  70 |         return new ForbiddenError(friendly);
+  71 |       case 404: {
+  code: 'UNAUTHORIZED',
+  digest: '478750494'
+}
+[api-client] GET /notifications → 401 Token không hợp lệ 
+[api-client] GET /notifications/unread-count → 401 Token không hợp lệ 
+ ⨯ Error [UnauthorizedError]: Token không hợp lệ
+    at mapApiErrorToDomain (src\infrastructure\http\api-error.ts:68:16)
+    at toResult (src\app\actions\_helpers.ts:30:71)
+    at async HostTopbar (src\components\host\topbar.tsx:22:38)
+  66 |         return new ValidationError(friendly, fieldErrors);
+  67 |       case 401:
+> 68 |         return new UnauthorizedError(friendly);
+     |                ^
+  69 |       case 403:
+  70 |         return new ForbiddenError(friendly);
+  71 |       case 404: {
+  code: 'UNAUTHORIZED',
+  digest: '3049714959'
+}
+ GET /host 500 in 3391ms
+ ○ Compiling /host/properties ...
+ ✓ Compiled /host/properties in 700ms (980 modules)
+[api-client] GET /properties → 401 Token không hợp lệ 
+ ⨯ Error [UnauthorizedError]: Token không hợp lệ
+    at mapApiErrorToDomain (src\infrastructure\http\api-error.ts:68:16)
+    at toResult (src\app\actions\_helpers.ts:30:71)
+    at async PropertiesListPage (src\app\(host)\host\properties\page.tsx:22:18)
+  66 |         return new ValidationError(friendly, fieldErrors);
+  67 |       case 401:
+> 68 |         return new UnauthorizedError(friendly);
+     |                ^
+  69 |       case 403:
+  70 |         return new ForbiddenError(friendly);
+  71 |       case 404: {
+  code: 'UNAUTHORIZED',
+  digest: '553000401'
+}
+[api-client] GET /notifications → 401 Token không hợp lệ 
+[api-client] GET /notifications/unread-count → 401 Token không hợp lệ 
+ ⨯ Error [UnauthorizedError]: Token không hợp lệ
+    at mapApiErrorToDomain (src\infrastructure\http\api-error.ts:68:16)
+    at toResult (src\app\actions\_helpers.ts:30:71)
+    at async HostTopbar (src\components\host\topbar.tsx:22:38)
+  66 |         return new ValidationError(friendly, fieldErrors);
+  67 |       case 401:
+> 68 |         return new UnauthorizedError(friendly);
+     |                ^
+  69 |       case 403:
+  70 |         return new ForbiddenError(friendly);
+  71 |       case 404: {
+  code: 'UNAUTHORIZED',
+  digest: '3049714959'
+}
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /host/properties 500 in 1583ms
+[api-client] GET /dashboard/stats → 401 Token không hợp lệ 
+[api-client] GET /bookings → 401 Token không hợp lệ 
+[api-client] GET /properties → 401 Token không hợp lệ 
+ ⨯ Error [UnauthorizedError]: Token không hợp lệ
+    at mapApiErrorToDomain (src\infrastructure\http\api-error.ts:68:16)
+    at toResult (src\app\actions\_helpers.ts:30:71)
+    at async HostDashboardPage (src\app\(host)\host\page.tsx:46:5)
+  66 |         return new ValidationError(friendly, fieldErrors);
+  67 |       case 401:
+> 68 |         return new UnauthorizedError(friendly);
+     |                ^
+  69 |       case 403:
+  70 |         return new ForbiddenError(friendly);
+  71 |       case 404: {
+  code: 'UNAUTHORIZED',
+  digest: '478750494'
+}
+[api-client] GET /notifications → 401 Token không hợp lệ 
+ ⨯ Error [UnauthorizedError]: Token không hợp lệ
+    at mapApiErrorToDomain (src\infrastructure\http\api-error.ts:68:16)
+    at toResult (src\app\actions\_helpers.ts:30:71)
+    at async HostTopbar (src\components\host\topbar.tsx:22:38)
+  66 |         return new ValidationError(friendly, fieldErrors);
+  67 |       case 401:
+> 68 |         return new UnauthorizedError(friendly);
+     |                ^
+  69 |       case 403:
+  70 |         return new ForbiddenError(friendly);
+  71 |       case 404: {
+  code: 'UNAUTHORIZED',
+  digest: '3049714959'
+}
+[api-client] GET /notifications/unread-count → 401 Token không hợp lệ 
+ GET /host 500 in 382ms
+ ○ Compiling /host/bookings ...
+ ✓ Compiled /host/bookings in 584ms (984 modules)
+[api-client] GET /bookings → 401 Token không hợp lệ 
+ ⨯ Error [UnauthorizedError]: Token không hợp lệ
+    at mapApiErrorToDomain (src\infrastructure\http\api-error.ts:68:16)
+    at toResult (src\app\actions\_helpers.ts:30:71)
+    at async BookingsListPage (src\app\(host)\host\bookings\page.tsx:58:18)
+  66 |         return new ValidationError(friendly, fieldErrors);
+  67 |       case 401:
+> 68 |         return new UnauthorizedError(friendly);
+     |                ^
+  69 |       case 403:
+  70 |         return new ForbiddenError(friendly);
+  71 |       case 404: {
+  code: 'UNAUTHORIZED',
+  digest: '4269743505'
+}
+[api-client] GET /notifications → 401 Token không hợp lệ 
+[api-client] GET /notifications/unread-count → 401 Token không hợp lệ 
+ ⨯ Error [UnauthorizedError]: Token không hợp lệ
+    at mapApiErrorToDomain (src\infrastructure\http\api-error.ts:68:16)
+    at toResult (src\app\actions\_helpers.ts:30:71)
+    at async HostTopbar (src\components\host\topbar.tsx:22:38)
+  66 |         return new ValidationError(friendly, fieldErrors);
+  67 |       case 401:
+> 68 |         return new UnauthorizedError(friendly);
+     |                ^
+  69 |       case 403:
+  70 |         return new ForbiddenError(friendly);
+  71 |       case 404: {
+  code: 'UNAUTHORIZED',
+  digest: '3049714959'
+}
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /host/bookings 500 in 1350ms
+ ○ Compiling /host/calendar ...
+ ✓ Compiled /host/calendar in 1458ms (1062 modules)
+[api-client] GET /properties → 401 Token không hợp lệ 
+ ⨯ Error [UnauthorizedError]: Token không hợp lệ
+    at mapApiErrorToDomain (src\infrastructure\http\api-error.ts:68:16)
+    at toResult (src\app\actions\_helpers.ts:30:71)
+    at async CalendarPage (src\app\(host)\host\calendar\page.tsx:32:42)
+  66 |         return new ValidationError(friendly, fieldErrors);
+  67 |       case 401:
+> 68 |         return new UnauthorizedError(friendly);
+     |                ^
+  69 |       case 403:
+  70 |         return new ForbiddenError(friendly);
+  71 |       case 404: {
+  code: 'UNAUTHORIZED',
+  digest: '1868748081'
+}
+[api-client] GET /notifications → 401 Token không hợp lệ 
+[api-client] GET /notifications/unread-count → 401 Token không hợp lệ 
+ ⨯ Error [UnauthorizedError]: Token không hợp lệ
+    at mapApiErrorToDomain (src\infrastructure\http\api-error.ts:68:16)
+    at toResult (src\app\actions\_helpers.ts:30:71)
+    at async HostTopbar (src\components\host\topbar.tsx:22:38)
+  66 |         return new ValidationError(friendly, fieldErrors);
+  67 |       case 401:
+> 68 |         return new UnauthorizedError(friendly);
+     |                ^
+  69 |       case 403:
+  70 |         return new ForbiddenError(friendly);
+  71 |       case 404: {
+  code: 'UNAUTHORIZED',
+  digest: '3049714959'
+}
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /host/calendar 500 in 1999ms
+[api-client] GET /bookings → 401 Token không hợp lệ 
+ ⨯ Error [UnauthorizedError]: Token không hợp lệ
+    at mapApiErrorToDomain (src\infrastructure\http\api-error.ts:68:16)
+    at toResult (src\app\actions\_helpers.ts:30:71)
+    at async BookingsListPage (src\app\(host)\host\bookings\page.tsx:58:18)
+  66 |         return new ValidationError(friendly, fieldErrors);
+  67 |       case 401:
+> 68 |         return new UnauthorizedError(friendly);
+     |                ^
+  69 |       case 403:
+  70 |         return new ForbiddenError(friendly);
+  71 |       case 404: {
+  code: 'UNAUTHORIZED',
+  digest: '4269743505'
+}
+[api-client] GET /notifications → 401 Token không hợp lệ 
+[api-client] GET /notifications/unread-count → 401 Token không hợp lệ 
+ ⨯ Error [UnauthorizedError]: Token không hợp lệ
+    at mapApiErrorToDomain (src\infrastructure\http\api-error.ts:68:16)
+    at toResult (src\app\actions\_helpers.ts:30:71)
+    at async HostTopbar (src\components\host\topbar.tsx:22:38)
+  66 |         return new ValidationError(friendly, fieldErrors);
+  67 |       case 401:
+> 68 |         return new UnauthorizedError(friendly);
+     |                ^
+  69 |       case 403:
+  70 |         return new ForbiddenError(friendly);
+  71 |       case 404: {
+  code: 'UNAUTHORIZED',
+  digest: '3049714959'
+}
+ GET /host/bookings 500 in 779ms
+ ○ Compiling /host/properties/new ...
+ ✓ Compiled /host/properties/new in 2.1s (1235 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /host/properties/new 200 in 2814ms
+[api-client] GET /notifications → 401 Token không hợp lệ 
+[api-client] GET /notifications/unread-count → 401 Token không hợp lệ 
+ ⨯ Error [UnauthorizedError]: Token không hợp lệ
+    at mapApiErrorToDomain (src\infrastructure\http\api-error.ts:68:16)
+    at toResult (src\app\actions\_helpers.ts:30:71)
+    at async HostTopbar (src\components\host\topbar.tsx:22:38)
+  66 |         return new ValidationError(friendly, fieldErrors);
+  67 |       case 401:
+> 68 |         return new UnauthorizedError(friendly);
+     |                ^
+  69 |       case 403:
+  70 |         return new ForbiddenError(friendly);
+  71 |       case 404: {
+  code: 'UNAUTHORIZED',
+  digest: '3049714959'
+}
+[api-client] GET /bookings → 401 Token không hợp lệ 
+ ⨯ Error [UnauthorizedError]: Token không hợp lệ
+    at mapApiErrorToDomain (src\infrastructure\http\api-error.ts:68:16)
+    at toResult (src\app\actions\_helpers.ts:30:71)
+    at async BookingsListPage (src\app\(host)\host\bookings\page.tsx:58:18)
+  66 |         return new ValidationError(friendly, fieldErrors);
+  67 |       case 401:
+> 68 |         return new UnauthorizedError(friendly);
+     |                ^
+  69 |       case 403:
+  70 |         return new ForbiddenError(friendly);
+  71 |       case 404: {
+  code: 'UNAUTHORIZED',
+  digest: '4269743505'
+}
+[api-client] GET /notifications → 401 Token không hợp lệ 
+ ⨯ Error [UnauthorizedError]: Token không hợp lệ
+    at mapApiErrorToDomain (src\infrastructure\http\api-error.ts:68:16)
+    at toResult (src\app\actions\_helpers.ts:30:71)
+    at async HostTopbar (src\components\host\topbar.tsx:22:38)
+  66 |         return new ValidationError(friendly, fieldErrors);
+  67 |       case 401:
+> 68 |         return new UnauthorizedError(friendly);
+     |                ^
+  69 |       case 403:
+  70 |         return new ForbiddenError(friendly);
+  71 |       case 404: {
+  code: 'UNAUTHORIZED',
+  digest: '3049714959'
+}
+[api-client] GET /notifications/unread-count → 401 Token không hợp lệ 
+ GET /host/bookings 500 in 389ms
+ ○ Compiling /host/reports ...
+ ✓ Compiled /host/reports in 807ms (1246 modules)
+[api-client] GET /reports → 401 Token không hợp lệ 
+ ⨯ Error [UnauthorizedError]: Token không hợp lệ
+    at mapApiErrorToDomain (src\infrastructure\http\api-error.ts:68:16)
+    at toResult (src\app\actions\_helpers.ts:30:71)
+    at async HostReportsPage (src\app\(host)\host\reports\page.tsx:90:18)
+  66 |         return new ValidationError(friendly, fieldErrors);
+  67 |       case 401:
+> 68 |         return new UnauthorizedError(friendly);
+     |                ^
+  69 |       case 403:
+  70 |         return new ForbiddenError(friendly);
+  71 |       case 404: {
+  code: 'UNAUTHORIZED',
+  digest: '3497717799'
+}
+[api-client] GET /notifications → 401 Token không hợp lệ 
+[api-client] GET /notifications/unread-count → 401 Token không hợp lệ 
+ ⨯ Error [UnauthorizedError]: Token không hợp lệ
+    at mapApiErrorToDomain (src\infrastructure\http\api-error.ts:68:16)
+    at toResult (src\app\actions\_helpers.ts:30:71)
+    at async HostTopbar (src\components\host\topbar.tsx:22:38)
+  66 |         return new ValidationError(friendly, fieldErrors);
+  67 |       case 401:
+> 68 |         return new UnauthorizedError(friendly);
+     |                ^
+  69 |       case 403:
+  70 |         return new ForbiddenError(friendly);
+  71 |       case 404: {
+  code: 'UNAUTHORIZED',
+  digest: '3049714959'
+}
+ GET /host/reports 500 in 1668ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 801ms (1247 modules)
+ GET /host/profile 404 in 1066ms
+ GET /host/conversations 404 in 154ms
+ ○ Compiling /admin ...
+ ✓ Compiled /admin in 861ms (1265 modules)
+[api-client] GET /dashboard/stats → 401 Token không hợp lệ 
+[api-client] GET /properties → 401 Token không hợp lệ 
+[api-client] GET /bookings → 401 Token không hợp lệ 
+ ⨯ Error [UnauthorizedError]: Token không hợp lệ
+    at mapApiErrorToDomain (src\infrastructure\http\api-error.ts:68:16)
+    at toResult (src\app\actions\_helpers.ts:30:71)
+    at async AdminOverviewPage (src\app\(admin)\admin\page.tsx:31:5)
+  66 |         return new ValidationError(friendly, fieldErrors);
+  67 |       case 401:
+> 68 |         return new UnauthorizedError(friendly);
+     |                ^
+  69 |       case 403:
+  70 |         return new ForbiddenError(friendly);
+  71 |       case 404: {
+  code: 'UNAUTHORIZED',
+  digest: '3992730494'
+}
+ GET /admin 200 in 1499ms
+ ○ Compiling /admin/properties ...
+ ✓ Compiled /admin/properties in 1764ms (1268 modules)
+[api-client] GET /properties → 401 Token không hợp lệ 
+ ⨯ Error [UnauthorizedError]: Token không hợp lệ
+    at mapApiErrorToDomain (src\infrastructure\http\api-error.ts:68:16)
+    at toResult (src\app\actions\_helpers.ts:30:71)
+    at async AdminPropertiesPage (src\app\(admin)\admin\properties\page.tsx:43:18)
+  66 |         return new ValidationError(friendly, fieldErrors);
+  67 |       case 401:
+> 68 |         return new UnauthorizedError(friendly);
+     |                ^
+  69 |       case 403:
+  70 |         return new ForbiddenError(friendly);
+  71 |       case 404: {
+  code: 'UNAUTHORIZED',
+  digest: '2510274586'
+}
+ GET /admin/properties 200 in 2493ms
+ ○ Compiling /admin/users ...
+ ✓ Compiled /admin/users in 1004ms (1271 modules)
+ GET /admin/users 200 in 1811ms
+ ○ Compiling /admin/kyc ...
+ ✓ Compiled /admin/kyc in 1084ms (1275 modules)
+ GET /admin/kyc 200 in 1819ms
+ ○ Compiling /admin/disputes ...
+ ✓ Compiled /admin/disputes in 1472ms (1284 modules)
+ GET /admin/disputes 200 in 2184ms
+ ○ Compiling /admin/reports ...
+ ✓ Compiled /admin/reports in 1163ms (1286 modules)
+ GET /admin/reports 200 in 2437ms
+ ○ Compiling /admin/bookings ...
+ ✓ Compiled /admin/bookings in 1651ms (1289 modules)
+[api-client] GET /bookings → 401 Token không hợp lệ 
+ ⨯ Error [UnauthorizedError]: Token không hợp lệ
+    at mapApiErrorToDomain (src\infrastructure\http\api-error.ts:68:16)
+    at toResult (src\app\actions\_helpers.ts:30:71)
+    at async AdminBookingsPage (src\app\(admin)\admin\bookings\page.tsx:30:18)
+  66 |         return new ValidationError(friendly, fieldErrors);
+  67 |       case 401:
+> 68 |         return new UnauthorizedError(friendly);
+     |                ^
+  69 |       case 403:
+  70 |         return new ForbiddenError(friendly);
+  71 |       case 404: {
+  code: 'UNAUTHORIZED',
+  digest: '737554427'
+}
+ GET /admin/bookings 200 in 2280ms
+ ✓ Compiled in 1427ms (1062 modules)
+ ✓ Compiled in 700ms (1062 modules)
+ ✓ Compiled in 930ms (1062 modules)
+ ✓ Compiled in 1393ms (1062 modules)
+ ✓ Compiled in 717ms (1062 modules)
+ GET /host 307 in 431ms
+ ○ Compiling / ...
+ ✓ Compiled / in 766ms (651 modules)
+ ⨯ Error: ENOENT: no such file or directory, open 'D:\Webhalong24hManager\.next\server\vendor-chunks\next.js'
+    at <unknown> (D:\Webhalong24hManager\.next\server\app\page.js:760:47)
+    at Object.<anonymous> (D:\Webhalong24hManager\.next\server\app\page.js:763:3) {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'D:\\Webhalong24hManager\\.next\\server\\vendor-chunks\\next.js',
+  page: '/'
+}
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 4.1s (1412 modules)
+ GET / 500 in 6001ms
+ ⨯ Error: ENOENT: no such file or directory, open 'D:\Webhalong24hManager\.next\server\vendor-chunks\zod.js'
+    at <unknown> (D:\Webhalong24hManager\.next\server\app\(host)\host\page.js:1293:47)
+    at Object.<anonymous> (D:\Webhalong24hManager\.next\server\app\(host)\host\page.js:1296:3) {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'D:\\Webhalong24hManager\\.next\\server\\vendor-chunks\\zod.js',
+  page: '/host'
+}
+ GET /host 500 in 316ms
+ ⨯ Error: ENOENT: no such file or directory, open 'D:\Webhalong24hManager\.next\server\vendor-chunks\zod.js'
+    at <unknown> (D:\Webhalong24hManager\.next\server\app\(host)\host\page.js:1293:47)
+    at Object.<anonymous> (D:\Webhalong24hManager\.next\server\app\(host)\host\page.js:1296:3) {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'D:\\Webhalong24hManager\\.next\\server\\vendor-chunks\\zod.js',
+  page: '/host'
+}
+ GET /host 500 in 287ms
+ ⨯ Error: ENOENT: no such file or directory, open 'D:\Webhalong24hManager\.next\server\vendor-chunks\zod.js'
+    at <unknown> (D:\Webhalong24hManager\.next\server\app\(host)\host\page.js:1293:47)
+    at Object.<anonymous> (D:\Webhalong24hManager\.next\server\app\(host)\host\page.js:1296:3) {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'D:\\Webhalong24hManager\\.next\\server\\vendor-chunks\\zod.js',
+  page: '/host'
+}
+ HEAD /host 500 in 301ms
+ ⨯ Error: ENOENT: no such file or directory, open 'D:\Webhalong24hManager\.next\server\vendor-chunks\zod.js'
+    at <unknown> (D:\Webhalong24hManager\.next\server\app\(host)\host\page.js:1293:47)
+    at Object.<anonymous> (D:\Webhalong24hManager\.next\server\app\(host)\host\page.js:1296:3) {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'D:\\Webhalong24hManager\\.next\\server\\vendor-chunks\\zod.js',
+  page: '/host'
+}
+ GET /host 500 in 327ms
+[?25h

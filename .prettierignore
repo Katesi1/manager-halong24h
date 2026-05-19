@@ -1,0 +1,13 @@
+.next
+node_modules
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+build
+dist
+coverage
+.env*
+*.md
+public
+supabase/.branches
+src/lib/database.types.ts
