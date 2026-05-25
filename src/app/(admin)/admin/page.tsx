@@ -52,7 +52,7 @@ export default async function AdminOverviewPage() {
   const recentBookings = bookings.slice(0, 5);
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       <PageHeader
         eyebrow="Quản trị hệ thống"
         title="Tổng quan hệ thống"

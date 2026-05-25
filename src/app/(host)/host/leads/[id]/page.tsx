@@ -143,7 +143,7 @@ export default async function LeadDetailPage(props: { params: Promise<{ id: stri
       : 0;
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto pb-28">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto pb-28">
       <div className="mb-4 flex items-center gap-3">
         <Link
           href="/host/leads"

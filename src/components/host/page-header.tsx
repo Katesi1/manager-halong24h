@@ -61,11 +61,11 @@ export function PageHeader({
           {eyebrow && (
             <p className="overline with-dash mb-2.5 text-[10px]">{eyebrow}</p>
           )}
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-navy-900 leading-[1.15] sm:text-4xl">
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-navy-900 leading-[1.15] sm:text-3xl lg:text-4xl">
             {title}
           </h1>
           {description && (
-            <p className="mt-3 text-base text-ink-700 leading-relaxed max-w-2xl">
+            <p className="mt-2 text-sm sm:text-base text-ink-700 leading-relaxed max-w-2xl">
               {description}
             </p>
           )}

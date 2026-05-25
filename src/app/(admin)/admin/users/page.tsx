@@ -78,7 +78,7 @@ export default async function AdminUsersPage(props: {
   const apiError = !result.ok ? result.error : null;
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       <PageHeader
         eyebrow="Vận hành hệ thống"
         title="Người dùng"
@@ -150,8 +150,8 @@ export default async function AdminUsersPage(props: {
           description="Thử bỏ bộ lọc hoặc kiểm tra lại từ khóa tìm kiếm."
         />
       ) : (
-        <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-ink-200/60 shadow-card">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto rounded-2xl bg-white ring-1 ring-ink-200/60 shadow-card">
+          <table className="w-full min-w-[600px] text-sm">
             <thead className="border-b border-ink-200 bg-cream-100 text-left">
               <tr>
                 <th className="overline muted no-dash text-[10px] px-4 py-3">

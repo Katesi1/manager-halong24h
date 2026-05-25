@@ -165,7 +165,7 @@ export default async function HousekeepingPage(props: {
   const filtered = sp.status ? tasks.filter((t) => t.status === sp.status) : tasks;
 
   return (
-    <div className="p-6 lg:p-8 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader
         title="Dọn phòng"
         description="Theo dõi nhân viên dọn phòng. Đồng bộ thời gian thực với app mobile."

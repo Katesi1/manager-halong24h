@@ -26,7 +26,7 @@ export default async function NewBookingPage(props: {
   // GUARD: SALE chưa được gán Owner → block
   if (profile.role === RoleCode.SALE && !profile.ownerId) {
     return (
-      <div className="p-6 lg:p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <GuardBanner
           icon="⏳"
           title="Tài khoản SALE chưa được gán Chủ nhà"
@@ -45,7 +45,7 @@ export default async function NewBookingPage(props: {
     !profile.kycBypass
   ) {
     return (
-      <div className="p-6 lg:p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <GuardBanner
           icon="🛡️"
           title="Cần KYC trước khi tạo đặt phòng"
@@ -64,7 +64,7 @@ export default async function NewBookingPage(props: {
   const subBlock = subResult.ok ? blockedReason(subResult.data) : null;
   if (subBlock) {
     return (
-      <div className="p-6 lg:p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <GuardBanner
           icon="💸"
           title="Gói cước cần được kích hoạt"
@@ -89,7 +89,7 @@ export default async function NewBookingPage(props: {
     : [];
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
       <PageHeader
         title="Tạo đặt phòng mới"
         description="Khách đến trực tiếp, đặt qua điện thoại, hoặc nhập từ kênh khác. Đặt phòng ở trạng thái giữ chỗ 30 phút — sau đó xác nhận để chốt."

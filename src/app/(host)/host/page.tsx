@@ -74,7 +74,7 @@ export default async function HostDashboardPage() {
   const apiError = !statsResult.ok ? statsResult.error : null;
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       <PageHeader
         title="Tổng quan"
         description="Xin chào! Đây là bức tranh kinh doanh hôm nay."
@@ -245,7 +245,7 @@ export default async function HostDashboardPage() {
           Đặt phòng sắp tới
         </h2>
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[600px] text-sm">
             <thead className="text-left text-xs font-semibold uppercase tracking-wider text-ink-500">
               <tr className="border-b border-ink-200">
                 <th className="pb-2 pr-4">Mã</th>

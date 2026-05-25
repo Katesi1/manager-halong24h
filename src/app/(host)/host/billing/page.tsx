@@ -84,7 +84,7 @@ export default async function HostBillingPage() {
   const { roomCount, currentTier, monthlyFee, invoices } = data;
 
   return (
-    <div className="p-6 lg:p-8 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader
         title="Gói cước"
         description={`Tự động tính theo số phòng đang hoạt động. Bạn đang có ${roomCount} phòng → tier ${currentTier.toUpperCase()}.`}
@@ -191,8 +191,8 @@ export default async function HostBillingPage() {
             Chưa có hóa đơn nào (gói Miễn phí hoặc tháng đầu sử dụng)
           </div>
         ) : (
-          <div className="mt-4 overflow-hidden rounded-2xl bg-white ring-1 ring-ink-200/60 shadow-card">
-            <table className="w-full text-sm">
+          <div className="mt-4 overflow-x-auto rounded-2xl bg-white ring-1 ring-ink-200/60 shadow-card">
+            <table className="w-full min-w-[600px] text-sm">
               <thead className="border-b border-ink-200 bg-cream-100 text-left text-xs font-semibold uppercase tracking-wider text-ink-500">
                 <tr>
                   <th className="px-4 py-3">Kỳ</th>

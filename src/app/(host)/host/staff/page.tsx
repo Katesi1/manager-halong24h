@@ -25,7 +25,7 @@ export default async function HostStaffPage() {
     (!invitesResult.ok ? invitesResult.error : null);
 
   return (
-    <div className="p-6 lg:p-8 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader
         title="Nhân viên SALE"
         description="Mời SALE qua email. SALE accept tạo tài khoản role=2 và được gán vào bạn."
@@ -45,7 +45,7 @@ export default async function HostStaffPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
           {/* Active staff list */}
-          <section className="overflow-hidden rounded-2xl bg-white ring-1 ring-ink-200/60 shadow-card">
+          <section className="overflow-x-auto rounded-2xl bg-white ring-1 ring-ink-200/60 shadow-card">
             <header className="flex items-baseline justify-between border-b border-ink-200 px-4 py-3">
               <h2 className="font-display text-lg font-semibold tracking-tight text-navy-900">
                 SALE đang hoạt động ({staff.length})
@@ -60,7 +60,7 @@ export default async function HostStaffPage() {
                 />
               </div>
             ) : (
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[600px] text-sm">
                 <thead className="border-b border-ink-200 bg-cream-100 text-left text-xs font-semibold uppercase tracking-wider text-ink-500">
                   <tr>
                     <th className="px-4 py-3">Tên</th>
@@ -101,13 +101,13 @@ export default async function HostStaffPage() {
 
           {/* Pending invites */}
           {invites.length > 0 && (
-            <section className="overflow-hidden rounded-2xl bg-white ring-1 ring-ink-200/60 shadow-card">
+            <section className="overflow-x-auto rounded-2xl bg-white ring-1 ring-ink-200/60 shadow-card">
               <header className="flex items-baseline justify-between border-b border-ink-200 px-4 py-3">
                 <h2 className="font-display text-lg font-semibold tracking-tight text-navy-900">
                   Lời mời đang chờ ({invites.length})
                 </h2>
               </header>
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[600px] text-sm">
                 <thead className="border-b border-ink-200 bg-cream-100 text-left text-xs font-semibold uppercase tracking-wider text-ink-500">
                   <tr>
                     <th className="px-4 py-3">Email</th>

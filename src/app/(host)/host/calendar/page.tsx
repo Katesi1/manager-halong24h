@@ -52,7 +52,7 @@ export default async function CalendarPage(props: {
   const apiError = !gridResult.ok ? gridResult.error : null;
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Lịch phòng"
         description="Quản lý trạng thái từng ngày của mỗi cơ sở. Bấm vào ô để khóa, mở khóa hoặc tạo đặt phòng."

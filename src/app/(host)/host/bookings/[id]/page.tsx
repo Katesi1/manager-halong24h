@@ -42,7 +42,7 @@ export default async function BookingDetailPage(props: {
   const fullyPaid = remaining === 0 && booking.totalPrice > 0;
 
   return (
-    <div className="p-6 lg:p-8 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader
         title={`Đặt phòng ${booking.id.slice(0, 12)}`}
         description={`Tạo lúc ${formatDateTime(booking.createdAt)}`}

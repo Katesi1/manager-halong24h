@@ -85,7 +85,7 @@ export default async function AdminPaymentsPage(props: {
   const activeFilters = [filters.status, filters.search].filter(Boolean).length;
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       <PageHeader
         eyebrow="Tài chính"
         title="Subscription chủ nhà"
@@ -180,8 +180,8 @@ export default async function AdminPaymentsPage(props: {
             </p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-ink-200/60 shadow-card">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-2xl bg-white ring-1 ring-ink-200/60 shadow-card">
+            <table className="w-full min-w-[600px] text-sm">
               <thead className="border-b border-ink-200 bg-cream-100 text-left">
                 <tr>
                   <th className="overline muted no-dash text-[10px] px-4 py-3">

@@ -24,7 +24,7 @@ export default async function HostMessagesPage(props: {
     sp.filter === 'unread' ? all.filter((c) => c.unread_owner > 0) : all;
 
   return (
-    <div className="p-6 lg:p-8 max-w-3xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
       <PageHeader
         title="Tin nhắn"
         description="Trò chuyện với khách. Phản hồi nhanh để tăng tỷ lệ chốt đặt phòng."

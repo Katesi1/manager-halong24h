@@ -18,7 +18,6 @@ export async function HostTopbar({ profile }: TopbarProps) {
     .slice(0, 1)
     .toUpperCase();
 
-  // Fetch notifications + unread count server-side
   const [notifResult, countResult] = await Promise.all([
     listNotificationsAction({ limit: 10 }),
     getUnreadNotificationCountAction(),
@@ -27,16 +26,10 @@ export async function HostTopbar({ profile }: TopbarProps) {
   const unreadCount = countResult.ok ? countResult.data : 0;
 
   return (
-    <header className="sticky top-0 z-20 border-b border-ink-200 bg-cream-50/95 backdrop-blur">
-      <div className="flex h-16 items-center justify-between px-4 lg:px-6">
+    <div className="border-b border-ink-200 bg-cream-50/95 backdrop-blur">
+      <div className="flex h-14 items-center justify-between px-4 lg:px-6">
         <div className="flex items-center gap-3">
           <HostMobileNav />
-          <Link
-            href="/"
-            className="hidden lg:inline text-sm text-ink-700 hover:text-navy-900 hover:underline"
-          >
-            ← Xem trang khách
-          </Link>
         </div>
         <div className="flex items-center gap-3">
           <NotificationBell
@@ -52,7 +45,7 @@ export async function HostTopbar({ profile }: TopbarProps) {
                 {profile.full_name || profile.email}
               </span>
             </summary>
-            <div className="absolute right-0 top-12 w-56 rounded-xl bg-white py-2 ring-1 ring-ink-200 shadow-card-hover">
+            <div className="absolute right-0 top-12 w-52 sm:w-56 rounded-xl bg-white py-2 ring-1 ring-ink-200 shadow-card-hover z-30">
               <div className="px-4 py-2 border-b border-ink-200">
                 <div className="text-sm font-semibold text-ink-900 truncate">
                   {profile.full_name || profile.email}
@@ -67,12 +60,6 @@ export async function HostTopbar({ profile }: TopbarProps) {
               >
                 Cài đặt tài khoản
               </Link>
-              <Link
-                href="/"
-                className="block px-4 py-2.5 text-sm text-ink-700 hover:bg-cream-100"
-              >
-                Trang khách
-              </Link>
               <div className="my-1 border-t border-ink-200" />
               <form action="/auth/signout" method="post">
                 <button
@@ -86,6 +73,6 @@ export async function HostTopbar({ profile }: TopbarProps) {
           </details>
         </div>
       </div>
-    </header>
+    </div>
   );
 }

@@ -6,7 +6,7 @@ import { Input, Label, Textarea } from '@/components/ui/input';
 
 export default function AdminSettingsPage() {
   return (
-    <div className="p-6 lg:p-8 max-w-4xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
       <PageHeader
         eyebrow="Vận hành hệ thống"
         title="Cài đặt hệ thống"
@@ -22,7 +22,8 @@ export default function AdminSettingsPage() {
           <p className="mt-1 text-sm text-ink-500">
             Giá tính theo số phòng đang hoạt động của chủ nhà mỗi tháng.
           </p>
-          <table className="mt-4 w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="mt-4 w-full min-w-[600px] text-sm">
             <thead className="text-left">
               <tr className="border-b border-ink-200">
                 <th className="overline muted no-dash text-[10px] pb-2">
@@ -58,6 +59,7 @@ export default function AdminSettingsPage() {
               ))}
             </tbody>
           </table>
+          </div>
           <div className="mt-4">
             <SaveButton
               label="Lưu giá gói cước"

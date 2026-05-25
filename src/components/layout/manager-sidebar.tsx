@@ -174,7 +174,7 @@ export function ManagerSidebar({
 
   if (collapsed) {
     return (
-      <aside className="hidden lg:flex w-16 shrink-0 flex-col border-r border-ink-200 bg-cream-50 relative">
+      <aside className="hidden lg:flex w-16 shrink-0 flex-col border-r border-ink-200 bg-cream-50 sticky top-0 h-screen relative">
         <div className="flex justify-center py-5 border-b border-ink-200">
           <Link href={isAdmin ? '/admin' : '/host'}>
             <Image
@@ -260,7 +260,7 @@ export function ManagerSidebar({
   }
 
   return (
-    <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-ink-200 bg-cream-50">
+    <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-ink-200 bg-cream-50 sticky top-0 h-screen">
       <div className="flex items-center justify-between px-5 py-5 border-b border-ink-200">
         <Link
           href={isAdmin ? '/admin' : '/host'}

@@ -250,7 +250,7 @@ export default async function AdminReportsPage(props: {
   const data = getMock(range);
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       <PageHeader
         eyebrow="Vận hành hệ thống"
         title="Báo cáo & Phân tích"
@@ -332,7 +332,7 @@ export default async function AdminReportsPage(props: {
             <Badge variant="warning">Cảnh báo</Badge>
           </div>
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[600px] text-sm">
               <thead>
                 <tr className="text-left text-[11px] uppercase tracking-wider text-ink-500">
                   <th className="px-3 py-2 font-medium">Chủ nhà</th>

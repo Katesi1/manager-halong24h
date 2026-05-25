@@ -88,7 +88,7 @@ export default async function AdminAuditLogPage(props: {
   ].filter(Boolean).length;
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
       <PageHeader
         eyebrow="Vận hành hệ thống"
         title="Nhật ký kiểm toán"

@@ -40,16 +40,16 @@ export function HostMobileNav() {
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
         <Drawer.Content className="fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-white shadow-xl outline-none">
-          <Drawer.Title className="sr-only">Menu chủ nhà</Drawer.Title>
+          <Drawer.Title className="sr-only">Menu</Drawer.Title>
           <div className="flex items-center justify-between border-b border-ink-200 px-6 py-4">
-            <Link href="/" onClick={() => setOpen(false)} className="flex items-center gap-2">
+            <span className="flex items-center gap-2">
               <span className="grid h-9 w-9 place-items-center rounded-lg bg-navy-900 text-white font-display font-bold">
                 H
               </span>
               <span className="text-xl font-semibold tracking-tight text-navy-900">
                 Halong<span className="text-gold-600">24h</span>
               </span>
-            </Link>
+            </span>
             <Drawer.Close asChild>
               <button
                 type="button"
@@ -84,13 +84,14 @@ export function HostMobileNav() {
             })}
           </nav>
           <div className="border-t border-ink-200 p-4">
-            <Link
-              href="/"
-              onClick={() => setOpen(false)}
-              className="text-sm text-ink-700 hover:underline"
-            >
-              ← Xem trang khách
-            </Link>
+            <form action="/auth/signout" method="post">
+              <button
+                type="submit"
+                className="w-full text-left text-sm text-ink-700 hover:text-navy-900 font-medium"
+              >
+                Đăng xuất
+              </button>
+            </form>
           </div>
         </Drawer.Content>
       </Drawer.Portal>

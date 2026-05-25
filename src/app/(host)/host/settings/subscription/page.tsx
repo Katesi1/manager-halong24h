@@ -37,7 +37,7 @@ export default async function HostSubscriptionPage() {
   const blocked = blockedReason(sub);
 
   return (
-    <div className="p-6 lg:p-8 max-w-3xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
       <PageHeader
         eyebrow="Tài khoản & cài đặt"
         title="Gói cước Halong24h"

@@ -199,7 +199,7 @@ function Cell({ allowed }: { allowed: boolean }) {
 
 export default function AdminPermissionsPage() {
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       <PageHeader
         eyebrow="Vận hành hệ thống"
         title="Phân quyền"
@@ -258,7 +258,7 @@ export default function AdminPermissionsPage() {
         </p>
 
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[600px] text-sm">
             <thead>
               <tr className="border-b border-ink-200 text-left">
                 <th className="px-3 py-3 text-[11px] font-medium uppercase tracking-wider text-ink-500">

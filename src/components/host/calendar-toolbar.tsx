@@ -58,7 +58,7 @@ export function CalendarToolbar({
         >
           <ChevronRight className="h-4 w-4" />
         </button>
-        <div className="ml-2 text-sm font-semibold text-ink-900">
+        <div className="ml-2 text-xs sm:text-sm font-semibold text-ink-900 hidden sm:block">
           {formatDate(start)} → {formatDate(end)}
         </div>
       </div>

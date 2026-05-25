@@ -17,7 +17,7 @@ export default async function HostKycPage() {
   const isOwner = profile.role === RoleCode.OWNER;
   if (!isOwner) {
     return (
-      <div className="p-6 lg:p-8 max-w-3xl mx-auto">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
         <PageHeader
           title="KYC — Xác minh chủ nhà"
           breadcrumbs={[
@@ -52,7 +52,7 @@ export default async function HostKycPage() {
     kycStatus === 'payment_pending';
 
   return (
-    <div className="p-6 lg:p-8 max-w-3xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
       <PageHeader
         title="KYC — Xác minh chủ nhà"
         description="Nộp hồ sơ xác minh để được đăng cơ sở. Admin sẽ duyệt trong 2-3 ngày làm việc."

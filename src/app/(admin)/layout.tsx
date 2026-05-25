@@ -25,18 +25,16 @@ export default async function AdminLayout({
   const kycPending = kycCountResult.ok ? kycCountResult.data : 0;
 
   return (
-    <div className="min-h-screen bg-cream-50">
+    <div className="flex min-h-screen bg-cream-50">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:bg-white focus:px-4 focus:py-2 focus:rounded focus:shadow-lg"
       >
         Bỏ qua đến nội dung chính
       </a>
-      <div className="flex">
-        <ManagerSidebar profile={profile} badges={{ kyc: kycPending }} />
-        <div className="flex-1 min-w-0">
-          <main id="main-content">{children}</main>
-        </div>
+      <ManagerSidebar profile={profile} badges={{ kyc: kycPending }} />
+      <div className="flex-1 min-w-0">
+        <main id="main-content">{children}</main>
       </div>
     </div>
   );
