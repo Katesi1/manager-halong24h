@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 import { PageHeader } from '@/components/host/page-header';
 import { SaveButton } from '@/components/host/save-button';
-import { Input, Label, Textarea } from '@/components/ui/input';
+import { Label, Textarea } from '@/components/ui/input';
 
 export default function AdminSettingsPage() {
   return (
@@ -10,64 +10,10 @@ export default function AdminSettingsPage() {
       <PageHeader
         eyebrow="Vận hành hệ thống"
         title="Cài đặt hệ thống"
-        description="Cấu hình gói cước · Email templates · Điều khoản · Chính sách hủy mặc định. Theo mô hình mới: hệ thống KHÔNG thu hoa hồng, chỉ thu phí subscription chủ nhà."
+        description="Email templates · Điều khoản · Chính sách hủy mặc định."
       />
 
       <div className="space-y-6">
-        {/* Subscription tiers */}
-        <section className="rounded-2xl bg-white p-6 ring-1 ring-ink-200/60 shadow-card">
-          <h2 className="font-display text-2xl font-semibold tracking-tight text-navy-900">
-            Gói cước chủ nhà
-          </h2>
-          <p className="mt-1 text-sm text-ink-500">
-            Giá tính theo số phòng đang hoạt động của chủ nhà mỗi tháng.
-          </p>
-          <div className="overflow-x-auto">
-          <table className="mt-4 w-full min-w-[600px] text-sm">
-            <thead className="text-left">
-              <tr className="border-b border-ink-200">
-                <th className="overline muted no-dash text-[10px] pb-2">
-                  Gói cước
-                </th>
-                <th className="overline muted no-dash text-[10px] pb-2">
-                  Số phòng
-                </th>
-                <th className="overline muted no-dash text-[10px] pb-2">
-                  Giá / phòng / tháng
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ink-200">
-              {[
-                { tier: 'Miễn phí', rooms: '1-3 phòng', price: 0 },
-                { tier: 'Cơ bản', rooms: '4-10 phòng', price: 50_000 },
-                { tier: 'Tiêu chuẩn', rooms: '11-30 phòng', price: 40_000 },
-                { tier: 'Chuyên nghiệp', rooms: '31+ phòng', price: 30_000 },
-              ].map((t) => (
-                <tr key={t.tier}>
-                  <td className="py-3 font-semibold text-ink-900">{t.tier}</td>
-                  <td className="py-3 text-ink-700">{t.rooms}</td>
-                  <td className="py-3">
-                    <Input
-                      type="number"
-                      defaultValue={t.price}
-                      step={5000}
-                      className="w-32"
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-          <div className="mt-4">
-            <SaveButton
-              label="Lưu giá gói cước"
-              successMessage="✓ Đã lưu giá gói cước"
-            />
-          </div>
-        </section>
-
         {/* Email templates — link sang trang quản lý riêng */}
         <section className="rounded-2xl bg-white p-6 ring-1 ring-ink-200/60 shadow-card">
           <div className="flex items-start justify-between gap-3 flex-wrap">

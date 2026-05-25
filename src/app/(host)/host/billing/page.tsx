@@ -1,6 +1,9 @@
+import { getCurrentProfile } from '@/app/actions/auth';
 import { listPropertiesAction } from '@/app/actions/properties';
+import { TierPricingEditor } from '@/components/admin/tier-pricing-editor';
 import { PageHeader } from '@/components/host/page-header';
 import { Badge } from '@/components/ui/badge';
+import { RoleCode } from '@/core/value-objects/role';
 import { formatVND, formatDate } from '@/lib/format';
 import {
   TIER_PRICE_PER_ROOM,
@@ -63,7 +66,6 @@ interface BillingData {
 }
 
 async function getBilling(): Promise<BillingData> {
-  // Đếm số phòng từ cùng nguồn với /host/properties để tránh số liệu lệch nhau.
   const result = await listPropertiesAction({ includeInactive: true });
   const roomCount = result.ok ? result.data.length : 0;
   const tier = calculateTier(roomCount);
@@ -80,8 +82,12 @@ async function getBilling(): Promise<BillingData> {
 }
 
 export default async function HostBillingPage() {
-  const data = await getBilling();
+  const [data, profile] = await Promise.all([
+    getBilling(),
+    getCurrentProfile(),
+  ]);
   const { roomCount, currentTier, monthlyFee, invoices } = data;
+  const isAdmin = profile?.role === RoleCode.ADMIN;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
@@ -95,7 +101,7 @@ export default async function HostBillingPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-gold-300">
-              Gói hiện tại · auto-tier
+              Gói hiện tại
             </p>
             <h2 className="mt-1 font-display text-3xl font-bold capitalize">
               {currentTier === 'free' ? 'Free' : currentTier}
@@ -120,14 +126,14 @@ export default async function HostBillingPage() {
         <p className="mt-1 text-sm text-ink-500">
           Hệ thống tự nâng/hạ tier khi bạn thêm/bớt phòng. Trả năm giảm 15%.
         </p>
-        <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {TIERS.map((t) => {
             const isCurrent = t.key === currentTier;
             return (
               <div
                 key={t.key}
                 className={
-                  'relative rounded-2xl bg-white p-6 ring-1 transition-all ' +
+                  'relative rounded-2xl bg-white p-5 ring-1 transition-all ' +
                   (isCurrent
                     ? 'ring-2 ring-navy-900 shadow-lg'
                     : t.popular
@@ -155,7 +161,7 @@ export default async function HostBillingPage() {
                 <p className="text-xs text-ink-500">
                   {TIER_PRICE_PER_ROOM[t.key] > 0 ? '/phòng/tháng' : 'Không tính phí'}
                 </p>
-                <ul className="mt-5 space-y-2 text-sm text-ink-700">
+                <ul className="mt-4 space-y-1.5 text-sm text-ink-700">
                   {t.perks.map((p) => (
                     <li key={p}>✓ {p}</li>
                   ))}
@@ -168,11 +174,8 @@ export default async function HostBillingPage() {
 
       {/* Auto-tier info */}
       <section className="mt-8 rounded-2xl bg-gold-50 p-5 ring-1 ring-gold-200">
-        <h3 className="font-display text-xl font-semibold tracking-tight text-gold-900">📊 Cách tính gói tự động</h3>
-        <p className="mt-2 text-sm text-gold-900">
-          Hệ thống tự đếm số phòng đang hoạt động mỗi ngày để cập nhật gói cước:
-        </p>
-        <ul className="mt-2 space-y-1 text-sm text-gold-900">
+        <h3 className="font-display text-xl font-semibold tracking-tight text-gold-900">Cách tính gói tự động</h3>
+        <ul className="mt-3 space-y-1 text-sm text-gold-900">
           <li>• 1-3 phòng → <strong>Miễn phí</strong> (0 ₫)</li>
           <li>• 4-10 phòng → <strong>Cơ bản</strong> (50.000 ₫/phòng)</li>
           <li>• 11-30 phòng → <strong>Tiêu chuẩn</strong> (40.000 ₫/phòng)</li>
@@ -233,6 +236,13 @@ export default async function HostBillingPage() {
           </div>
         )}
       </section>
+
+      {/* Admin only: chỉnh sửa giá gói cước */}
+      {isAdmin && (
+        <section className="mt-8">
+          <TierPricingEditor />
+        </section>
+      )}
     </div>
   );
 }

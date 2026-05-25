@@ -1,17 +1,18 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { CreditCard, Search, Wallet } from 'lucide-react';
 
 import {
   countOverdueSubscriptionsAction,
   listSubscriptionsAction,
   sumPaidSubscriptionsAction,
 } from '@/app/actions/subscriptions';
-import { PaymentsDateChips } from '@/components/admin/payments-date-chips';
 import { PaymentsExport } from '@/components/admin/payments-export';
 import { SubscriptionRowActions } from '@/components/admin/subscription-row-actions';
 import { FormattedDate } from '@/components/common/formatted-date';
 import { PageHeader, StatCard } from '@/components/host/page-header';
 import { Badge } from '@/components/ui/badge';
+import { Pagination } from '@/components/ui/pagination';
 import {
   PLAN_LABEL,
   type Subscription,
@@ -21,6 +22,8 @@ import {
 import { formatVND } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Subscription chủ nhà' };
+
+const PAGE_SIZE = 10;
 
 const STATUS_LABEL: Record<SubscriptionStatus, string> = {
   paid: 'Đã thu',
@@ -39,6 +42,21 @@ const STATUS_VARIANT: Record<
   frozen: 'dark',
 };
 
+const PLAN_VARIANT: Record<string, Parameters<typeof Badge>[0]['variant']> = {
+  free: 'default',
+  basic: 'info',
+  standard: 'navy',
+  pro: 'gold',
+};
+
+const TABS: { key: string; label: string }[] = [
+  { key: '', label: 'Tất cả' },
+  { key: 'pending', label: 'Chờ thu' },
+  { key: 'overdue', label: 'Quá hạn' },
+  { key: 'paid', label: 'Đã thu' },
+  { key: 'frozen', label: 'Đã khoá' },
+];
+
 function parseStatus(v: string | undefined): SubscriptionStatus | undefined {
   if (v === 'paid' || v === 'pending' || v === 'overdue' || v === 'frozen') {
     return v;
@@ -55,8 +73,17 @@ function monthRange(): { from: string; to: string } {
   return { from: from.toISOString(), to: to.toISOString() };
 }
 
+function buildHref(base: string, params: Record<string, string | undefined>) {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v) sp.set(k, v);
+  }
+  const qs = sp.toString();
+  return qs ? `${base}?${qs}` : base;
+}
+
 export default async function AdminPaymentsPage(props: {
-  searchParams: Promise<{ status?: string; q?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; page?: string }>;
 }) {
   const sp = await props.searchParams;
   const filters: SubscriptionFilters = {
@@ -71,190 +98,199 @@ export default async function AdminPaymentsPage(props: {
     sumPaidSubscriptionsAction(from, to),
   ]);
 
-  const subscriptions: Subscription[] = listResult.ok ? listResult.data : [];
+  const allSubscriptions: Subscription[] = listResult.ok ? listResult.data : [];
   const overdueCount = overdueResult.ok ? overdueResult.data : 0;
   const paidThisMonth = paidResult.ok ? paidResult.data : 0;
 
-  const pendingTotal = subscriptions
+  const pendingTotal = allSubscriptions
     .filter((s) => s.status === 'pending')
     .reduce((sum, s) => sum + s.amount, 0);
-  const overdueTotal = subscriptions
+  const overdueTotal = allSubscriptions
     .filter((s) => s.status === 'overdue')
     .reduce((sum, s) => sum + s.amount, 0);
 
-  const activeFilters = [filters.status, filters.search].filter(Boolean).length;
+  const currentPage = Math.max(1, parseInt(sp.page ?? '1', 10) || 1);
+  const totalPages = Math.ceil(allSubscriptions.length / PAGE_SIZE);
+  const paginated = allSubscriptions.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
+
+  function pageHref(page: number) {
+    return buildHref('/admin/payments', {
+      status: sp.status,
+      q: sp.q,
+      page: page > 1 ? String(page) : undefined,
+    });
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       <PageHeader
         eyebrow="Tài chính"
         title="Subscription chủ nhà"
-        description="Doanh thu hệ thống = phí gói cước chủ nhà trả theo số phòng. Hệ thống KHÔNG còn lấy hoa hồng trên đặt phòng — khách trả trực tiếp cho chủ nhà."
+        description="Doanh thu = phí gói cước chủ nhà trả theo số phòng/tháng. Khách chuyển khoản trực tiếp cho chủ nhà qua STK đã xác minh KYC."
         actions={<PaymentsExport />}
       />
 
-      <div className="mb-6 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-emerald-100">
-        ℹ️ Mô hình mới: chủ nhà KYC 7 yếu tố → khách chuyển khoản trực tiếp qua
-        STK đã xác minh. Cuộc chat + bill lưu trong hệ thống để giải quyết khiếu nại.
-        Halong24h thu phí cố định mỗi phòng/tháng, không liên quan đến giá đặt phòng.
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Stats */}
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Đã thu tháng này" value={formatVND(paidThisMonth)} />
         <StatCard
           label="Chờ thu"
           value={formatVND(pendingTotal)}
-          hint={`${subscriptions.filter((s) => s.status === 'pending').length} chủ nhà`}
+          hint={`${allSubscriptions.filter((s) => s.status === 'pending').length} chủ nhà`}
         />
         <StatCard
           label="Quá hạn"
           value={formatVND(overdueTotal)}
-          hint={`${overdueCount} quá hạn`}
+          hint={`${overdueCount} chủ nhà`}
         />
         <StatCard
-          label="Tổng kỳ trong list"
-          value={String(subscriptions.length)}
+          label="Tổng kỳ hiện tại"
+          value={String(allSubscriptions.length)}
         />
       </div>
 
-      <div className="mt-6 mb-3">
-        <PaymentsDateChips />
-      </div>
-
-      <form
-        className="mb-3 rounded-2xl bg-white p-4 ring-1 ring-ink-200/60 shadow-card grid gap-3 sm:grid-cols-[1fr_1fr_auto]"
-        action="/admin/payments"
-      >
-        <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-wider text-ink-500 mb-1">
-            Trạng thái
-          </label>
-          <select
-            name="status"
-            defaultValue={filters.status ?? ''}
-            className="h-9 w-full rounded-md border border-ink-200 bg-white px-3 text-sm"
-          >
-            <option value="">Tất cả</option>
-            <option value="paid">Đã thu</option>
-            <option value="pending">Chờ thu</option>
-            <option value="overdue">Quá hạn</option>
-            <option value="frozen">Đã khoá</option>
-          </select>
+      {/* Tabs + Search */}
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-1.5">
+          {TABS.map((t) => {
+            const active = (sp.status ?? '') === t.key;
+            return (
+              <Link
+                key={t.key}
+                href={buildHref('/admin/payments', {
+                  status: t.key || undefined,
+                  q: sp.q,
+                })}
+                className={
+                  'rounded-lg px-3.5 py-2 text-sm font-medium transition-all ' +
+                  (active
+                    ? 'bg-navy-900 text-white shadow-sm'
+                    : 'text-ink-600 hover:bg-cream-200 hover:text-ink-900')
+                }
+              >
+                {t.label}
+              </Link>
+            );
+          })}
         </div>
-        <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-wider text-ink-500 mb-1">
-            Tìm theo tên chủ nhà
-          </label>
+
+        <form
+          action="/admin/payments"
+          method="get"
+          className="relative max-w-xs w-full sm:w-auto"
+        >
+          {sp.status && <input type="hidden" name="status" value={sp.status} />}
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
           <input
             type="search"
             name="q"
-            defaultValue={filters.search ?? ''}
-            placeholder="VD: Trần Đức Tuấn"
-            className="h-9 w-full rounded-md border border-ink-200 bg-white px-3 text-sm"
+            defaultValue={sp.q}
+            placeholder="Tìm tên chủ nhà..."
+            className="h-10 w-full rounded-lg border border-ink-200 bg-white pl-9 pr-3 text-sm text-ink-900 placeholder:text-ink-400 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-500/20"
           />
-        </div>
-        <div className="flex items-end gap-2">
-          <button
-            type="submit"
-            className="h-9 rounded-md bg-navy-900 px-4 text-sm font-semibold text-white hover:bg-navy-800"
-          >
-            Lọc
-          </button>
-          {activeFilters > 0 && (
-            <Link
-              href="/admin/payments"
-              className="h-9 inline-flex items-center rounded-md border border-ink-200 px-3 text-sm text-ink-700 hover:bg-cream-100"
-            >
-              Xoá
-            </Link>
-          )}
-        </div>
-      </form>
+        </form>
+      </div>
 
-      <section>
-        {subscriptions.length === 0 ? (
-          <div className="rounded-2xl bg-white p-8 text-center ring-1 ring-ink-200/60 shadow-card">
-            <p className="text-2xl">💸</p>
-            <p className="mt-2 text-sm font-medium text-ink-900">
-              Không có subscription phù hợp
-            </p>
+      {/* Table */}
+      {allSubscriptions.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-ink-200 bg-white p-16 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-cream-200">
+            <Wallet className="h-7 w-7 text-ink-400" />
           </div>
-        ) : (
+          <p className="text-sm font-medium text-ink-700">
+            Không có subscription phù hợp
+          </p>
+          <p className="mt-1 text-xs text-ink-500">
+            Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm.
+          </p>
+        </div>
+      ) : (
+        <>
           <div className="overflow-x-auto rounded-2xl bg-white ring-1 ring-ink-200/60 shadow-card">
-            <table className="w-full min-w-[600px] text-sm">
-              <thead className="border-b border-ink-200 bg-cream-100 text-left">
-                <tr>
-                  <th className="overline muted no-dash text-[10px] px-4 py-3">
+            <table className="w-full min-w-[850px] text-sm">
+              <thead>
+                <tr className="border-b border-ink-200 bg-cream-50">
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-ink-500">
                     Kỳ
                   </th>
-                  <th className="overline muted no-dash text-[10px] px-4 py-3">
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-ink-500">
                     Chủ nhà
                   </th>
-                  <th className="overline muted no-dash text-[10px] px-4 py-3">
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-ink-500">
                     Gói cước
                   </th>
-                  <th className="overline muted no-dash text-[10px] px-4 py-3 text-right">
+                  <th className="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-ink-500">
                     Phòng
                   </th>
-                  <th className="overline muted no-dash text-[10px] px-4 py-3 text-right">
+                  <th className="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-ink-500">
                     Số tiền
                   </th>
-                  <th className="overline muted no-dash text-[10px] px-4 py-3">
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-ink-500">
                     Hết hạn
                   </th>
-                  <th className="overline muted no-dash text-[10px] px-4 py-3">
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-ink-500">
                     Trạng thái
                   </th>
-                  <th className="overline muted no-dash text-[10px] px-4 py-3 text-right">
+                  <th className="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-ink-500">
                     Hành động
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-ink-200">
-                {subscriptions.map((s) => (
-                  <tr key={s.id} className="hover:bg-cream-100">
-                    <td className="px-4 py-3 text-ink-700 text-xs font-mono">
+              <tbody className="divide-y divide-ink-100">
+                {paginated.map((s) => (
+                  <tr key={s.id} className="transition-colors hover:bg-cream-50">
+                    <td className="px-5 py-4 text-xs font-mono text-ink-500">
                       {s.startAt.slice(0, 7)}
                     </td>
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/admin/users/${s.ownerId}`}
-                        className="font-medium text-ink-900 hover:underline"
-                      >
-                        {s.ownerName}
-                      </Link>
-                      <p className="text-[11px] font-mono text-ink-500">
-                        {s.ownerId}
-                      </p>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cream-200 text-xs font-bold text-navy-800 uppercase">
+                          {s.ownerName.charAt(0)}
+                        </div>
+                        <div className="min-w-0">
+                          <Link
+                            href={`/admin/users/${s.ownerId}`}
+                            className="font-semibold text-ink-900 hover:text-navy-900 hover:underline"
+                          >
+                            {s.ownerName}
+                          </Link>
+                          <p className="text-[11px] font-mono text-ink-400 truncate">
+                            {s.ownerId}
+                          </p>
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={s.plan === 'pro' ? 'gold' : 'info'}>
+                    <td className="px-5 py-4">
+                      <Badge variant={PLAN_VARIANT[s.plan] ?? 'default'}>
                         {PLAN_LABEL[s.plan]}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 text-right text-ink-700">
+                    <td className="px-5 py-4 text-right font-medium text-ink-700">
                       {s.roomCount}
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-emerald-700">
+                    <td className="px-5 py-4 text-right font-semibold text-emerald-700">
                       {formatVND(s.amount)}
                     </td>
-                    <td className="px-4 py-3 text-ink-700 text-xs">
+                    <td className="px-5 py-4 text-xs text-ink-500">
                       <FormattedDate iso={s.expireAt} />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-5 py-4">
                       <Badge variant={STATUS_VARIANT[s.status]}>
                         {STATUS_LABEL[s.status]}
                       </Badge>
                       {s.note && (
                         <p
-                          className="mt-1 text-[10px] text-ink-500 max-w-[180px] truncate"
+                          className="mt-1 max-w-[180px] text-[10px] text-ink-400 truncate"
                           title={s.note}
                         >
                           {s.note}
                         </p>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-5 py-4 text-right">
                       <SubscriptionRowActions
                         subscriptionId={s.id}
                         status={s.status}
@@ -266,14 +302,16 @@ export default async function AdminPaymentsPage(props: {
               </tbody>
             </table>
           </div>
-        )}
-      </section>
 
-      <p className="mt-6 text-xs text-ink-500">
-        Bảng giá theo phòng: Miễn phí (1-3 phòng: 0 ₫) · Cơ bản (4-10:
-        50.000 ₫/phòng) · Tiêu chuẩn (11-30: 40.000 ₫/phòng) · Chuyên nghiệp
-        (31+: 30.000 ₫/phòng).
-      </p>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={allSubscriptions.length}
+            pageSize={PAGE_SIZE}
+            buildHref={pageHref}
+          />
+        </>
+      )}
     </div>
   );
 }

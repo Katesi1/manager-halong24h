@@ -4,6 +4,7 @@ import { unstable_cache } from 'next/cache';
 import { getCurrentProfile } from '@/app/actions/auth';
 import { countPendingKycAdminAction } from '@/app/actions/kyc-admin';
 import { ManagerSidebar } from '@/components/layout/manager-sidebar';
+import { ManagerTopbar } from '@/components/layout/topbar';
 import { isAdmin } from '@/core/value-objects/role';
 
 const cachedCountPendingKyc = unstable_cache(
@@ -33,8 +34,13 @@ export default async function AdminLayout({
         Bỏ qua đến nội dung chính
       </a>
       <ManagerSidebar profile={profile} badges={{ kyc: kycPending }} />
-      <div className="flex-1 min-w-0">
-        <main id="main-content">{children}</main>
+      <div className="flex-1 min-w-0 flex flex-col">
+        <header className="sticky top-0 z-20">
+          <ManagerTopbar profile={profile} adminAlerts={{ kycPending: kycPending }} />
+        </header>
+        <main id="main-content" className="flex-1">
+          {children}
+        </main>
       </div>
     </div>
   );
