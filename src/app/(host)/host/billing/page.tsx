@@ -7,7 +7,7 @@ import {
   TIER_ROOM_RANGE,
   calculateTier,
   type SubscriptionTier,
-} from '@/lib/database.types';
+} from '@/lib/legacy-types';
 
 const TIERS: {
   key: SubscriptionTier;

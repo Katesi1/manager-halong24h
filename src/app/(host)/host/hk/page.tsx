@@ -6,7 +6,7 @@ import { GradientAvatar } from '@/components/ui/gradient-avatar';
 import { Badge } from '@/components/ui/badge';
 import { relativeTime, formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import type { HkTaskStatus, HkIssueSeverity } from '@/lib/database.types';
+import type { HkTaskStatus, HkIssueSeverity } from '@/lib/legacy-types';
 
 interface HkTaskRow {
   id: string;

@@ -7,7 +7,7 @@ import {
 
 import { HostMobileNav } from './mobile-nav';
 import { NotificationBell } from './notification-bell';
-import type { Profile } from '@/lib/database.types';
+import type { Profile } from '@/lib/legacy-types';
 
 interface TopbarProps {
   profile: Pick<Profile, 'full_name' | 'email' | 'role' | 'avatar_url'>;

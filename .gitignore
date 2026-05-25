@@ -45,7 +45,3 @@ next-env.d.ts
 # IDE
 .vscode/
 .idea/
-
-# Supabase local
-supabase/.branches
-supabase/.temp

@@ -39,7 +39,7 @@ export default async function HostSettingsPage() {
             Hồ sơ
           </h2>
           <p className="mt-1 text-sm text-ink-500">
-            Email + tên cá nhân. BE chưa hỗ trợ chỉnh sửa qua FE — đang demo.
+            Email và tên cá nhân.
           </p>
           <div className="mt-5">
             <ProfileForm

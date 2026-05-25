@@ -1,4 +1,4 @@
-import type { PricingRule, Room } from './database.types';
+import type { PricingRule, Room } from './legacy-types';
 
 /**
  * Pricing engine — rules-based với priority + override stops chain.

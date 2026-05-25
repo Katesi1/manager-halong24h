@@ -76,10 +76,16 @@ export function mapApiErrorToDomain(err: unknown): DomainError {
         return new DomainError(`API_${err.status}`, friendly);
     }
   }
+  if (err instanceof DOMException && err.name === 'AbortError') {
+    return new NetworkError('Máy chủ phản hồi quá chậm. Vui lòng thử lại.');
+  }
   if (err instanceof TypeError) {
-    return new NetworkError(err.message);
+    return new NetworkError('Không thể kết nối tới máy chủ. Vui lòng thử lại sau.');
   }
   if (err instanceof Error) {
+    if (err.name === 'AbortError') {
+      return new NetworkError('Máy chủ phản hồi quá chậm. Vui lòng thử lại.');
+    }
     return new DomainError('UNKNOWN', err.message);
   }
   return new DomainError('UNKNOWN', 'Đã có lỗi xảy ra');

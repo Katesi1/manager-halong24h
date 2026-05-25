@@ -1,5 +1,5 @@
 import type { PropertyCardData } from '@/components/listing/property-card';
-import type { BookingMode } from './database.types';
+import type { BookingMode } from './legacy-types';
 
 export interface SamplePropertyDetail {
   id: string;
@@ -40,9 +40,7 @@ export interface SamplePropertyDetail {
   lng: number;
 }
 
-/** Sample property data dùng khi Supabase chưa cấu hình.
- *  Để demo UI render đẹp ngay từ đầu, không cần phải seed DB trước.
- *  Khi Supabase đã cấu hình thật, các page sẽ query thay vì dùng sample này. */
+/** Sample property data cho demo UI. */
 export const SAMPLE_PROPERTIES: PropertyCardData[] = [
   {
     id: 'sample-1',

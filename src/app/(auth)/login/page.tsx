@@ -23,7 +23,7 @@ function LoginForm() {
   return (
     <div>
       <h1 className="font-display text-3xl font-bold text-ink-900">Đăng nhập</h1>
-      <p className="mt-2 text-sm text-ink-500">Chào mừng trở lại Halong24h.</p>
+      <p className="mt-2 text-sm text-ink-500">Đăng nhập vào trang quản lý Halong24h.</p>
 
       <form action={formAction} className="mt-8 space-y-4">
         <input type="hidden" name="redirect" value={redirectTo} />
@@ -38,7 +38,9 @@ function LoginForm() {
             type="email"
             autoComplete="email"
             required
-            placeholder="ban@email.com"
+            defaultValue={state.values?.email ?? ''}
+            placeholder="email@example.com"
+            key={`email-${state.values?.email ?? ''}`}
           />
           {state.fieldErrors?.email && (
             <p className="mt-1 text-xs text-red-600">{state.fieldErrors.email}</p>
@@ -46,28 +48,28 @@ function LoginForm() {
         </div>
 
         <div>
-          <div className="flex items-baseline justify-between">
-            <Label htmlFor="password" required>
-              Mật khẩu
-            </Label>
-            <Link
-              href="/forgot-password"
-              className="text-xs font-medium text-navy-700 hover:underline"
-            >
-              Quên mật khẩu?
-            </Link>
-          </div>
+          <Label htmlFor="password" required>
+            Mật khẩu
+          </Label>
           <Input
             id="password"
             name="password"
             type="password"
             autoComplete="current-password"
             required
-            placeholder="Tối thiểu 6 ký tự"
+            placeholder="••••••••"
           />
           {state.fieldErrors?.password && (
             <p className="mt-1 text-xs text-red-600">{state.fieldErrors.password}</p>
           )}
+          <div className="mt-1 text-right">
+            <Link
+              href="/forgot-password"
+              className="text-xs text-ink-500 hover:text-navy-700 hover:underline"
+            >
+              Quên mật khẩu?
+            </Link>
+          </div>
         </div>
 
         {state.error && (

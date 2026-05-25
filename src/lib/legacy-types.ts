@@ -1,6 +1,5 @@
-// Legacy domain types — giữ lại để các page UI demo dùng (không phụ thuộc DB nào).
-// Đây là tập string-literal unions + interface dùng cho hiển thị mock data.
-// Khi mọi page legacy migrate sang Clean Arch (core/entities/*) có thể xoá file này.
+// Legacy domain types — dùng cho các page UI demo chưa migrate sang Clean Arch.
+// Khi mọi page legacy migrate sang core/entities/* thì xoá file này.
 
 export type UserRole = 'super_admin' | 'owner' | 'sale' | 'housekeeping' | 'customer';
 export type PropertyStatus = 'pending' | 'active' | 'rejected' | 'suspended';

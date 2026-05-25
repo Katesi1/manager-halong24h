@@ -4,7 +4,7 @@ import { GradientAvatar } from '@/components/ui/gradient-avatar';
 import { FilterChips, type ChipItem } from '@/components/ui/filter-chips';
 import { Badge } from '@/components/ui/badge';
 import { formatVND, formatDate } from '@/lib/format';
-import type { Guest } from '@/lib/database.types';
+import type { Guest } from '@/lib/legacy-types';
 
 const DEMO: Guest[] = [
   {

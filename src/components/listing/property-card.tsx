@@ -2,7 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 import { Badge } from '@/components/ui/badge';
-import type { BookingMode } from '@/lib/database.types';
+import type { BookingMode } from '@/lib/legacy-types';
 import { formatVND } from '@/lib/format';
 
 export interface PropertyCardData {

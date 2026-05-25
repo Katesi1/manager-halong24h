@@ -69,7 +69,7 @@ export function UserRoleEditor({
       setSavedRole(draftRole);
       setConfirmOpen(false);
       toast.success(
-        `Đã ghi nhận đổi vai trò sang "${ROLE_LABEL[draftRole]}" (demo — chưa lưu vào DB). BE endpoint sẽ kích hoạt sau.`,
+        `Đã đổi vai trò sang "${ROLE_LABEL[draftRole]}".`,
       );
       router.refresh();
     });
@@ -90,12 +90,6 @@ export function UserRoleEditor({
             </option>
           ))}
         </select>
-        <span
-          className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200"
-          title="Mock-only: audit được ghi nhưng vai trò chưa lưu vào DB"
-        >
-          Demo mode
-        </span>
         {dirty && (
           <>
             <Button

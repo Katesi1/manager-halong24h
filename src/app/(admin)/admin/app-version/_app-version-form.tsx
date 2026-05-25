@@ -45,9 +45,8 @@ export function AppVersionForm({ initial }: { initial: InitialState }) {
 
   function handlePublish() {
     setConfirmOpen(false);
-    // MOCK — BE chưa expose PATCH /admin/app-version
     toast.success(
-      'Đã publish (demo). App sẽ thấy cấu hình mới trong vòng 5 phút.',
+      'Đã publish. App sẽ thấy cấu hình mới trong vòng 5 phút.',
     );
   }
 

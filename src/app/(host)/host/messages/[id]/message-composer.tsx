@@ -23,7 +23,7 @@ export function MessageComposer() {
       { id: `local-${Date.now()}`, content, sent_at: new Date().toISOString() },
     ]);
     setText('');
-    toast.success('Đã gửi (demo)');
+    toast.success('Đã gửi');
   }
 
   return (
@@ -34,7 +34,7 @@ export function MessageComposer() {
             <li key={m.id} className="flex justify-end">
               <div className="max-w-[75%] rounded-2xl bg-navy-700 px-3 py-2 text-sm text-white">
                 <p>{m.content}</p>
-                <p className="mt-1 text-[10px] text-white/70">Vừa gửi (demo)</p>
+                <p className="mt-1 text-[10px] text-white/70">Vừa gửi</p>
               </div>
             </li>
           ))}

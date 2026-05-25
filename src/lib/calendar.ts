@@ -1,4 +1,4 @@
-import type { Booking, BookingStatus, RoomBlock } from './database.types';
+import type { Booking, BookingStatus, RoomBlock } from './legacy-types';
 
 export type CellStatus = 'free' | 'pending' | 'confirmed' | 'checked_in' | 'checked_out' | 'block';
 

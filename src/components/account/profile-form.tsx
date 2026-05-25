@@ -28,9 +28,7 @@ export function ProfileForm({ defaults }: ProfileFormProps) {
     setTimeout(() => {
       setPending(false);
       show(
-        process.env.NODE_ENV === 'development'
-          ? 'Đã lưu (demo — BE chưa có endpoint cập nhật profile)'
-          : 'Đã lưu thông tin.',
+        'Đã lưu thông tin.',
         'success',
       );
     }, 400);

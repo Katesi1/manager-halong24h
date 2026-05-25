@@ -14,10 +14,7 @@ import { mapApiErrorToDomain } from '@/infrastructure/http/api-error';
  *   ValidationError -> { ok: false, error, fieldErrors }
  *   Mọi DomainError khác (kể cả UnauthorizedError) -> fail(message)
  *
- * Note: Trước đây rethrow UnauthorizedError → caller redirect login.
- * Vấn đề: ở DEV_BYPASS_AUTH=1, FE middleware bypass login nhưng api-client
- * không inject token thật → BE trả 401 → page /host/* crash 500.
- * Sửa: 401 cũng convert thành fail() để UI render empty state thay vì 500.
+ * Note: 401 cũng convert thành fail() để UI render empty state thay vì 500.
  */
 export async function toResult<T>(
   fn: () => Promise<T>,

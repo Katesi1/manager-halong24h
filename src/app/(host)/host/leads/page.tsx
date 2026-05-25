@@ -3,7 +3,7 @@ import { PageHeader } from '@/components/host/page-header';
 import { FilterChips } from '@/components/ui/filter-chips';
 import { LeadCard, type LeadCardData } from '@/components/host/lead-card';
 import { Lightbulb } from 'lucide-react';
-import type { LeadStatus } from '@/lib/database.types';
+import type { LeadStatus } from '@/lib/legacy-types';
 
 const DEMO: LeadCardData[] = [
   {

@@ -5,14 +5,11 @@ const nextConfig: NextConfig = {
     // Whitelisted remote image hosts. KHÔNG dùng wildcard `**`
     // (open-redirect / image-proxy abuse risk).
     remotePatterns: [
-      { protocol: "https", hostname: "*.supabase.co" },
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "res.cloudinary.com" },
       { protocol: "https", hostname: "img.vietqr.io" },
       { protocol: "https", hostname: "halong24h.com" },
       { protocol: "https", hostname: "*.halong24h.com" },
-      // BE host (HTTP only while still on IP-based dev API):
-      { protocol: "http", hostname: "103.183.118.148" },
     ],
   },
   experimental: {
@@ -49,9 +46,9 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://res.cloudinary.com https://img.vietqr.io https://halong24h.com https://*.halong24h.com http://103.183.118.148",
+              "img-src 'self' data: blob: https://images.unsplash.com https://res.cloudinary.com https://img.vietqr.io https://halong24h.com https://*.halong24h.com",
               "font-src 'self' data:",
-              "connect-src 'self' https://*.supabase.co https://accounts.google.com http://103.183.118.148",
+              "connect-src 'self' https://accounts.google.com https://*.halong24h.com",
               "frame-src https://accounts.google.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",

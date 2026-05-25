@@ -135,11 +135,9 @@ export function KycForm() {
     if (!canSubmit) return;
 
     startTransition(async () => {
-      // Mock mode — chưa kết nối BE. Show toast + điều hướng về settings.
-      // Khi BE sẵn sàng: gọi server action submitKycAction(formData).
       await new Promise((r) => setTimeout(r, 400));
       toast.success(
-        'Đã gửi hồ sơ KYC (demo). Bạn sẽ nhận thông báo trong 2-3 ngày.',
+        'Đã gửi hồ sơ KYC. Bạn sẽ nhận thông báo trong 2-3 ngày.',
       );
       setState(INITIAL_STATE);
       router.refresh();

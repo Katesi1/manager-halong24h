@@ -230,13 +230,13 @@ AI agent phải **tự động cập nhật CLAUDE.md** khi:
 
 ---
 
-## 9. Supabase — đã loại bỏ hoàn toàn
+## 9. Data Source
 
-Project **không còn** dùng Supabase. Toàn bộ data flow đi qua Clean Architecture:
-- Auth/Properties/Dashboard → `ApiXxxRepository` (REST API)
+Project dùng **REST API** qua Clean Architecture:
+- Auth/Properties/Dashboard/Bookings/Notifications → `ApiXxxRepository` (REST API)
 - Module chưa có endpoint → `MockXxxRepository`
 
-Lịch sử: Supabase được dùng làm scaffold ban đầu (cookies-based auth + Postgres tables). Sau khi BE REST API ra, toàn bộ migrate sang Clean Arch. Folder `src/lib/supabase/` và package `@supabase/*` đã bị xoá hoàn toàn (xem changelog).
+Supabase đã được loại bỏ hoàn toàn (code, config, migrations, packages). Không còn bất kỳ reference nào trong source code.
 
 ---
 
@@ -276,6 +276,7 @@ Khi BE bổ sung endpoint, cập nhật bảng này + §3.
 | 2026-05-16 | audit-self-write | Audit log không còn demo tĩnh. Tạo `core/entities/audit-log.ts` + `application/ports/audit-log-repository.ts` + `application/audit-log/actions.ts` + `infrastructure/mocks/mock-audit-log-repository.ts` (singleton in-memory store, seeded với 5 entry). Helper `lib/audit-recorder.ts` ghi best-effort từ Server Action (không throw nếu fail). Wire vào 12 admin action: `approveKycAdminAction`, `rejectKycAdminAction`, `banAdminUserAction`, `unbanAdminUserAction`, `revokeUserSessionAction`, `updateUserSubscriptionAction`, `resetUserPasswordAction`, `approvePropertyAction`, `rejectPropertyAction`, `suspendPropertyAction`, `startDisputeInvestigationAction`, `resolveDisputeAction`, `rejectDisputeAction`. Page `/admin/audit-log` dùng real repo + filter theo loại hành động / đối tượng / search query. |
 | 2026-05-17 | reviews-emails-subscription | (1) Reviews moderation: `core/entities/review.ts` + port + use case + mock (5 seed: 1 spam có flag SĐT cạnh tranh, 1 profanity đã ẩn, 3 normal) + page `/admin/reviews` + filter status/rating/flagged/search + `ReviewModerationActions` (hide với reason ≥5, restore) + sidebar entry. (2) Test send email: Server Action `sendTestEmailAction` (mock mode log console, live mode chờ BE `POST /admin/emails/test`) + `TestEmailButton` thay nút disabled, pre-fill admin email. (3) Subscription tracking: `core/entities/subscription.ts` (4 plan, 4 status: paid/pending/overdue/frozen, expireAt + auto-mark overdue) + port + use case + mock (5 seed bao gồm 1 frozen + 1 overdue) + actions (`listSubscriptionsAction`, `getMySubscriptionAction`, `markSubscriptionPaidAction`, `freezeSubscriptionAction`, `unfreezeSubscriptionAction`) + helper `lib/subscription-guard.ts` `blockedReason()` + refactor `/admin/payments` dùng real repo + `SubscriptionRowActions` (mark paid / freeze / unfreeze) + `/host/settings/subscription` cho owner xem & STK chuyển khoản + banner ở host layout + guard chặn tạo property/booking khi overdue/frozen. |
 | 2026-05-17 | dev-role-switch | `actions/auth.ts` mở rộng dev bypass: 7 profile (admin/owner/owner-nokyc/owner-overdue/sale/sale-noown/customer), switch bằng cookie `dev_role` (không cần restart server). Cho phép giả lập đầy đủ 4 vai trong test. |
+| 2026-05-25 | supabase-final-cleanup | Loại bỏ hoàn toàn mọi reference Supabase còn sót: xoá thư mục `supabase/` (migrations + README), xoá env vars Supabase trong `.env.local.example`, xoá `*.supabase.co` khỏi `next.config.ts` (images + CSP), dọn `.gitignore`/`.prettierignore`/`eslint.config.mjs`. Rename `database.types.ts` → `legacy-types.ts` + cập nhật 11 file import. Cập nhật `README.md` và `docs/CODING-STANDARDS.md` thay mọi reference Supabase bằng Clean Architecture / REST API. Xoá prop `isSupabaseReady` khỏi `image-uploader.tsx`. Typecheck 0 errors, grep supabase trong src/ = 0 results. |
 
 ---
 

@@ -1,7 +1,7 @@
 # Webhalong24h Manager — Chuẩn mực code
 
 > Tài liệu này định nghĩa quy chuẩn viết code, mô tả task, và design pattern khuyến nghị cho dự án.
-> Stack: **Next.js 15 (App Router) · React 19 · Supabase SSR · Tailwind v4 · TypeScript 5.7 · Zod**.
+> Stack: **Next.js 15 (App Router) · React 19 · REST API · Tailwind v4 · TypeScript 5.7 · Zod**.
 
 ---
 
@@ -49,15 +49,15 @@ Khi yêu cầu AI làm task, prompt nên đủ 4 phần:
 
 | Mục | Nội dung | Ví dụ |
 |---|---|---|
-| **R — Role** | AI đóng vai gì? | "Là backend dev quen Supabase RLS và Next.js Server Actions" |
-| **I — Issue** | Vấn đề/yêu cầu cụ thể | "Host hiện thấy được booking của host khác qua URL tay — RLS thiếu policy theo `host_id`" |
-| **S — Steps** | Các bước AI nên làm theo thứ tự | "1) Đọc `database.types.ts` xác định bảng. 2) Viết migration RLS policy. 3) Thêm test integration." |
+| **R — Role** | AI đóng vai gì? | "Là backend dev quen Clean Architecture và Next.js Server Actions" |
+| **I — Issue** | Vấn đề/yêu cầu cụ thể | "Host hiện thấy được booking của host khác qua URL tay — thiếu scope check theo `ownerId`" |
+| **S — Steps** | Các bước AI nên làm theo thứ tự | "1) Đọc entity + port xác định model. 2) Thêm scope check vào use case. 3) Thêm test integration." |
 | **E — Expected outcome** | Tiêu chí "xong" có thể kiểm chứng | "GET `/host/bookings/{id}` của host khác trả 404; test integration pass; không hồi quy danh sách của chính host." |
 
 ### Template RISE
 
 ```markdown
-**Role**: Senior Next.js + Supabase engineer thuộc team Webhalong24h
+**Role**: Senior Next.js + Clean Architecture engineer thuộc team Webhalong24h
 **Issue**: <mô tả vấn đề bằng 1-3 câu, kèm file path / triệu chứng>
 **Steps**:
   1. <step nhỏ, có thể verify>
@@ -79,22 +79,15 @@ Khi yêu cầu AI làm task, prompt nên đủ 4 phần:
 
 ## 3. Design Patterns khuyến nghị cho dự án
 
-Stack này có những đặc thù: multi-tenant (admin/host), thanh toán VND, Server Components/Actions, Supabase RLS. Dưới đây là pattern nên áp dụng + chống pattern cần tránh.
+Stack này có những đặc thù: multi-tenant (admin/host), thanh toán VND, Server Components/Actions, REST API qua Clean Architecture. Dưới đây là pattern nên áp dụng + chống pattern cần tránh.
 
-### 3.1. Tách rõ 4 môi trường Supabase client (BẮT BUỘC)
+### 3.1. Clean Architecture — Dependency Rule
 
-Đã có sẵn trong `src/lib/supabase/`:
-
-| File | Dùng ở đâu | Auth context |
-|---|---|---|
-| `client.ts` | Client Component (`'use client'`) | Session của user qua cookie |
-| `server.ts` | Server Component, Route Handler, Server Action | Session của user qua cookie SSR |
-| `middleware.ts` | `middleware.ts` (refresh token) | — |
-| `admin.ts` | Server Action **cần bypass RLS** (vd: cron, webhook, admin tool) | Service role key |
-
-**Quy tắc vàng**:
-- Không bao giờ import `admin.ts` trong Client Component (sẽ leak service key vào bundle).
-- Không dùng `admin.ts` cho luồng do user kích hoạt trừ khi đã `assertRole('admin')` trước.
+Xem `CLAUDE.md §2` cho cấu trúc chi tiết. Nguyên tắc:
+- `core` không import layer nào khác.
+- `application` chỉ import `core`, phụ thuộc infrastructure qua port (interface).
+- `infrastructure` implement port, gọi REST API hoặc mock.
+- `app` (presentation) gọi Server Action → use case → port → repo.
 
 ### 3.2. Server Action + Result type (thay cho throw)
 
@@ -104,8 +97,8 @@ Stack này có những đặc thù: multi-tenant (admin/host), thanh toán VND, 
 // ❌ Lỗi không có shape, UI khó xử lý theo từng case
 export async function createBooking(input: unknown) {
   const data = BookingSchema.parse(input) // throws ZodError
-  const { error } = await supabase.from('bookings').insert(data)
-  if (error) throw error
+  const result = await repo.create(data)
+  if (!result.ok) throw new Error(result.error)
 }
 ```
 
@@ -126,11 +119,10 @@ export async function createBooking(
   if (!parsed.success) {
     return { ok: false, error: 'VALIDATION', fieldErrors: parsed.error.flatten().fieldErrors }
   }
-  const supabase = await createServerClient()
-  const { data, error } = await supabase
-    .from('bookings').insert(parsed.data).select('id').single()
-  if (error) return { ok: false, error: error.message }
-  return { ok: true, data: { id: data.id } }
+  const repo = bookingsRepo()
+  const result = await repo.create(parsed.data)
+  if (!result.ok) return { ok: false, error: result.error }
+  return { ok: true, data: { id: result.data.id } }
 }
 ```
 
@@ -142,35 +134,19 @@ const [state, action, pending] = useActionState(createBookingAction, null)
 
 ### 3.3. Repository / Data Access Layer
 
-**Lý do**: bảng Supabase được query rải rác → khó tối ưu, khó đổi schema, dễ rò RLS.
-
-Cấu trúc đề xuất:
+Đã implement theo Clean Architecture (xem `CLAUDE.md §2`):
 
 ```
-src/lib/data/
-├── bookings.ts      # findById, listForHost, createPending, ...
-├── properties.ts
-├── payments.ts
-├── disputes.ts
-└── _types.ts
+src/application/ports/       # Interface (contract)
+src/infrastructure/repositories/  # ApiXxxRepository (REST API)
+src/infrastructure/mocks/    # MockXxxRepository (chưa có API)
+src/infrastructure/container.ts   # DI — resolve repo theo env
 ```
 
 Quy tắc:
-- Một file = một bảng/aggregate root.
-- Mỗi function nhận `SupabaseClient` làm tham số đầu (dependency injection) → test được.
-- Không leak object Supabase ra ngoài (return type là model của domain, không phải `PostgrestResponse`).
-
-```ts
-// src/lib/data/bookings.ts
-export async function findBookingById(
-  supabase: SupabaseClient,
-  id: string
-): Promise<Booking | null> {
-  const { data } = await supabase.from('bookings')
-    .select('id, host_id, check_in_at, status').eq('id', id).maybeSingle()
-  return data ? mapToBooking(data) : null
-}
-```
+- Một port = một aggregate root.
+- Use case nhận repo qua container (dependency injection) → dễ swap api/mock.
+- Không leak HTTP detail ra ngoài (return type là domain entity).
 
 ### 3.4. RBAC Guard cho route group
 
@@ -179,16 +155,14 @@ export async function findBookingById(
 ```ts
 // src/app/(admin)/layout.tsx
 export default async function AdminLayout({ children }: { children: ReactNode }) {
-  const supabase = await createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-  const role = await getUserRole(supabase, user.id)
-  if (role !== 'admin') redirect('/') // hoặc forbidden()
+  const profile = await getCurrentProfile()
+  if (!profile) redirect('/login')
+  if (profile.roleCode !== 0) redirect('/')
   return <>{children}</>
 }
 ```
 
-Tương tự `(host)/layout.tsx`. **Không** dùng middleware làm RBAC chính (middleware chỉ refresh session) vì middleware không thấy được DB role chuẩn xác.
+Tương tự `(host)/layout.tsx`. **Không** dùng middleware làm RBAC chính vì middleware không thấy được role chuẩn xác.
 
 ### 3.5. Money / VND — không dùng `number`
 
@@ -206,14 +180,14 @@ Mọi cột tiền trong DB lưu **integer (đồng)**, không lưu float.
 
 ### 3.6. Container / Presentational cho page admin & host
 
-Page route trong App Router là **Server Component** → fetch data ở đó.
-Component nhận props là **Client Component** thuần, không gọi Supabase.
+Page route trong App Router là **Server Component** → gọi Server Action ở đó.
+Component nhận props là **Client Component** thuần, không gọi API trực tiếp.
 
 ```tsx
 // src/app/(host)/host/bookings/page.tsx (Server)
 export default async function Page() {
-  const supabase = await createServerClient()
-  const bookings = await listBookingsForCurrentHost(supabase)
+  const result = await listBookingsAction()
+  const bookings = result.ok ? result.data : []
   return <BookingTable bookings={bookings} />
 }
 
@@ -298,28 +272,26 @@ Mọi rollout rủi ro phải có flag. Có flag mới được dùng SOAP plan 
 - [ ] `pnpm typecheck` (hoặc `npm run typecheck`) pass
 - [ ] `npm run lint` pass
 - [ ] Server Action có Zod schema và trả `Result<T>`
-- [ ] Không có `supabase` được tạo trong Client Component (dùng hook `useSupabase()` hoặc prop drill)
-- [ ] `admin.ts` không bị import từ Client Component
+- [ ] Không import `infrastructure/*` trực tiếp từ Client Component
 - [ ] Tiền tệ dùng `VND` brand type, không `number` thô
 - [ ] Page mới có guard role nếu nằm trong `(admin)` hoặc `(host)`
-- [ ] Không hardcode khóa Supabase / VietQR
+- [ ] Không hardcode API keys / secrets
 - [ ] Đã test thủ công ở `http://localhost:3001` cho cả host & admin role
 
 ---
 
 ## 6. Anti-pattern cấm
 
-1. Gọi `createServerClient()` trong vòng lặp (mỗi request đã có 1 client, dùng lại).
-2. `select('*')` trong list view (kéo cột không dùng).
-3. `useEffect` để fetch data ban đầu — dùng Server Component fetch.
-4. State client mirror server state (giữ state ở Server, dùng `revalidatePath` / `revalidateTag`).
-5. `as any`, `// @ts-ignore` không kèm comment giải thích.
-6. RPC/Edge Function ẩn — mọi business rule phải có entry rõ trong `src/app/actions/` hoặc `src/lib/data/`.
+1. Import `infrastructure/*` trực tiếp từ Client Component (luôn đi qua Server Action).
+2. `useEffect` để fetch data ban đầu — dùng Server Component fetch.
+3. State client mirror server state (giữ state ở Server, dùng `revalidatePath` / `revalidateTag`).
+4. `as any`, `// @ts-ignore` không kèm comment giải thích.
+5. Business logic ngoài Clean Arch — mọi rule phải có entry rõ trong `src/app/actions/` → use case → port.
 
 ---
 
 ## 7. Liên kết
 
 - ECC rules đã cài: `~/.claude/rules/ecc/` (common + có thể bổ sung typescript layer)
-- Supabase RLS reference: `supabase/migrations/` (TBD)
+- API spec: `api-spec-website-admin.md`
 - VietQR spec: xem `src/lib/vietqr.ts`

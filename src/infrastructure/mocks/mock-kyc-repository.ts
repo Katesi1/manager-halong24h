@@ -25,8 +25,7 @@ function mapStatus(s: KycStatus | undefined): KycSubmissionStatus | 'none' {
 
 export class MockKycRepository implements KycRepository {
   async getStatus(): Promise<KycStatusResponse> {
-    // Đọc từ profile hiện hành để mock đồng bộ với UI dev (DEV_BYPASS_AUTH).
-    // Nếu profile chưa có kycStatus → 'none'.
+    // Đọc kycStatus từ profile hiện hành.
     const profile = await getCurrentProfile();
     return {
       kycStatus: mapStatus(profile?.kycStatus),

@@ -16,7 +16,6 @@ interface ImageUploaderProps {
    * @deprecated
    */
   kind?: 'property';
-  isSupabaseReady?: boolean;
 }
 
 const MAX_SIZE_BYTES = 10 * 1024 * 1024;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState } from 'react';
 import Link from 'next/link';
 import { signupAction, type ActionResult } from '@/app/actions/auth';
 import { Input, Label } from '@/components/ui/input';
@@ -9,37 +9,17 @@ import { cn } from '@/lib/utils';
 
 export default function SignupPage() {
   const [state, formAction] = useActionState<ActionResult, FormData>(signupAction, {});
-  const [role, setRole] = useState<'customer' | 'owner'>('customer');
+  const v = state.values;
 
   return (
     <div>
-      <h1 className="font-display text-3xl font-bold text-ink-900">Đăng ký</h1>
-      <p className="mt-2 text-sm text-ink-500">Tạo tài khoản miễn phí để bắt đầu.</p>
+      <h1 className="font-display text-3xl font-bold text-ink-900">Đăng ký chủ nhà</h1>
+      <p className="mt-2 text-sm text-ink-500">
+        Tạo tài khoản để quản lý cơ sở lưu trú trên Halong24h.
+      </p>
 
       <form action={formAction} className="mt-8 space-y-4">
-        {/* Role selection */}
-        <div>
-          <Label>Bạn muốn đăng ký làm</Label>
-          <div className="grid grid-cols-2 gap-2">
-            <RoleButton
-              value="customer"
-              active={role === 'customer'}
-              onClick={() => setRole('customer')}
-              title="Khách"
-              desc="Đặt phòng cho chuyến đi"
-              icon="🧳"
-            />
-            <RoleButton
-              value="owner"
-              active={role === 'owner'}
-              onClick={() => setRole('owner')}
-              title="Chủ nhà"
-              desc="Cho thuê villa, KS, homestay"
-              icon="🏡"
-            />
-          </div>
-          <input type="hidden" name="role" value={role} />
-        </div>
+        <input type="hidden" name="role" value="owner" />
 
         <div>
           <Label htmlFor="full_name" required>
@@ -51,7 +31,9 @@ export default function SignupPage() {
             type="text"
             required
             autoComplete="name"
+            defaultValue={v?.full_name ?? ''}
             placeholder="Nguyễn Văn A"
+            key={`name-${v?.full_name ?? ''}`}
           />
           {state.fieldErrors?.full_name && (
             <p className="mt-1 text-xs text-red-600">{state.fieldErrors.full_name}</p>
@@ -68,7 +50,9 @@ export default function SignupPage() {
             type="email"
             autoComplete="email"
             required
-            placeholder="ban@email.com"
+            defaultValue={v?.email ?? ''}
+            placeholder="email@example.com"
+            key={`email-${v?.email ?? ''}`}
           />
           {state.fieldErrors?.email && (
             <p className="mt-1 text-xs text-red-600">{state.fieldErrors.email}</p>
@@ -82,7 +66,9 @@ export default function SignupPage() {
             name="phone"
             type="tel"
             autoComplete="tel"
-            placeholder="0123 456 789"
+            defaultValue={v?.phone ?? ''}
+            placeholder="0912 345 678"
+            key={`phone-${v?.phone ?? ''}`}
           />
         </div>
 
@@ -96,7 +82,7 @@ export default function SignupPage() {
             type="password"
             autoComplete="new-password"
             required
-            placeholder="Tối thiểu 8 ký tự"
+            placeholder="••••••••"
           />
           {state.fieldErrors?.password && (
             <p className="mt-1 text-xs text-red-600">{state.fieldErrors.password}</p>
@@ -116,8 +102,8 @@ export default function SignupPage() {
           </div>
         )}
 
-        <SubmitButton pending="Đang tạo tài khoản..." variant={role === 'owner' ? 'gold' : 'primary'}>
-          {role === 'owner' ? 'Đăng ký chủ nhà' : 'Đăng ký khách'}
+        <SubmitButton pending="Đang tạo tài khoản..." variant="gold">
+          Đăng ký chủ nhà
         </SubmitButton>
 
         <p className="text-center text-xs text-ink-500">
@@ -140,36 +126,5 @@ export default function SignupPage() {
         </p>
       </form>
     </div>
-  );
-}
-
-function RoleButton({
-  value: _value,
-  active,
-  onClick,
-  title,
-  desc,
-  icon,
-}: {
-  value: string;
-  active: boolean;
-  onClick: () => void;
-  title: string;
-  desc: string;
-  icon: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'flex flex-col items-start rounded-xl border-2 p-3 text-left transition-all',
-        active ? 'border-navy-900 bg-navy-50' : 'border-ink-200 hover:border-ink-300',
-      )}
-    >
-      <div className="text-2xl">{icon}</div>
-      <div className="mt-1 text-sm font-semibold text-ink-900">{title}</div>
-      <div className="text-xs text-ink-500">{desc}</div>
-    </button>
   );
 }

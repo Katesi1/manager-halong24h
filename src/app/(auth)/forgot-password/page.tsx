@@ -27,7 +27,7 @@ export default function ForgotPasswordPage() {
             type="email"
             autoComplete="email"
             required
-            placeholder="ban@email.com"
+            placeholder="email@example.com"
           />
           {state.fieldErrors?.email && (
             <p className="mt-1 text-xs text-red-600">{state.fieldErrors.email}</p>

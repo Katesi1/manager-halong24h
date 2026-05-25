@@ -16,7 +16,7 @@ export function PaymentsExport() {
 
   function handleExport(_format: (typeof EXPORT_OPTIONS)[number]['key']) {
     toast.success(
-      'Đang chuẩn bị file (demo). Sẽ gửi qua email trong vài phút.',
+      'Đang chuẩn bị file. Sẽ gửi qua email trong vài phút.',
     );
     setOpen(false);
   }

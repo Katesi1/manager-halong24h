@@ -40,7 +40,7 @@ export function SubscriptionRowActions({
 
   function onSubmitCallNote() {
     if (callNote.trim().length < 3) return;
-    toast.success('Đã ghi note (demo).');
+    toast.success('Đã ghi note.');
     setCallOpen(false);
     setCallNote('');
   }

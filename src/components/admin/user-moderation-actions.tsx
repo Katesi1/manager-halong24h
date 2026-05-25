@@ -188,14 +188,14 @@ export function UserModerationActions({
     setDeleteReason('');
     setDeleteAck(false);
     toast.success(
-      `Đã đặt xóa tài khoản (demo). Hard delete sau ${hardDeleteDateString()}.`,
+      `Đã đặt xóa tài khoản. Hard delete sau ${hardDeleteDateString()}.`,
     );
   }
 
   function onRestoreAccount() {
     writePendingDeletion(userId, false);
     setPendingDeletion(false);
-    toast.success('Đã khôi phục tài khoản (demo).');
+    toast.success('Đã khôi phục tài khoản.');
   }
 
   function onResetPwd() {

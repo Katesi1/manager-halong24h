@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { LeadActions } from '@/components/host/lead-actions';
 import { formatDate, formatDateTime, formatVND, minutesAgo, dowLabel } from '@/lib/format';
-import type { LeadStatus } from '@/lib/database.types';
+import type { LeadStatus } from '@/lib/legacy-types';
 
 interface LeadDetail {
   id: string;

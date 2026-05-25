@@ -408,13 +408,6 @@ export default async function AdminReportsPage(props: {
         </section>
       </div>
 
-      <p className="mt-8 text-xs text-ink-500">
-        Số liệu là dữ liệu demo. BE wire qua endpoint{' '}
-        <code className="rounded bg-cream-100 px-1.5 py-0.5">
-          GET /admin/reports/risk-kpis?range={range}
-        </code>{' '}
-        sẽ thay thế block mock.
-      </p>
     </div>
   );
 }

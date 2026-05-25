@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { relativeTime, minutesAgo, formatDate } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { Zap } from 'lucide-react';
-import type { LeadStatus } from '@/lib/database.types';
+import type { LeadStatus } from '@/lib/legacy-types';
 
 export interface LeadCardData {
   id: string;

@@ -9,5 +9,4 @@ coverage
 .env*
 *.md
 public
-supabase/.branches
-src/lib/database.types.ts
+src/lib/legacy-types.ts

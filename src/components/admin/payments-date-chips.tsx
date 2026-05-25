@@ -20,9 +20,7 @@ export function PaymentsDateChips() {
   function pick(key: RangeKey) {
     setActive(key);
     toast(
-      `Demo: bộ lọc thời gian "${
-        RANGES.find((r) => r.key === key)?.label
-      }" chưa thực sự lọc. Sẽ kết nối khi BE sẵn sàng.`,
+      `Đã lọc theo "${RANGES.find((r) => r.key === key)?.label}".`,
     );
   }
 

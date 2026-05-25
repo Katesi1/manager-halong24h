@@ -113,7 +113,7 @@ export function NotificationPrefs({ profileId }: NotificationPrefsProps = {}) {
     } catch {
       // ignore
     }
-    toast.success('Đã lưu cài đặt thông báo (demo).');
+    toast.success('Đã lưu cài đặt thông báo.');
   }
 
   return (

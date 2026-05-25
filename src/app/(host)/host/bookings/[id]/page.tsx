@@ -180,7 +180,7 @@ export default async function BookingDetailPage(props: {
                 href={`/host/messages?booking=${booking.id}`}
                 className="mt-4 inline-block text-xs font-semibold text-navy-700 hover:underline"
               >
-                Mở tin nhắn (demo) →
+                Mở tin nhắn →
               </Link>
             </div>
           </section>

@@ -1,8 +1,10 @@
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://103.183.118.148:3000';
+if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
+  throw new Error('NEXT_PUBLIC_API_BASE_URL chưa được cấu hình trong .env');
+}
 
-// 3s — tránh first-paint 10-13s khi BE chậm/không phản hồi. Lỗi → UI fallback empty state.
-export const API_TIMEOUT_MS = 3_000;
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+export const API_TIMEOUT_MS = 15_000;
 
 export const COOKIE_ACCESS_TOKEN = 'h24h_access';
 export const COOKIE_REFRESH_TOKEN = 'h24h_refresh';
