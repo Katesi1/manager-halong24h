@@ -96,6 +96,7 @@ const ADMIN_GROUPS: NavGroup[] = [
     label: 'Cấu hình',
     collapsible: true,
     items: [
+      { href: '/admin/pricing', label: 'Quản lý gói cước', icon: CreditCard },
       { href: '/admin/permissions', label: 'Phân quyền', icon: KeyRound },
       { href: '/admin/settings', label: 'Cài đặt hệ thống', icon: Settings },
     ],
@@ -109,7 +110,6 @@ const HOST_GROUPS: NavGroup[] = [
     label: 'Tổng quan',
     items: [
       { href: '/host', label: 'Tổng quan', icon: LayoutGrid, exact: true },
-      { href: '/host/reports', label: 'Báo cáo', icon: TrendingUp },
     ],
   },
   {
