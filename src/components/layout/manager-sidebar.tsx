@@ -110,6 +110,8 @@ const HOST_GROUPS: NavGroup[] = [
     label: 'Tổng quan',
     items: [
       { href: '/host', label: 'Tổng quan', icon: LayoutGrid, exact: true },
+      { href: '/host/billing', label: 'Gói cước', icon: CreditCard, hideForSale: true },
+      { href: '/host/settings', label: 'Cài đặt cá nhân', icon: Settings },
     ],
   },
   {
@@ -133,15 +135,6 @@ const HOST_GROUPS: NavGroup[] = [
       { href: '/host/guests', label: 'Khách hàng', icon: Users },
       { href: '/host/hk', label: 'Dọn phòng', icon: Sparkles },
       { href: '/host/staff', label: 'Nhân viên', icon: UserCog, hideForSale: true },
-    ],
-  },
-  {
-    id: 'host-account',
-    label: 'Tài khoản',
-    collapsible: true,
-    items: [
-      { href: '/host/billing', label: 'Gói cước', icon: CreditCard, hideForSale: true },
-      { href: '/host/settings', label: 'Cài đặt cá nhân', icon: Settings },
     ],
   },
 ];
@@ -420,8 +413,6 @@ function NavGroupRender({
   badges: Partial<Record<BadgeKey, number>>;
   onNavigate?: () => void;
 }) {
-  if (group.items.length === 0) return null;
-
   const hasActiveItem = group.items.some((item) =>
     item.external
       ? false
@@ -431,6 +422,8 @@ function NavGroupRender({
   );
 
   const [open, setOpen] = useState(!group.collapsible || hasActiveItem);
+
+  if (group.items.length === 0) return null;
 
   if (group.collapsible) {
     return (

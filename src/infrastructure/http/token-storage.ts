@@ -31,14 +31,20 @@ export async function readTokens(): Promise<Partial<TokenPair>> {
 
 export async function writeTokens(pair: TokenPair): Promise<void> {
   const store = await cookies();
-  store.set(COOKIE_ACCESS_TOKEN, pair.accessToken, {
-    ...COMMON_COOKIE_OPTS,
-    maxAge: ACCESS_TOKEN_MAX_AGE_SEC,
-  });
-  store.set(COOKIE_REFRESH_TOKEN, pair.refreshToken, {
-    ...COMMON_COOKIE_OPTS,
-    maxAge: REFRESH_TOKEN_MAX_AGE_SEC,
-  });
+  try {
+    store.set(COOKIE_ACCESS_TOKEN, pair.accessToken, {
+      ...COMMON_COOKIE_OPTS,
+      maxAge: ACCESS_TOKEN_MAX_AGE_SEC,
+    });
+    store.set(COOKIE_REFRESH_TOKEN, pair.refreshToken, {
+      ...COMMON_COOKIE_OPTS,
+      maxAge: REFRESH_TOKEN_MAX_AGE_SEC,
+    });
+  } catch {
+    // Next.js cấm `cookies().set()` trong Server Component.
+    // Khi rơi vào case đó (refresh từ Server Component layout), nuốt lỗi —
+    // middleware sẽ tự refresh ở request kế tiếp dựa vào refresh cookie hiện có.
+  }
 }
 
 export async function clearTokens(): Promise<void> {

@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import * as Popover from '@radix-ui/react-popover';
+import { Lock, Unlock, Plus, Eye, X } from 'lucide-react';
 
 import {
   lockDateAction,
@@ -35,18 +36,24 @@ export function CalendarGrid({ properties }: CalendarGridProps) {
   if (properties.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-ink-200 bg-white p-12 text-center">
-        <p className="text-2xl">📅</p>
-        <h3 className="mt-3 font-display text-2xl font-semibold tracking-tight text-navy-900">
-          Không có cơ sở nào
+        <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-cream-100">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-7 w-7 text-ink-400">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+        </div>
+        <h3 className="mt-4 font-display text-xl font-semibold text-navy-900">
+          Chưa có cơ sở nào
         </h3>
         <p className="mt-1 text-sm text-ink-500">
-          Thêm cơ sở để bắt đầu quản lý lịch.
+          Thêm cơ sở để bắt đầu quản lý lịch phòng.
         </p>
       </div>
     );
   }
 
-  // Tất cả property đều có days[] cùng độ dài; lấy từ phần tử đầu.
   const dates = properties[0]?.days.map((d) => d.date) ?? [];
   const today = todayISO();
 
@@ -55,14 +62,20 @@ export function CalendarGrid({ properties }: CalendarGridProps) {
       <div
         className="grid min-w-max"
         style={{
-          gridTemplateColumns: `240px repeat(${dates.length}, minmax(48px, 1fr))`,
+          gridTemplateColumns: `220px repeat(${dates.length}, minmax(52px, 1fr))`,
         }}
       >
-        <HeaderCorner />
+        {/* Header row */}
+        <div className="sticky left-0 z-20 flex items-end border-b border-r border-ink-200 bg-cream-50 px-4 py-2.5">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">
+            Cơ sở
+          </span>
+        </div>
         {dates.map((d) => (
           <DateHeader key={d} date={d} isToday={d === today} />
         ))}
 
+        {/* Property rows */}
         {properties.map((prop) => (
           <PropertyRow key={prop.id} property={prop} today={today} />
         ))}
@@ -71,41 +84,44 @@ export function CalendarGrid({ properties }: CalendarGridProps) {
   );
 }
 
-function HeaderCorner() {
-  return (
-    <div className="sticky left-0 z-20 border-b border-r border-ink-200 bg-white px-3 py-3 overline muted no-dash text-[10px]">
-      Cơ sở
-    </div>
-  );
-}
-
 function DateHeader({ date, isToday }: { date: string; isToday: boolean }) {
   const dt = new Date(date);
   const dow = dt.getUTCDay();
   const isWeekend = dow === 0 || dow === 5 || dow === 6;
+  const dayNum = dt.getUTCDate();
+  const month = dt.getUTCMonth() + 1;
+  const isFirstOfMonth = dayNum === 1;
+
   return (
     <div
       className={cn(
-        'border-b border-r border-ink-200 px-1 py-2 text-center',
-        isToday && 'bg-navy-50',
+        'border-b border-r border-ink-200 px-1 py-2 text-center transition-colors',
+        isToday ? 'bg-navy-50' : 'bg-cream-50',
       )}
     >
       <p
         className={cn(
-          'text-[10px] font-semibold uppercase',
-          isWeekend ? 'text-rose-600' : 'text-ink-500',
+          'text-[10px] font-semibold uppercase leading-none',
+          isWeekend ? 'text-rose-500' : 'text-ink-400',
         )}
       >
         {dowLabel(date)}
       </p>
       <p
         className={cn(
-          'text-sm font-bold',
-          isToday ? 'text-navy-900' : 'text-ink-900',
+          'mt-1 text-sm font-bold leading-none',
+          isToday
+            ? 'mx-auto grid h-6 w-6 place-items-center rounded-full bg-navy-900 text-white text-xs'
+            : 'text-ink-900',
         )}
       >
-        {dt.getUTCDate()}
+        {dayNum}
       </p>
+      {isFirstOfMonth && (
+        <p className="mt-0.5 text-[9px] font-medium text-ink-400">
+          T{month}
+        </p>
+      )}
     </div>
   );
 }
@@ -119,11 +135,21 @@ function PropertyRow({
 }) {
   return (
     <>
-      <div className="sticky left-0 z-10 border-b border-r border-ink-200 bg-white px-3 py-2.5 text-sm">
-        <p className="font-semibold text-ink-900 line-clamp-1">
-          🏠 {property.name}
-        </p>
-        <p className="text-[11px] text-ink-500 font-mono">{property.id}</p>
+      <div className="sticky left-0 z-10 flex items-center gap-2.5 border-b border-r border-ink-200 bg-white px-4 py-2.5">
+        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-navy-50 text-navy-700">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-ink-900 truncate leading-tight">
+            {property.name}
+          </p>
+          <p className="text-[10px] text-ink-400 font-mono truncate">
+            {property.id.slice(0, 12)}
+          </p>
+        </div>
       </div>
       {property.days.map((day) => (
         <CalendarCell
@@ -138,29 +164,28 @@ function PropertyRow({
   );
 }
 
-const CELL_CLASS: Record<CalendarStatus, string> = {
-  [CalendarStatus.AVAILABLE]: 'bg-white hover:bg-emerald-50',
-  [CalendarStatus.LOCKED]: 'bg-rose-100 hover:bg-rose-200 ring-1 ring-rose-300 ring-inset',
-  [CalendarStatus.HOLD]: 'bg-amber-200 hover:bg-amber-300',
-  [CalendarStatus.BOOKED]: 'bg-navy-700 hover:bg-navy-800 text-white',
+const CELL_BG: Record<CalendarStatus, string> = {
+  [CalendarStatus.AVAILABLE]: 'bg-emerald-50/50 hover:bg-emerald-100/70',
+  [CalendarStatus.LOCKED]: 'bg-rose-50 hover:bg-rose-100',
+  [CalendarStatus.HOLD]: 'bg-amber-100/70 hover:bg-amber-200/70',
+  [CalendarStatus.BOOKED]: 'bg-navy-700 hover:bg-navy-800',
 };
 
-const CELL_INDICATOR: Record<CalendarStatus, string> = {
-  [CalendarStatus.AVAILABLE]: '',
-  [CalendarStatus.LOCKED]: '×',
-  [CalendarStatus.HOLD]: '⏳',
-  [CalendarStatus.BOOKED]: '●',
+const CELL_ICON: Record<CalendarStatus, React.ReactNode> = {
+  [CalendarStatus.AVAILABLE]: null,
+  [CalendarStatus.LOCKED]: <Lock className="h-3 w-3 text-rose-400" />,
+  [CalendarStatus.HOLD]: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3 text-amber-600">
+      <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+    </svg>
+  ),
+  [CalendarStatus.BOOKED]: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3 w-3 text-white/90">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  ),
 };
 
-// TODO(perf-r4): Lift Popover.Root to grid level instead of per-cell.
-// Current: each cell mounts a Radix Popover.Root → ~140 instances for a
-// 10-property × 14-day grid. Lifting requires:
-//   1) State `selectedCell: CellState | null` on CalendarGrid
-//   2) Single <Popover.Root open={!!selectedCell} onOpenChange={close}>
-//   3) Position via Popover.Anchor over the clicked cell ref
-// Deferred — touching this risks breaking the lock/unlock confirm flow
-// and the booking-create navigation. Revisit after we add an E2E test
-// covering CellMenu interactions (lock/unlock/create-booking/goto-list).
 function CalendarCell({
   propertyId,
   propertyName,
@@ -186,20 +211,16 @@ function CalendarCell({
         <button
           type="button"
           aria-label={`${formatDate(day.date)} · ${CALENDAR_STATUS_LABEL[day.status]}`}
-          title={[
-            formatDate(day.date),
-            CALENDAR_STATUS_LABEL[day.status],
-            day.note,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
           className={cn(
-            'relative flex h-14 items-center justify-center border-b border-r border-ink-200 text-xs font-semibold transition-colors',
-            CELL_CLASS[day.status],
-            isToday && 'ring-1 ring-navy-700 ring-inset',
+            'relative flex h-12 items-center justify-center border-b border-r border-ink-100 transition-all cursor-pointer',
+            CELL_BG[day.status],
+            isToday && 'ring-2 ring-inset ring-navy-400/40',
           )}
         >
-          <span>{CELL_INDICATOR[day.status]}</span>
+          {CELL_ICON[day.status]}
+          {day.note && (
+            <span className="absolute bottom-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-gold-500" />
+          )}
         </button>
       </Popover.Trigger>
       <Popover.Portal>
@@ -207,7 +228,7 @@ function CalendarCell({
           side="bottom"
           align="start"
           sideOffset={4}
-          className="z-50 w-64 rounded-xl border border-ink-200 bg-white p-4 shadow-lg"
+          className="z-50 w-72 rounded-xl bg-white p-0 shadow-floating ring-1 ring-ink-200/60 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
         >
           <CellMenu state={cellState} />
         </Popover.Content>
@@ -245,79 +266,107 @@ function CellMenu({ state }: { state: CellState }) {
     });
   }
 
-  function onCreateBooking() {
-    router.push(
-      `/host/bookings/new?propertyId=${state.propertyId}&checkIn=${state.date}`,
-    );
-  }
-
-  function onGotoBookings() {
-    router.push(
-      `/host/bookings?propertyId=${state.propertyId}&from=${state.date}`,
-    );
-  }
-
   return (
-    <div className="space-y-3">
-      <header>
-        <p className="text-xs font-semibold uppercase tracking-wider text-ink-500">
-          {formatDate(state.date)}
-        </p>
-        <p className="mt-0.5 text-sm font-bold text-ink-900 line-clamp-1">
+    <div>
+      {/* Header */}
+      <div className="border-b border-ink-100 bg-cream-50 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-ink-500">
+            {formatDate(state.date)}
+          </p>
+          <StatusBadge status={state.status} />
+        </div>
+        <p className="mt-1 text-sm font-bold text-navy-900 truncate">
           {state.propertyName}
         </p>
-        <p className="mt-1 text-xs">
-          Trạng thái: <StatusBadge status={state.status} />
-          {state.note && (
-            <span className="ml-1 text-ink-500">· {state.note}</span>
-          )}
-        </p>
-      </header>
+        {state.note && (
+          <p className="mt-1 text-xs text-ink-500 italic">{state.note}</p>
+        )}
+      </div>
 
       {error && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
+        <div className="mx-4 mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
           {error}
-        </p>
+        </div>
       )}
 
-      <div className="grid gap-1.5">
+      {/* Actions */}
+      <div className="p-2">
         {state.status === CalendarStatus.AVAILABLE && (
           <>
-            <MenuButton onClick={onCreateBooking} disabled={pending}>
-              ➕ Tạo đặt phòng
-            </MenuButton>
-            <MenuButton onClick={onLock} disabled={pending} variant="danger">
-              🔒 Khóa ngày này
-            </MenuButton>
+            <MenuBtn
+              icon={<Plus className="h-4 w-4" />}
+              label="Tạo đặt phòng"
+              sub="Tạo booking mới cho ngày này"
+              onClick={() =>
+                router.push(
+                  `/host/bookings/new?propertyId=${state.propertyId}&checkIn=${state.date}`,
+                )
+              }
+              disabled={pending}
+            />
+            <MenuBtn
+              icon={<Lock className="h-4 w-4" />}
+              label="Khoá ngày"
+              sub="Chặn đặt phòng cho ngày này"
+              onClick={onLock}
+              disabled={pending}
+              variant="danger"
+            />
           </>
         )}
         {state.status === CalendarStatus.LOCKED && (
-          <MenuButton onClick={onUnlock} disabled={pending}>
-            🔓 Mở khóa
-          </MenuButton>
+          <MenuBtn
+            icon={<Unlock className="h-4 w-4" />}
+            label="Mở khoá"
+            sub="Cho phép đặt phòng lại"
+            onClick={onUnlock}
+            disabled={pending}
+          />
         )}
-        {state.status === CalendarStatus.HOLD && (
-          <MenuButton onClick={onGotoBookings} disabled={pending}>
-            👁️ Xem đặt phòng đang giữ
-          </MenuButton>
-        )}
-        {state.status === CalendarStatus.BOOKED && (
-          <MenuButton onClick={onGotoBookings} disabled={pending}>
-            👁️ Xem đặt phòng
-          </MenuButton>
+        {(state.status === CalendarStatus.HOLD ||
+          state.status === CalendarStatus.BOOKED) && (
+          <MenuBtn
+            icon={<Eye className="h-4 w-4" />}
+            label={
+              state.status === CalendarStatus.HOLD
+                ? 'Xem đặt phòng đang giữ'
+                : 'Xem đặt phòng'
+            }
+            sub="Mở chi tiết booking liên quan"
+            onClick={() =>
+              router.push(
+                `/host/bookings?propertyId=${state.propertyId}&from=${state.date}`,
+              )
+            }
+            disabled={pending}
+          />
         )}
       </div>
+
+      <Popover.Close asChild>
+        <button
+          type="button"
+          className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full text-ink-400 hover:bg-ink-100 hover:text-ink-700 transition-colors"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </Popover.Close>
     </div>
   );
 }
 
-function MenuButton({
-  children,
+function MenuBtn({
+  icon,
+  label,
+  sub,
   onClick,
   disabled,
   variant = 'default',
 }: {
-  children: React.ReactNode;
+  icon: React.ReactNode;
+  label: string;
+  sub: string;
   onClick: () => void;
   disabled?: boolean;
   variant?: 'default' | 'danger';
@@ -328,13 +377,24 @@ function MenuButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors disabled:opacity-50',
+        'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors disabled:opacity-50',
         variant === 'danger'
-          ? 'bg-rose-50 text-rose-700 hover:bg-rose-100'
-          : 'bg-ink-50 text-ink-900 hover:bg-cream-200',
+          ? 'hover:bg-rose-50 text-rose-700'
+          : 'hover:bg-cream-100 text-ink-900',
       )}
     >
-      {children}
+      <div
+        className={cn(
+          'grid h-8 w-8 shrink-0 place-items-center rounded-lg',
+          variant === 'danger' ? 'bg-rose-50' : 'bg-cream-100',
+        )}
+      >
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm font-medium leading-tight">{label}</p>
+        <p className="text-[11px] text-ink-500 leading-tight">{sub}</p>
+      </div>
     </button>
   );
 }
@@ -349,7 +409,7 @@ function StatusBadge({ status }: { status: CalendarStatus }) {
   return (
     <span
       className={cn(
-        'inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider',
+        'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider',
         cls[status],
       )}
     >
