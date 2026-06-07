@@ -29,11 +29,18 @@ interface RequestOptions {
   revalidate?: number | false;
   /** Tags để revalidateTag. */
   tags?: string[];
+  /**
+   * Internal — override accessToken cho retry sau refresh (khi cookie chưa
+   * ghi được do RSC ctx). Không expose ra public API.
+   */
+  _accessTokenOverride?: string;
 }
 
 type Method = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
-async function refreshTokens(refreshToken: string): Promise<void> {
+async function refreshTokens(
+  refreshToken: string,
+): Promise<{ accessToken: string; refreshToken: string }> {
   const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -46,10 +53,14 @@ async function refreshTokens(refreshToken: string): Promise<void> {
     accessToken: string;
     refreshToken: string;
   }>;
-  await writeTokens({
+  const pair = {
     accessToken: json.data.accessToken,
     refreshToken: json.data.refreshToken,
-  });
+  };
+  // Best-effort ghi cookie. Trả về pair cho caller dùng retry trực tiếp —
+  // không phụ thuộc readTokens() để tránh stale state khi RSC ctx block set.
+  await writeTokens(pair);
+  return pair;
 }
 
 function buildUrl(
@@ -91,7 +102,10 @@ async function request<T>(
   }
 
   if (!opts.skipAuth) {
-    const { accessToken } = await readTokens();
+    // Ưu tiên _accessTokenOverride (sau refresh, cookie có thể chưa ghi được)
+    // → đảm bảo retry dùng token mới, không phụ thuộc cookie store.
+    const accessToken =
+      opts._accessTokenOverride ?? (await readTokens()).accessToken;
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
   }
 
@@ -119,9 +133,19 @@ async function request<T>(
     const { refreshToken } = await readTokens();
     if (refreshToken) {
       try {
-        await refreshTokens(refreshToken);
-        return request<T>(method, path, { ...opts, skipRefresh: true });
-      } catch {
+        const fresh = await refreshTokens(refreshToken);
+        return request<T>(method, path, {
+          ...opts,
+          skipRefresh: true,
+          _accessTokenOverride: fresh.accessToken,
+        });
+      } catch (refreshErr) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            '[api-client] refresh failed, falling through to 401',
+            refreshErr instanceof Error ? refreshErr.message : refreshErr,
+          );
+        }
         // Fall through to throw 401 below
       }
     }

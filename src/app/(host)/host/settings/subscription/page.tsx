@@ -18,17 +18,23 @@ const STATUS_VARIANT: Record<
   SubscriptionStatus,
   Parameters<typeof Badge>[0]['variant']
 > = {
-  paid: 'success',
-  pending: 'warning',
-  overdue: 'danger',
+  none: 'default',
+  trial: 'gold',
+  active: 'success',
+  past_due: 'danger',
+  cancelled: 'default',
   frozen: 'dark',
+  expired: 'warning',
 };
 
 const STATUS_LABEL: Record<SubscriptionStatus, string> = {
-  paid: 'Đang hoạt động',
-  pending: 'Chờ thanh toán',
-  overdue: 'Quá hạn',
+  none: 'Chưa có',
+  trial: 'Đang trial',
+  active: 'Đang hoạt động',
+  past_due: 'Quá hạn',
+  cancelled: 'Đã huỷ',
   frozen: 'Đã khoá',
+  expired: 'Hết hạn',
 };
 
 export default async function HostSubscriptionPage() {
@@ -91,7 +97,7 @@ export default async function HostSubscriptionPage() {
               <Detail
                 label="Hết hạn"
                 value={formatDate(sub.expireAt)}
-                hint={sub.status === 'overdue' ? '⚠️ Đã quá hạn' : undefined}
+                hint={sub.status === 'past_due' ? '⚠️ Đã quá hạn' : undefined}
               />
               {sub.paidAt && (
                 <Detail label="Đã thu" value={formatDate(sub.paidAt)} />
@@ -106,7 +112,7 @@ export default async function HostSubscriptionPage() {
               </div>
             )}
 
-            {(sub.status === 'pending' || sub.status === 'overdue') && (
+            {(sub.status === 'past_due' || sub.status === 'trial') && (
               <div className="mt-5 rounded-lg bg-amber-50 p-4 ring-1 ring-amber-200">
                 <p className="text-sm font-semibold text-amber-900">
                   Chuyển khoản phí gói cước

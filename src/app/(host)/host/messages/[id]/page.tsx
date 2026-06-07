@@ -1,19 +1,55 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 
+import { getCurrentProfile } from '@/app/actions/auth';
+import {
+  getConversationAction,
+  listConversationsAction,
+  listMessagesAction,
+} from '@/app/actions/conversations';
+import { ChatThread } from '@/components/chat/chat-thread';
 import { GradientAvatar } from '@/components/ui/gradient-avatar';
-import { formatDateTime } from '@/lib/format';
+import type {
+  Conversation as SpecConversation,
+  Message,
+} from '@/core/entities/chat';
+import { readTokens } from '@/infrastructure/http/token-storage';
 import { cn } from '@/lib/utils';
-import { DEMO_CONVERSATIONS, getDemoMessages } from '../demo-data';
-import { MessageComposer } from './message-composer';
+
+function customerOf(conv: SpecConversation) {
+  return conv.members.find((m) => m.role === 'customer');
+}
+
+function customerNameOf(conv: SpecConversation): string {
+  return customerOf(conv)?.user.name ?? 'Khách';
+}
 
 export default async function HostMessageDetailPage(props: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await props.params;
-  const conv = DEMO_CONVERSATIONS.find((c) => c.id === id);
-  if (!conv) notFound();
-  const messages = getDemoMessages(id);
+
+  // Fetch song song để giảm latency
+  const [convRes, listRes, profile, tokens] = await Promise.all([
+    getConversationAction(id),
+    listConversationsAction(),
+    getCurrentProfile(),
+    readTokens(),
+  ]);
+
+  if (!profile) redirect('/login?redirect=/host/messages');
+  if (!tokens.accessToken) redirect('/login?redirect=/host/messages');
+  if (!convRes.ok || !convRes.data) notFound();
+
+  const conv = convRes.data;
+  const allConvs = listRes.ok ? listRes.data : [];
+
+  // Load tin nhắn ban đầu (cursor-based, oldest-first per spec §17.1)
+  const msgRes = await listMessagesAction(id, undefined, 50);
+  const initialMessages: Message[] = msgRes.ok ? msgRes.data.items : [];
+  const initialNextCursor = msgRes.ok ? msgRes.data.nextCursor : null;
+
+  const customerName = customerNameOf(conv);
 
   return (
     <div className="p-4 lg:p-6 max-w-6xl mx-auto">
@@ -27,10 +63,10 @@ export default async function HostMessageDetailPage(props: {
       </div>
 
       <h1 className="mb-3 font-display text-lg font-semibold text-ink-900">
-        Hội thoại với {conv.customer_name}
-        {conv.property_name && (
+        Hội thoại với {customerName}
+        {conv.subject && (
           <span className="ml-2 text-sm font-normal text-ink-500">
-            · {conv.property_name}
+            · {conv.subject}
           </span>
         )}
       </h1>
@@ -38,78 +74,67 @@ export default async function HostMessageDetailPage(props: {
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         {/* Conversation list (hidden on mobile) */}
         <aside className="hidden lg:block overflow-hidden rounded-2xl bg-white ring-1 ring-ink-200">
-          <ul className="divide-y divide-ink-200">
-            {DEMO_CONVERSATIONS.map((c) => (
-              <li key={c.id}>
-                <Link
-                  href={`/host/messages/${c.id}`}
-                  className={cn(
-                    'block px-3 py-3 transition-colors',
-                    c.id === id ? 'bg-navy-50' : 'hover:bg-cream-100',
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <GradientAvatar name={c.customer_name} size="sm" online={c.online} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-ink-900">
-                        {c.customer_name}
-                      </p>
-                      <p className="truncate text-xs text-ink-500">
-                        {c.last_message_preview}
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          {allConvs.length === 0 ? (
+            <p className="p-4 text-xs text-ink-500">Chưa có hội thoại khác.</p>
+          ) : (
+            <ul className="divide-y divide-ink-200">
+              {allConvs.map((c) => {
+                const name = customerNameOf(c);
+                return (
+                  <li key={c.id}>
+                    <Link
+                      href={`/host/messages/${c.id}`}
+                      className={cn(
+                        'block px-3 py-3 transition-colors',
+                        c.id === id ? 'bg-navy-50' : 'hover:bg-cream-100',
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <GradientAvatar name={name} size="sm" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-ink-900">
+                            {name}
+                          </p>
+                          <p className="truncate text-xs text-ink-500">
+                            {c.lastMessagePreview ?? '—'}
+                          </p>
+                        </div>
+                        {c.myUnread > 0 && (
+                          <span className="rounded-full bg-rose-500 px-1.5 text-[10px] text-white">
+                            {c.myUnread}
+                          </span>
+                        )}
+                      </div>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </aside>
 
         {/* Thread + composer */}
         <section className="overflow-hidden rounded-2xl bg-white ring-1 ring-ink-200 flex flex-col min-h-[60vh]">
           <header className="flex items-center gap-3 border-b border-ink-200 px-4 py-3">
-            <GradientAvatar name={conv.customer_name} size="md" online={conv.online} />
+            <GradientAvatar name={customerName} size="md" />
             <div className="min-w-0 flex-1">
-              <p className="truncate font-semibold text-ink-900">{conv.customer_name}</p>
+              <p className="truncate font-semibold text-ink-900">
+                {customerName}
+              </p>
               <p className="truncate text-xs text-ink-500">
-                {conv.property_name}
-                {conv.property_short ? ` · ${conv.property_short}` : ''}
+                {conv.subject ?? `#${conv.id.slice(0, 8)}`}
               </p>
             </div>
           </header>
 
-          <div className="flex-1 space-y-3 overflow-y-auto bg-cream-50 px-4 py-4">
-            {messages.map((m) => (
-              <div
-                key={m.id}
-                className={cn(
-                  'flex',
-                  m.from_me ? 'justify-end' : 'justify-start',
-                )}
-              >
-                <div
-                  className={cn(
-                    'max-w-[75%] rounded-2xl px-3 py-2 text-sm',
-                    m.from_me
-                      ? 'bg-navy-700 text-white'
-                      : 'bg-white text-ink-900 ring-1 ring-ink-200',
-                  )}
-                >
-                  <p>{m.content}</p>
-                  <p
-                    className={cn(
-                      'mt-1 text-[10px]',
-                      m.from_me ? 'text-white/70' : 'text-ink-500',
-                    )}
-                  >
-                    {formatDateTime(m.sent_at)}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <MessageComposer />
+          <ChatThread
+            conversationId={id}
+            currentUserId={profile.id}
+            accessToken={tokens.accessToken}
+            peerUserId={customerOf(conv)?.userId ?? null}
+            initialMessages={initialMessages}
+            initialNextCursor={initialNextCursor}
+          />
         </section>
       </div>
     </div>

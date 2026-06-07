@@ -29,7 +29,13 @@ export async function readTokens(): Promise<Partial<TokenPair>> {
   };
 }
 
-export async function writeTokens(pair: TokenPair): Promise<void> {
+/**
+ * Returns `true` nếu ghi cookie thành công, `false` nếu bị block bởi RSC context.
+ * Caller PHẢI xử lý case `false`: dùng token trả về trực tiếp cho retry, không
+ * dựa vào readTokens() (cookie chưa được ghi). Tránh module-level cache vì
+ * serverless reuse instance giữa user → cross-user token leak.
+ */
+export async function writeTokens(pair: TokenPair): Promise<boolean> {
   const store = await cookies();
   try {
     store.set(COOKIE_ACCESS_TOKEN, pair.accessToken, {
@@ -40,10 +46,15 @@ export async function writeTokens(pair: TokenPair): Promise<void> {
       ...COMMON_COOKIE_OPTS,
       maxAge: REFRESH_TOKEN_MAX_AGE_SEC,
     });
-  } catch {
-    // Next.js cấm `cookies().set()` trong Server Component.
-    // Khi rơi vào case đó (refresh từ Server Component layout), nuốt lỗi —
-    // middleware sẽ tự refresh ở request kế tiếp dựa vào refresh cookie hiện có.
+    return true;
+  } catch (err) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(
+        '[token-storage] cookies().set() blocked (likely RSC context). Caller must pass fresh tokens explicitly. Move auth-mutating call to Server Action or Route Handler for persistence.',
+        err,
+      );
+    }
+    return false;
   }
 }
 

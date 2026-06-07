@@ -2,7 +2,6 @@ import type { AuditLogRepository } from '@/application/ports/audit-log-repositor
 import type {
   AuditEntry,
   AuditFilters,
-  RecordAuditInput,
 } from '@/core/entities/audit-log';
 
 /**
@@ -61,14 +60,6 @@ const SEED: AuditEntry[] = [
 
 const store: AuditEntry[] = [...SEED];
 
-let counter = SEED.length;
-
-function nextId(): string {
-  counter += 1;
-  const stamp = Date.now().toString(36);
-  return `log-${stamp}-${counter}`;
-}
-
 function matchesFilters(entry: AuditEntry, f: AuditFilters): boolean {
   if (f.actorId && entry.actor.id !== f.actorId) return false;
   if (f.action && entry.action !== f.action) return false;
@@ -91,16 +82,4 @@ export class MockAuditLogRepository implements AuditLogRepository {
     return filters.limit ? filtered.slice(0, filters.limit) : filtered;
   }
 
-  async record(input: RecordAuditInput): Promise<AuditEntry> {
-    const entry: AuditEntry = {
-      id: nextId(),
-      actor: input.actor,
-      action: input.action,
-      target: input.target,
-      reason: input.reason ?? null,
-      at: new Date().toISOString(),
-    };
-    store.unshift(entry);
-    return entry;
-  }
 }

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Search } from 'lucide-react';
+import { Search, Lightbulb } from 'lucide-react';
 import { PageHeader } from '@/components/host/page-header';
 
 export const metadata: Metadata = { title: 'Tin nhắn' };
@@ -8,17 +8,60 @@ import { FilterChips } from '@/components/ui/filter-chips';
 import { GradientAvatar } from '@/components/ui/gradient-avatar';
 import { relativeTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { listConversationsAction } from '@/app/actions/conversations';
+import { getCurrentProfile } from '@/app/actions/auth';
+import type { Conversation as SpecConversation } from '@/core/entities/chat';
 import { DEMO_CONVERSATIONS, type Conversation } from './demo-data';
 
-async function getConversations(): Promise<Conversation[]> {
-  return DEMO_CONVERSATIONS;
+function adaptConversation(
+  c: SpecConversation,
+  currentUserId: string | null,
+): Conversation {
+  const customer = c.members.find((m) => m.role === 'customer');
+  return {
+    id: c.id,
+    property_name: c.subject ?? '',
+    property_short: c.propertyId ? c.propertyId.slice(0, 6) : '—',
+    customer_name: customer?.user.name ?? 'Khách',
+    last_message_preview: c.lastMessagePreview ?? '',
+    last_message_from_me:
+      currentUserId !== null && c.lastSenderId === currentUserId,
+    last_message_at: c.lastMessageAt ?? c.createdAt,
+    unread_owner: c.myUnread,
+    online: false,
+  };
+}
+
+type ConvState =
+  | { items: Conversation[]; mode: 'live' }
+  | { items: Conversation[]; mode: 'empty' }
+  | { items: Conversation[]; mode: 'demo-error'; error: string };
+
+async function getConversations(): Promise<ConvState> {
+  const [res, profile] = await Promise.all([
+    listConversationsAction(),
+    getCurrentProfile(),
+  ]);
+  if (!res.ok) {
+    return { items: DEMO_CONVERSATIONS, mode: 'demo-error', error: res.error };
+  }
+  if (res.data.length === 0) {
+    return { items: [], mode: 'empty' };
+  }
+  return {
+    items: res.data.map((c) => adaptConversation(c, profile?.id ?? null)),
+    mode: 'live',
+  };
 }
 
 export default async function HostMessagesPage(props: {
   searchParams: Promise<{ filter?: string }>;
 }) {
   const sp = await props.searchParams;
-  const all = await getConversations();
+  const state = await getConversations();
+  const all = state.items;
+  const isDemo = state.mode === 'demo-error';
+  const errorMsg = state.mode === 'demo-error' ? state.error : null;
   const unreadCount = all.filter((c) => c.unread_owner > 0).length;
   const filtered =
     sp.filter === 'unread' ? all.filter((c) => c.unread_owner > 0) : all;
@@ -38,6 +81,13 @@ export default async function HostMessagesPage(props: {
           </button>
         }
       />
+
+      {isDemo && (
+        <div className="mb-4 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-900 ring-1 ring-rose-200">
+          <Lightbulb className="mr-2 inline h-4 w-4" />
+          Không tải được hội thoại từ BE ({errorMsg}). Hiển thị dữ liệu demo.
+        </div>
+      )}
 
       <div className="mb-4">
         <FilterChips

@@ -1,10 +1,18 @@
 import Link from 'next/link';
-import { CheckCircle2, Clock, Wrench, AlertCircle, Sparkles } from 'lucide-react';
-import { PageHeader } from '@/components/host/page-header';
+import {
+  CheckCircle2,
+  Clock,
+  Wrench,
+  AlertCircle,
+  Sparkles,
+  Smartphone,
+  AlertTriangle,
+  UserPlus,
+} from 'lucide-react';
 import { FilterChips } from '@/components/ui/filter-chips';
 import { GradientAvatar } from '@/components/ui/gradient-avatar';
 import { Badge } from '@/components/ui/badge';
-import { relativeTime, formatDateTime } from '@/lib/format';
+import { relativeTime, formatDateTime, minutesAgo } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { HkTaskStatus, HkIssueSeverity } from '@/lib/legacy-types';
 
@@ -38,11 +46,18 @@ const STATUS_LABEL: Record<HkTaskStatus, string> = {
   rejected: 'Bị từ chối',
 };
 
+const TYPE_LABEL = {
+  clean: 'Dọn phòng',
+  inspect: 'Kiểm tra',
+  restock: 'Bổ sung đồ',
+} as const;
+
 const SEVERITY_LABEL: Record<HkIssueSeverity, string> = {
   minor: 'Nhỏ',
   medium: 'Trung bình',
   urgent: 'Khẩn',
 };
+
 const SEVERITY_VARIANT: Record<HkIssueSeverity, Parameters<typeof Badge>[0]['variant']> = {
   minor: 'default',
   medium: 'warning',
@@ -162,206 +177,404 @@ export default async function HousekeepingPage(props: {
     open_issues: issues.filter((i) => i.status === 'open').length,
   };
 
+  const totalActive = counts.pending + counts.in_progress + counts.done;
+  const completionPct = totalActive === 0 ? 0 : Math.round((counts.done / totalActive) * 100);
+  const unassigned = tasks.filter((t) => !t.assigned_name && t.status !== 'done').length;
+
   const filtered = sp.status ? tasks.filter((t) => t.status === sp.status) : tasks;
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
-      <PageHeader
-        title="Dọn phòng"
-        description="Theo dõi nhân viên dọn phòng. Đồng bộ thời gian thực với app mobile."
-      />
-
-      {/* Quick stats */}
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat icon={<Clock className="h-5 w-5" />} label="Chờ dọn" value={counts.pending} color="amber" />
-        <Stat icon={<Sparkles className="h-5 w-5" />} label="Đang dọn" value={counts.in_progress} color="blue" />
-        <Stat icon={<CheckCircle2 className="h-5 w-5" />} label="Đã sạch" value={counts.done} color="emerald" />
-        <Stat icon={<AlertCircle className="h-5 w-5" />} label="Sự cố mở" value={counts.open_issues} color="rose" />
+    <div className="min-h-screen bg-gradient-to-br from-cream-50/50 via-white to-cream-50/30 p-4 sm:p-6 lg:p-8">
+      {/* Editorial header */}
+      <div className="mb-8">
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div className="max-w-2xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gold-600">
+              Vận hành · Buồng phòng
+            </p>
+            <h1 className="mt-2 font-display text-4xl font-bold leading-[1.05] tracking-tight text-navy-900 sm:text-5xl">
+              Dọn phòng
+            </h1>
+            <p className="mt-3 text-sm leading-relaxed text-ink-500 sm:text-base">
+              Theo dõi nhân viên buồng phòng theo thời gian thực. Lọc theo trạng thái để giao việc, xử lý sự cố trước khi khách check-in.
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* Filter chips */}
-      <div className="mb-4">
-        <FilterChips
-          active={sp.status ?? 'all'}
-          items={[
-            { key: 'all', label: 'Tất cả', href: '/host/hk', count: tasks.length },
-            { key: 'pending', label: 'Chờ dọn', href: '/host/hk?status=pending', count: counts.pending },
-            { key: 'in_progress', label: 'Đang dọn', href: '/host/hk?status=in_progress', count: counts.in_progress },
-            { key: 'done', label: 'Đã sạch', href: '/host/hk?status=done', count: counts.done },
-          ]}
+      {/* Bento stats */}
+      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
+        <BentoBig
+          label="Hoàn thành hôm nay"
+          subLabel={`${counts.done} / ${totalActive} task`}
+          value={`${completionPct}%`}
+          bar={completionPct}
+        />
+        <BentoStat
+          icon={<Clock className="h-4 w-4" />}
+          label="Chờ dọn"
+          value={counts.pending}
+          tone="amber"
+        />
+        <BentoStat
+          icon={<Sparkles className="h-4 w-4" />}
+          label="Đang dọn"
+          value={counts.in_progress}
+          tone="blue"
+        />
+        <BentoStat
+          icon={<CheckCircle2 className="h-4 w-4" />}
+          label="Đã sạch"
+          value={counts.done}
+          tone="emerald"
+        />
+        <BentoStat
+          icon={<UserPlus className="h-4 w-4" />}
+          label="Chưa giao"
+          value={unassigned}
+          tone="navy"
+        />
+        <BentoStat
+          icon={<AlertCircle className="h-4 w-4" />}
+          label="Sự cố mở"
+          value={counts.open_issues}
+          tone="rose"
         />
       </div>
 
-      {/* Tasks list */}
-      <section className="space-y-3 mb-10">
-        {filtered.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-ink-200 bg-white p-12 text-center text-sm text-ink-500">
-            Không có task phù hợp
-          </div>
-        ) : (
-          filtered.map((t) => (
-            <article
-              key={t.id}
-              className={cn(
-                'rounded-2xl bg-white p-4 ring-1 transition',
-                t.status === 'done' ? 'ring-emerald-200 opacity-80' : 'ring-ink-200 hover:ring-navy-300',
-              )}
-            >
-              <div className="flex items-start gap-3">
-                <div
-                  className={cn(
-                    'grid h-10 w-10 shrink-0 place-items-center rounded-full',
-                    t.status === 'done'
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : t.status === 'in_progress'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-amber-100 text-amber-700',
-                  )}
-                >
-                  {t.type === 'clean' ? (
-                    <Sparkles className="h-5 w-5" />
-                  ) : t.type === 'inspect' ? (
-                    <CheckCircle2 className="h-5 w-5" />
-                  ) : (
-                    <Wrench className="h-5 w-5" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h3 className="font-semibold text-ink-900">{t.room_name}</h3>
-                      <p className="text-xs text-ink-500">
-                        {t.property_name} ·{' '}
-                        {t.type === 'clean' ? 'Dọn phòng' : t.type === 'inspect' ? 'Kiểm tra' : 'Bổ sung đồ'}
-                      </p>
-                    </div>
-                    <Badge
-                      variant={
-                        t.status === 'done'
-                          ? 'success'
-                          : t.status === 'in_progress'
-                            ? 'info'
-                            : t.status === 'rejected'
-                              ? 'danger'
-                              : 'warning'
-                      }
-                    >
-                      {STATUS_LABEL[t.status]}
-                    </Badge>
-                  </div>
-                  {t.notes && <p className="mt-2 text-sm text-ink-700">{t.notes}</p>}
-                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-ink-500">
-                    {t.assigned_name ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <GradientAvatar name={t.assigned_name} size="sm" />
-                        {t.assigned_name}
-                      </span>
-                    ) : (
-                      <span className="text-amber-600 font-medium">⚠️ Chưa giao</span>
-                    )}
-                    {t.due_at && t.status !== 'done' && (
-                      <span>
-                        <Clock className="inline h-3 w-3 mr-0.5" />
-                        Hạn {relativeTime(t.due_at)}
-                      </span>
-                    )}
-                    {t.done_at && (
-                      <span className="text-emerald-700">
-                        ✓ Xong {relativeTime(t.done_at)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </article>
-          ))
-        )}
-      </section>
-
-      {/* Issues */}
-      {issues.length > 0 && (
+      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        {/* Tasks column */}
         <section>
-          <div className="mb-3 flex items-baseline justify-between">
-            <h2 className="font-display text-2xl font-semibold tracking-tight text-navy-900">
-              Sự cố ({counts.open_issues} mở)
+          <div className="mb-4 flex items-baseline justify-between gap-3">
+            <h2 className="font-display text-xl font-semibold tracking-tight text-navy-900">
+              Danh sách công việc
             </h2>
-            <Link href="/host/hk/issues" className="text-sm font-semibold text-navy-700 hover:underline">
-              Xem tất cả →
-            </Link>
+            <span className="text-xs text-ink-500 tabular-nums">
+              {filtered.length} / {tasks.length} task
+            </span>
           </div>
-          <div className="space-y-3">
-            {issues.slice(0, 5).map((iss) => (
-              <article
-                key={iss.id}
-                className={cn(
-                  'rounded-xl bg-white p-4 ring-1',
-                  iss.status === 'closed' ? 'ring-ink-100 opacity-70' : 'ring-ink-200',
-                  iss.severity === 'urgent' && iss.status !== 'closed' && 'ring-2 ring-rose-300 bg-rose-50/40',
-                )}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="font-semibold text-ink-900">{iss.room_name}</h4>
-                      <Badge variant={SEVERITY_VARIANT[iss.severity]}>
-                        {iss.severity === 'urgent' && '⚡ '}
-                        {SEVERITY_LABEL[iss.severity]}
-                      </Badge>
-                      {iss.status === 'fixing' && <Badge variant="info">Đang sửa</Badge>}
-                      {iss.status === 'closed' && <Badge variant="success">Đã xong</Badge>}
-                    </div>
-                    <p className="text-xs text-ink-500 mt-0.5">
-                      {iss.category} · báo bởi {iss.reported_by}
-                    </p>
-                    <p className="mt-2 text-sm text-ink-700">{iss.description}</p>
-                  </div>
-                  <span className="text-xs text-ink-500 shrink-0">
-                    {formatDateTime(iss.created_at)}
-                  </span>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
 
-      {/* Mobile note */}
-      <div className="mt-8 rounded-xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-100">
-        <p className="font-semibold">📱 App mobile cho nhân viên dọn phòng</p>
-        <p className="mt-1">
-          Nhân viên HK dùng app mobile (đang phát triển) để cập nhật trạng thái + upload ảnh.
-          Web này dành cho chủ nhà giám sát + giao việc.
-        </p>
+          <div className="mb-4">
+            <FilterChips
+              active={sp.status ?? 'all'}
+              items={[
+                { key: 'all', label: 'Tất cả', href: '/host/hk', count: tasks.length },
+                { key: 'pending', label: 'Chờ dọn', href: '/host/hk?status=pending', count: counts.pending },
+                { key: 'in_progress', label: 'Đang dọn', href: '/host/hk?status=in_progress', count: counts.in_progress },
+                { key: 'done', label: 'Đã sạch', href: '/host/hk?status=done', count: counts.done },
+              ]}
+            />
+          </div>
+
+          {filtered.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-ink-200 bg-white p-12 text-center">
+              <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-cream-100 to-cream-200 text-ink-400">
+                <Sparkles className="h-6 w-6" />
+              </div>
+              <p className="mt-4 text-sm text-ink-500">Không có task phù hợp với bộ lọc</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filtered.map((t) => (
+                <TaskCard key={t.id} task={t} />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Issues sidebar */}
+        <aside className="space-y-4">
+          <div className="rounded-3xl bg-white p-5 ring-1 ring-ink-200/60 shadow-sm">
+            <div className="mb-4 flex items-baseline justify-between gap-2">
+              <h2 className="font-display text-lg font-semibold tracking-tight text-navy-900">
+                Sự cố
+                {counts.open_issues > 0 && (
+                  <span className="ml-2 inline-flex items-center justify-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-700">
+                    {counts.open_issues} mở
+                  </span>
+                )}
+              </h2>
+              <Link
+                href="/host/hk/issues"
+                className="text-xs font-semibold text-navy-700 hover:underline"
+              >
+                Tất cả →
+              </Link>
+            </div>
+            {issues.length === 0 ? (
+              <p className="text-sm text-ink-500">Không có sự cố nào</p>
+            ) : (
+              <div className="space-y-3">
+                {issues.slice(0, 5).map((iss) => (
+                  <IssueCard key={iss.id} issue={iss} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Mobile note — restyled */}
+          <div className="rounded-3xl bg-gradient-to-br from-navy-900 to-navy-800 p-5 text-white ring-1 ring-navy-700 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/10">
+                <Smartphone className="h-4 w-4 text-gold-400" />
+              </div>
+              <div>
+                <p className="text-sm font-bold leading-tight">App mobile cho nhân viên</p>
+                <p className="mt-1.5 text-[11px] leading-relaxed text-white/70">
+                  Nhân viên HK dùng app mobile để cập nhật trạng thái và upload ảnh. Web này dành cho chủ nhà giám sát và giao việc.
+                </p>
+              </div>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   );
 }
 
-function Stat({
+function TaskCard({ task: t }: { task: HkTaskRow }) {
+  const isDone = t.status === 'done';
+  const isProgress = t.status === 'in_progress';
+  const dueMinutes = t.due_at ? Math.floor((new Date(t.due_at).getTime() - Date.now()) / 60_000) : null;
+  const isUrgent = dueMinutes !== null && dueMinutes <= 60 && !isDone;
+  const isOverdue = dueMinutes !== null && dueMinutes < 0 && !isDone;
+
+  const typeIcon =
+    t.type === 'clean' ? <Sparkles className="h-4 w-4" /> :
+    t.type === 'inspect' ? <CheckCircle2 className="h-4 w-4" /> :
+    <Wrench className="h-4 w-4" />;
+
+  const accentStripe =
+    isOverdue ? 'before:bg-rose-500' :
+    isUrgent ? 'before:bg-amber-500' :
+    isProgress ? 'before:bg-blue-500' :
+    isDone ? 'before:bg-emerald-500' :
+    'before:bg-ink-200';
+
+  return (
+    <article
+      className={cn(
+        'relative overflow-hidden rounded-2xl bg-white p-4 pl-5 ring-1 transition',
+        'before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1',
+        accentStripe,
+        isDone ? 'ring-emerald-100 bg-emerald-50/30' : 'ring-ink-200/60 hover:ring-navy-300 hover:shadow-sm',
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className={cn(
+            'grid h-10 w-10 shrink-0 place-items-center rounded-xl ring-1',
+            isDone ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' :
+            isProgress ? 'bg-blue-50 text-blue-700 ring-blue-100' :
+            'bg-amber-50 text-amber-700 ring-amber-100',
+          )}
+        >
+          {typeIcon}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className={cn(
+                'font-semibold leading-tight truncate',
+                isDone ? 'text-ink-700' : 'text-ink-900',
+              )}>
+                {t.room_name}
+              </h3>
+              <p className="mt-0.5 text-[11px] text-ink-500">
+                <span className="font-medium text-ink-700">{t.property_name}</span>
+                <span className="mx-1.5 text-ink-300">·</span>
+                {TYPE_LABEL[t.type]}
+              </p>
+            </div>
+            <Badge
+              variant={
+                isDone ? 'success' :
+                isProgress ? 'info' :
+                t.status === 'rejected' ? 'danger' :
+                'warning'
+              }
+            >
+              {STATUS_LABEL[t.status]}
+            </Badge>
+          </div>
+
+          {t.notes && (
+            <p className={cn(
+              'mt-2 text-sm leading-relaxed',
+              isDone ? 'text-ink-500' : 'text-ink-700',
+            )}>
+              {t.notes}
+            </p>
+          )}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+            {t.assigned_name ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-cream-100 pl-1 pr-2.5 py-0.5 text-ink-700">
+                <GradientAvatar name={t.assigned_name} size="sm" />
+                <span className="font-medium">{t.assigned_name}</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-800">
+                <AlertTriangle className="h-3 w-3" />
+                Chưa giao
+              </span>
+            )}
+
+            {t.due_at && !isDone && (
+              <DuePill minutes={dueMinutes ?? 0} due={t.due_at} />
+            )}
+
+            {t.done_at && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 font-medium text-emerald-700">
+                <CheckCircle2 className="h-3 w-3" />
+                Xong {relativeTime(t.done_at)}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function DuePill({ minutes, due }: { minutes: number; due: string }) {
+  const overdue = minutes < 0;
+  const urgent = !overdue && minutes <= 60;
+
+  const label = overdue
+    ? `Quá hạn ${Math.abs(minutes)}p`
+    : minutes < 60
+      ? `Còn ${minutes}p`
+      : `Hạn ${relativeTime(due)}`;
+
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full px-2 py-1 font-medium tabular-nums',
+        overdue ? 'bg-rose-100 text-rose-700' :
+        urgent ? 'bg-amber-100 text-amber-800' :
+        'bg-ink-100 text-ink-700',
+      )}
+    >
+      <Clock className="h-3 w-3" />
+      {label}
+    </span>
+  );
+}
+
+function IssueCard({ issue: iss }: { issue: HkIssueRow }) {
+  const isUrgent = iss.severity === 'urgent' && iss.status !== 'closed';
+  const isClosed = iss.status === 'closed';
+
+  return (
+    <article
+      className={cn(
+        'relative overflow-hidden rounded-xl bg-white p-3 pl-4 ring-1 transition',
+        'before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1',
+        iss.severity === 'urgent' ? 'before:bg-rose-500' :
+        iss.severity === 'medium' ? 'before:bg-amber-500' :
+        'before:bg-ink-300',
+        isUrgent ? 'ring-rose-200 bg-rose-50/40' :
+        isClosed ? 'ring-ink-100 opacity-70' :
+        'ring-ink-200/60',
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <h4 className="text-sm font-semibold text-ink-900 leading-tight truncate">
+          {iss.room_name}
+        </h4>
+        <span className="text-[10px] text-ink-400 shrink-0 tabular-nums">
+          {minutesAgo(iss.created_at) < 1440
+            ? relativeTime(iss.created_at)
+            : formatDateTime(iss.created_at).slice(0, 5)}
+        </span>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+        <Badge variant={SEVERITY_VARIANT[iss.severity]}>
+          {iss.severity === 'urgent' && '⚡ '}
+          {SEVERITY_LABEL[iss.severity]}
+        </Badge>
+        <span className="text-[11px] text-ink-500">{iss.category}</span>
+        {iss.status === 'fixing' && <Badge variant="info">Đang sửa</Badge>}
+        {isClosed && <Badge variant="success">Đã xong</Badge>}
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-ink-700 line-clamp-2">
+        {iss.description}
+      </p>
+      <p className="mt-2 text-[10px] text-ink-400">Báo bởi {iss.reported_by}</p>
+    </article>
+  );
+}
+
+function BentoBig({
+  label,
+  subLabel,
+  value,
+  bar,
+}: {
+  label: string;
+  subLabel: string;
+  value: string;
+  bar: number;
+}) {
+  return (
+    <div className="col-span-2 row-span-1 flex flex-col justify-between rounded-2xl bg-gradient-to-br from-navy-900 via-navy-800 to-navy-900 p-4 text-white ring-1 ring-navy-700 shadow-sm">
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60">
+          {label}
+        </p>
+        <p className="mt-2 font-display text-4xl font-bold leading-none tabular-nums">
+          {value}
+        </p>
+        <p className="mt-1 text-[11px] text-white/50">{subLabel}</p>
+      </div>
+      <div className="mt-3 h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-gold-400 to-gold-500 transition-all"
+          style={{ width: `${Math.min(100, bar)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function BentoStat({
   icon,
   label,
   value,
-  color,
+  tone,
 }: {
   icon: React.ReactNode;
   label: string;
   value: number;
-  color: 'amber' | 'blue' | 'emerald' | 'rose';
+  tone: 'amber' | 'blue' | 'emerald' | 'rose' | 'navy';
 }) {
-  const colorClass = {
-    amber: 'bg-amber-50 text-amber-700 ring-amber-200',
-    blue: 'bg-blue-50 text-blue-700 ring-blue-200',
-    emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-    rose: 'bg-rose-50 text-rose-700 ring-rose-200',
-  }[color];
-
+  const valueCls: Record<typeof tone, string> = {
+    amber: 'text-amber-700',
+    blue: 'text-blue-700',
+    emerald: 'text-emerald-700',
+    rose: 'text-rose-600',
+    navy: 'text-navy-900',
+  };
+  const iconCls: Record<typeof tone, string> = {
+    amber: 'bg-amber-50 text-amber-700 ring-amber-100',
+    blue: 'bg-blue-50 text-blue-700 ring-blue-100',
+    emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+    rose: 'bg-rose-50 text-rose-600 ring-rose-100',
+    navy: 'bg-navy-50 text-navy-700 ring-navy-100',
+  };
   return (
-    <div className="rounded-2xl bg-white p-4 ring-1 ring-ink-200/60 shadow-card">
-      <div className={`inline-grid h-10 w-10 place-items-center rounded-lg ring-1 ${colorClass}`}>
+    <div className="rounded-2xl bg-white p-4 ring-1 ring-ink-200/60 shadow-sm">
+      <div className={cn('inline-grid h-7 w-7 place-items-center rounded-lg ring-1', iconCls[tone])}>
         {icon}
       </div>
-      <p className="mt-3 overline muted no-dash text-[10px]">{label}</p>
-      <p className="mt-1 font-display text-2xl font-bold text-ink-900">{value}</p>
+      <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-400">
+        {label}
+      </p>
+      <p className={cn('mt-1 font-display text-3xl font-bold leading-none tabular-nums', valueCls[tone])}>
+        {value}
+      </p>
     </div>
   );
 }

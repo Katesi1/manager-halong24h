@@ -24,9 +24,12 @@ interface RefreshResponse {
   refreshToken?: string;
 }
 
-async function refreshAtBackend(
-  refreshToken: string,
-): Promise<{ accessToken: string; refreshToken: string } | null> {
+type RefreshResult =
+  | { accessToken: string; refreshToken: string }
+  | 'network-error'
+  | null;
+
+async function refreshAtBackend(refreshToken: string): Promise<RefreshResult> {
   const base = process.env.NEXT_PUBLIC_API_BASE_URL;
   if (!base) return null;
   try {
@@ -36,7 +39,11 @@ async function refreshAtBackend(
       body: JSON.stringify({ refreshToken }),
       cache: 'no-store',
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // 401/403 = refresh token thật sự invalid → logout đúng
+      // 5xx = BE đang lỗi → giữ cookie, đừng force logout
+      return res.status >= 500 ? 'network-error' : null;
+    }
     const json = (await res.json()) as RefreshResponse;
     const access =
       json.data?.accessToken ??
@@ -48,8 +55,13 @@ async function refreshAtBackend(
       json.refreshToken;
     if (!access || !refresh) return null;
     return { accessToken: access, refreshToken: refresh };
-  } catch {
-    return null;
+  } catch (err) {
+    // TypeError = network down (fetch failed). Phân biệt với "refresh invalid"
+    // để middleware không xoá cookie chỉ vì BE tạm sập vài giây.
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[middleware] refresh network error', err);
+    }
+    return 'network-error';
   }
 }
 
@@ -77,6 +89,11 @@ export async function middleware(request: NextRequest) {
 
   if (!access && refresh) {
     const pair = await refreshAtBackend(refresh);
+    if (pair === 'network-error') {
+      // BE tạm sập — giữ cookie, cho request đi qua. Layout sẽ redirect /login
+      // nếu getCurrentProfile cũng fail, nhưng cookie còn để retry kỳ sau.
+      return NextResponse.next();
+    }
     if (!pair) {
       const url = request.nextUrl.clone();
       url.pathname = '/login';

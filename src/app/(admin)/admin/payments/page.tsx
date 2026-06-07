@@ -26,20 +26,26 @@ export const metadata: Metadata = { title: 'Subscription chủ nhà' };
 const PAGE_SIZE = 10;
 
 const STATUS_LABEL: Record<SubscriptionStatus, string> = {
-  paid: 'Đã thu',
-  pending: 'Chờ thu',
-  overdue: 'Quá hạn',
+  none: 'Chưa có',
+  trial: 'Trial',
+  active: 'Đang hoạt động',
+  past_due: 'Quá hạn',
+  cancelled: 'Đã huỷ',
   frozen: 'Đã khoá',
+  expired: 'Hết hạn',
 };
 
 const STATUS_VARIANT: Record<
   SubscriptionStatus,
   Parameters<typeof Badge>[0]['variant']
 > = {
-  paid: 'success',
-  pending: 'warning',
-  overdue: 'danger',
+  none: 'default',
+  trial: 'gold',
+  active: 'success',
+  past_due: 'danger',
+  cancelled: 'default',
   frozen: 'dark',
+  expired: 'warning',
 };
 
 const PLAN_VARIANT: Record<string, Parameters<typeof Badge>[0]['variant']> = {
@@ -51,17 +57,26 @@ const PLAN_VARIANT: Record<string, Parameters<typeof Badge>[0]['variant']> = {
 
 const TABS: { key: string; label: string }[] = [
   { key: '', label: 'Tất cả' },
-  { key: 'pending', label: 'Chờ thu' },
-  { key: 'overdue', label: 'Quá hạn' },
-  { key: 'paid', label: 'Đã thu' },
+  { key: 'trial', label: 'Trial' },
+  { key: 'active', label: 'Đang hoạt động' },
+  { key: 'past_due', label: 'Quá hạn' },
   { key: 'frozen', label: 'Đã khoá' },
+  { key: 'cancelled', label: 'Đã huỷ' },
 ];
 
 function parseStatus(v: string | undefined): SubscriptionStatus | undefined {
-  if (v === 'paid' || v === 'pending' || v === 'overdue' || v === 'frozen') {
-    return v;
-  }
-  return undefined;
+  const allowed: SubscriptionStatus[] = [
+    'none',
+    'trial',
+    'active',
+    'past_due',
+    'cancelled',
+    'frozen',
+    'expired',
+  ];
+  return allowed.includes(v as SubscriptionStatus)
+    ? (v as SubscriptionStatus)
+    : undefined;
 }
 
 function monthRange(): { from: string; to: string } {
@@ -103,11 +118,9 @@ export default async function AdminPaymentsPage(props: {
   const paidThisMonth = paidResult.ok ? paidResult.data : 0;
 
   const pendingTotal = allSubscriptions
-    .filter((s) => s.status === 'pending')
+    .filter((s) => s.status === 'past_due')
     .reduce((sum, s) => sum + s.amount, 0);
-  const overdueTotal = allSubscriptions
-    .filter((s) => s.status === 'overdue')
-    .reduce((sum, s) => sum + s.amount, 0);
+  const overdueTotal = pendingTotal;
 
   const currentPage = Math.max(1, parseInt(sp.page ?? '1', 10) || 1);
   const totalPages = Math.ceil(allSubscriptions.length / PAGE_SIZE);
@@ -139,7 +152,7 @@ export default async function AdminPaymentsPage(props: {
         <StatCard
           label="Chờ thu"
           value={formatVND(pendingTotal)}
-          hint={`${allSubscriptions.filter((s) => s.status === 'pending').length} chủ nhà`}
+          hint={`${allSubscriptions.filter((s) => s.status === 'past_due').length} chủ nhà`}
         />
         <StatCard
           label="Quá hạn"

@@ -2,7 +2,6 @@ import type { AuditLogRepository } from '@/application/ports/audit-log-repositor
 import type {
   AuditEntry,
   AuditFilters,
-  RecordAuditInput,
 } from '@/core/entities/audit-log';
 
 export async function listAuditEntriesUseCase(
@@ -10,11 +9,4 @@ export async function listAuditEntriesUseCase(
   filters?: AuditFilters,
 ): Promise<AuditEntry[]> {
   return repo.list(filters);
-}
-
-export async function recordAuditEntryUseCase(
-  repo: AuditLogRepository,
-  input: RecordAuditInput,
-): Promise<AuditEntry> {
-  return repo.record(input);
 }

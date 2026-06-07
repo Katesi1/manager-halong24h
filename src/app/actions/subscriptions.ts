@@ -14,7 +14,6 @@ import {
 } from '@/application/subscriptions/actions';
 import type { SubscriptionFilters } from '@/core/entities/subscription';
 import { subscriptionRepository } from '@/infrastructure/container';
-import { recordAudit } from '@/lib/audit-recorder';
 import { requireAdmin, requireManagerRole } from '@/lib/auth-guard';
 
 import { toResult } from './_helpers';
@@ -68,16 +67,6 @@ export async function markSubscriptionPaidAction(
       subscriptionId,
       paidAmount,
     });
-    await recordAudit(
-      profile,
-      'user_change_plan',
-      {
-        type: 'user',
-        id: sub.ownerId,
-        label: `Chủ nhà ${sub.ownerName}`,
-      },
-      `Ghi nhận thu phí ${sub.amount.toLocaleString('vi-VN')}đ, gia hạn đến ${sub.expireAt.slice(0, 10)}`,
-    );
     return sub;
   });
   if (result.ok) {
@@ -97,16 +86,6 @@ export async function freezeSubscriptionAction(
       subscriptionId,
       reason,
     });
-    await recordAudit(
-      profile,
-      'user_change_plan',
-      {
-        type: 'user',
-        id: sub.ownerId,
-        label: `Chủ nhà ${sub.ownerName}`,
-      },
-      `Tạm khoá subscription: ${reason}`,
-    );
     return sub;
   });
   if (result.ok) {
@@ -122,16 +101,6 @@ export async function unfreezeSubscriptionAction(subscriptionId: string) {
     const sub = await unfreezeSubscriptionUseCase(
       subscriptionRepository(),
       subscriptionId,
-    );
-    await recordAudit(
-      profile,
-      'user_change_plan',
-      {
-        type: 'user',
-        id: sub.ownerId,
-        label: `Chủ nhà ${sub.ownerName}`,
-      },
-      `Mở khoá subscription`,
     );
     return sub;
   });

@@ -170,4 +170,50 @@ export class MockBookingRepository implements BookingRepository {
     store.set(input.id, updated);
     return updated;
   }
+
+  async listMine(filters?: BookingFilters): Promise<Booking[]> {
+    return this.list(filters);
+  }
+
+  async monthCalendar(filters: {
+    propertyId: string;
+    year: number;
+    month: number;
+  }): Promise<Booking[]> {
+    return Array.from(store.values()).filter(
+      (b) => b.propertyId === filters.propertyId,
+    );
+  }
+
+  async customerHold(input: CreateBookingHoldInput): Promise<Booking> {
+    return this.hold(input);
+  }
+
+  async customerCancel(id: string): Promise<Booking> {
+    return this.cancel({ id });
+  }
+
+  async update(input: {
+    id: string;
+    customerName?: string;
+    customerPhone?: string;
+    guestCount?: number;
+    notes?: string;
+    depositAmount?: number;
+  }): Promise<Booking> {
+    const b = store.get(input.id);
+    if (!b) throw new NotFoundError('Không tìm thấy booking');
+    const updated: Booking = {
+      ...b,
+      guestName: input.customerName ?? b.guestName,
+      guestPhone: input.customerPhone ?? b.guestPhone,
+      guestCount: input.guestCount ?? b.guestCount,
+      notes: input.notes ?? b.notes,
+      deposit:
+        input.depositAmount !== undefined ? vnd(input.depositAmount) : b.deposit,
+      updatedAt: new Date().toISOString(),
+    };
+    store.set(input.id, updated);
+    return updated;
+  }
 }

@@ -25,7 +25,7 @@ const SEED: Subscription[] = [
     cycle: 'monthly',
     roomCount: 5,
     amount: 5 * PRICE_PER_ROOM.basic,
-    status: 'paid',
+    status: 'active',
     startAt: '2026-05-05T00:00:00.000Z',
     expireAt: '2026-06-05T00:00:00.000Z',
     paidAt: '2026-05-05T09:00:00.000Z',
@@ -42,7 +42,7 @@ const SEED: Subscription[] = [
     cycle: 'monthly',
     roomCount: 18,
     amount: 18 * PRICE_PER_ROOM.standard,
-    status: 'paid',
+    status: 'active',
     startAt: '2026-05-08T00:00:00.000Z',
     expireAt: '2026-06-08T00:00:00.000Z',
     paidAt: '2026-05-08T11:00:00.000Z',
@@ -59,7 +59,7 @@ const SEED: Subscription[] = [
     cycle: 'monthly',
     roomCount: 6,
     amount: 6 * PRICE_PER_ROOM.basic,
-    status: 'pending',
+    status: 'none',
     startAt: '2026-05-10T00:00:00.000Z',
     expireAt: '2026-06-10T00:00:00.000Z',
     paidAt: null,
@@ -76,7 +76,7 @@ const SEED: Subscription[] = [
     cycle: 'monthly',
     roomCount: 42,
     amount: 42 * PRICE_PER_ROOM.pro,
-    status: 'overdue',
+    status: 'past_due',
     startAt: '2026-04-05T00:00:00.000Z',
     expireAt: '2026-05-05T00:00:00.000Z',
     paidAt: null,
@@ -136,14 +136,14 @@ export class MockSubscriptionRepository implements SubscriptionRepository {
   }
 
   async countOverdue(): Promise<number> {
-    return Array.from(store.values()).filter((s) => s.status === 'overdue')
+    return Array.from(store.values()).filter((s) => s.status === 'past_due')
       .length;
   }
 
   async sumPaidBetween(from: string, to: string): Promise<number> {
     return Array.from(store.values())
       .filter(
-        (s) => s.paidAt && s.paidAt >= from && s.paidAt <= to && s.status === 'paid',
+        (s) => s.paidAt && s.paidAt >= from && s.paidAt <= to && s.status === 'active',
       )
       .reduce((total, s) => total + s.amount, 0);
   }
@@ -153,7 +153,7 @@ export class MockSubscriptionRepository implements SubscriptionRepository {
     if (!sub) throw new NotFoundError('Không tìm thấy subscription');
     const updated: Subscription = {
       ...sub,
-      status: 'paid',
+      status: 'active',
       paidAt: new Date().toISOString(),
       // Gia hạn từ ngày trả: monthly = +30, yearly = +365
       expireAt: plus(NOW, sub.cycle === 'yearly' ? 365 : 30),
@@ -183,7 +183,7 @@ export class MockSubscriptionRepository implements SubscriptionRepository {
     const isExpired = sub.expireAt < new Date().toISOString();
     const updated: Subscription = {
       ...sub,
-      status: isExpired ? 'overdue' : 'paid',
+      status: isExpired ? 'past_due' : 'active',
       note: null,
       updatedAt: new Date().toISOString(),
     };

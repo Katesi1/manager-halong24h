@@ -3,7 +3,8 @@ import { PageHeader } from '@/components/host/page-header';
 import { FilterChips } from '@/components/ui/filter-chips';
 import { LeadCard, type LeadCardData } from '@/components/host/lead-card';
 import { Lightbulb } from 'lucide-react';
-import type { LeadStatus } from '@/lib/legacy-types';
+import { listLeadsAction } from '@/app/actions/leads';
+import type { Lead, LeadStatus } from '@/core/entities/lead';
 
 const DEMO: LeadCardData[] = [
   {
@@ -79,15 +80,49 @@ const DEMO: LeadCardData[] = [
   },
 ];
 
-async function getLeads(): Promise<LeadCardData[]> {
-  return DEMO;
+function toCardData(lead: Lead): LeadCardData {
+  return {
+    id: lead.id,
+    guest_name: lead.guestName,
+    guest_phone: lead.guestPhone,
+    guest_email: lead.guestEmail,
+    check_in: lead.checkIn,
+    check_out: lead.checkOut,
+    num_guests: lead.numGuests,
+    message: lead.message,
+    status: lead.status,
+    created_at: lead.createdAt,
+    property_name: lead.propertyName ?? '—',
+    room_name: null,
+  };
+}
+
+type LeadsState =
+  | { leads: LeadCardData[]; mode: 'live' }
+  | { leads: LeadCardData[]; mode: 'demo-error'; error: string }
+  | { leads: LeadCardData[]; mode: 'empty' };
+
+async function getLeads(): Promise<LeadsState> {
+  const res = await listLeadsAction();
+  if (!res.ok) {
+    // BE fail (403/500/network) — fallback DEMO + hiển thị error rõ ràng.
+    return { leads: DEMO, mode: 'demo-error', error: res.error };
+  }
+  if (res.data.length === 0) {
+    // User chưa có lead nào thực sự — empty state đúng, không show DEMO.
+    return { leads: [], mode: 'empty' };
+  }
+  return { leads: res.data.map(toCardData), mode: 'live' };
 }
 
 export default async function LeadsListPage(props: {
   searchParams: Promise<{ status?: string }>;
 }) {
   const sp = await props.searchParams;
-  const allLeads = await getLeads();
+  const state = await getLeads();
+  const allLeads = state.leads;
+  const isDemo = state.mode === 'demo-error';
+  const errorMsg = state.mode === 'demo-error' ? state.error : null;
 
   const counts: Record<LeadStatus, number> = {
     new: allLeads.filter((l) => l.status === 'new').length,
@@ -111,6 +146,13 @@ export default async function LeadsListPage(props: {
         }
         description="Khách gửi qua form liên hệ. Phản hồi nhanh < 30ph để giữ Trust Score và lên Top tìm kiếm."
       />
+
+      {isDemo && (
+        <div className="mb-4 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-900 ring-1 ring-rose-200">
+          <Lightbulb className="mr-2 inline h-4 w-4" />
+          Không tải được lead từ BE ({errorMsg}). Hiển thị dữ liệu demo tạm thời.
+        </div>
+      )}
 
       {/* Filter chips */}
       <div className="mb-5">

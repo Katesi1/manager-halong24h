@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Bell, Search, ShieldCheck, UserCog, Building, AlertTriangle, MessageSquare, Star } from 'lucide-react';
+import { Bell, Search, ShieldCheck, UserCog, Building, AlertTriangle, MessageSquare, CalendarCheck, CreditCard } from 'lucide-react';
 
 import { listAuditEntriesAction } from '@/app/actions/audit-log';
 import { PageHeader } from '@/components/host/page-header';
@@ -26,24 +26,36 @@ const ACTION_VARIANT: Record<
   kyc_reject: 'danger',
   user_ban: 'danger',
   user_unban: 'success',
-  user_revoke_session: 'warning',
+  user_revoke_sessions: 'warning',
   user_reset_password: 'info',
   user_change_plan: 'gold',
   user_change_role: 'gold',
+  user_delete: 'danger',
+  user_kyc_bypass_toggle: 'info',
   property_approve: 'success',
   property_reject: 'danger',
   property_suspend: 'warning',
   dispute_resolve: 'success',
   dispute_reject: 'default',
-  dispute_start_investigation: 'info',
+  dispute_investigate: 'info',
   review_hide: 'warning',
+  review_restore: 'success',
+  booking_mark_paid: 'success',
+  subscription_trial_grant: 'gold',
+  subscription_trial_revoke: 'warning',
+  subscription_set_price: 'info',
+  subscription_mark_paid: 'success',
+  subscription_freeze: 'warning',
+  subscription_unfreeze: 'success',
 };
 
 const TARGET_ICON: Record<AuditTargetType, typeof Bell> = {
   kyc: ShieldCheck,
   user: UserCog,
   property: Building,
+  booking: CalendarCheck,
   dispute: AlertTriangle,
+  subscription: CreditCard,
   review: MessageSquare,
 };
 
@@ -51,7 +63,9 @@ const TARGET_COLOR: Record<AuditTargetType, string> = {
   kyc: 'bg-emerald-100 text-emerald-700',
   user: 'bg-navy-100 text-navy-700',
   property: 'bg-gold-100 text-gold-700',
+  booking: 'bg-sky-100 text-sky-700',
   dispute: 'bg-rose-100 text-rose-700',
+  subscription: 'bg-violet-100 text-violet-700',
   review: 'bg-amber-100 text-amber-700',
 };
 
@@ -65,10 +79,16 @@ const TABS: { key: string; label: string }[] = [
 ];
 
 function parseTarget(v: string | undefined): AuditTargetType | undefined {
-  if (v === 'kyc' || v === 'user' || v === 'property' || v === 'dispute' || v === 'review') {
-    return v;
-  }
-  return undefined;
+  const allowed: AuditTargetType[] = [
+    'kyc',
+    'user',
+    'property',
+    'booking',
+    'dispute',
+    'subscription',
+    'review',
+  ];
+  return allowed.includes(v as AuditTargetType) ? (v as AuditTargetType) : undefined;
 }
 
 function buildHref(base: string, params: Record<string, string | undefined>) {

@@ -182,4 +182,30 @@ export class MockPropertyRepository implements PropertyRepository {
   async setCoverImage(_propertyId: string, _imageId: string): Promise<void> {
     // no-op
   }
+
+  async listPublic(): Promise<Property[]> {
+    return MOCK_PROPERTIES.filter((p) => p.isActive);
+  }
+
+  async getShare(id: string): Promise<Property | null> {
+    return MOCK_PROPERTIES.find((p) => p.id === id) ?? null;
+  }
+
+  async approve(id: string): Promise<Property> {
+    const found = await this.getById(id);
+    if (!found) throw new Error(`Mock property repository: không tìm thấy ${id}`);
+    return found;
+  }
+
+  async reject(id: string, _reason: string): Promise<Property> {
+    const found = await this.getById(id);
+    if (!found) throw new Error(`Mock property repository: không tìm thấy ${id}`);
+    return found;
+  }
+
+  async suspend(id: string, _reason?: string): Promise<Property> {
+    const found = await this.getById(id);
+    if (!found) throw new Error(`Mock property repository: không tìm thấy ${id}`);
+    return found;
+  }
 }

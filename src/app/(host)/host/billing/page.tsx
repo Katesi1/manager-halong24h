@@ -77,7 +77,7 @@ export default async function HostBillingPage() {
               {sub && (
                 <p className="mt-1 text-xs text-white/50">
                   Hết hạn: {formatDate(sub.expireAt)}
-                  {sub.status === 'overdue' && (
+                  {sub.status === 'past_due' && (
                     <span className="ml-2 inline-flex items-center rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-semibold text-rose-300">
                       Quá hạn
                     </span>
@@ -113,7 +113,7 @@ export default async function HostBillingPage() {
           <QuickStat
             label="Trạng thái"
             value={
-              sub?.status === 'overdue'
+              sub?.status === 'past_due'
                 ? 'Quá hạn'
                 : sub?.status === 'frozen'
                   ? 'Tạm khoá'
@@ -122,7 +122,7 @@ export default async function HostBillingPage() {
                     : 'Hoạt động'
             }
             valueClass={
-              sub?.status === 'overdue'
+              sub?.status === 'past_due'
                 ? 'text-rose-600'
                 : sub?.status === 'frozen'
                   ? 'text-amber-600'

@@ -8,7 +8,10 @@ import type {
   UpdatePricesInput,
   UpdatePropertyInput,
 } from '@/core/entities/property';
-import type { PropertyRepository } from '@/application/ports/property-repository';
+import type {
+  PropertyRepository,
+  PublicPropertyFilters,
+} from '@/application/ports/property-repository';
 
 import { apiClient } from '../http/api-client';
 
@@ -78,6 +81,55 @@ export class ApiPropertyRepository implements PropertyRepository {
   async setCoverImage(propertyId: string, imageId: string): Promise<void> {
     await apiClient.patch(
       `/properties/${propertyId}/images/${imageId}/cover`,
+    );
+  }
+
+  async listPublic(filters?: PublicPropertyFilters): Promise<Property[]> {
+    return apiClient.get<Property[]>('/properties/public', {
+      skipAuth: true,
+      query: {
+        checkinDate: filters?.checkinDate,
+        checkoutDate: filters?.checkoutDate,
+        guests: filters?.guests,
+        minPrice: filters?.minPrice,
+        maxPrice: filters?.maxPrice,
+        type: filters?.type,
+        view: filters?.view,
+      },
+      cache: 'no-store',
+    });
+  }
+
+  async getShare(id: string): Promise<Property | null> {
+    try {
+      return await apiClient.get<Property>(`/properties/share/${id}`, {
+        skipAuth: true,
+        cache: 'no-store',
+      });
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        'status' in err &&
+        (err as { status: number }).status === 404
+      ) {
+        return null;
+      }
+      throw err;
+    }
+  }
+
+  async approve(id: string): Promise<Property> {
+    return apiClient.post<Property>(`/properties/${id}/approve`);
+  }
+
+  async reject(id: string, reason: string): Promise<Property> {
+    return apiClient.post<Property>(`/properties/${id}/reject`, { reason });
+  }
+
+  async suspend(id: string, reason?: string): Promise<Property> {
+    return apiClient.post<Property>(
+      `/properties/${id}/suspend`,
+      reason ? { reason } : undefined,
     );
   }
 }

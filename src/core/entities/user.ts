@@ -10,12 +10,22 @@ export interface Permission {
 
 export type KycStatus = 'none' | 'pending' | 'approved' | 'rejected';
 
+/** Spec §10.5 / §19. */
 export type SubscriptionStatus =
+  | 'none'
+  | 'trial'
   | 'active'
-  | 'trialing'
   | 'past_due'
   | 'cancelled'
+  | 'frozen'
   | 'expired'
+  | null;
+
+export type SubscriptionProvider =
+  | 'apple_iap'
+  | 'vnpay'
+  | 'manual_bank'
+  | 'manual'
   | null;
 
 export interface AuthSession {
@@ -29,20 +39,27 @@ export interface AuthUser {
   name: string;
   phone: string | null;
   email: string;
+  avatar: string | null;
   role: RoleCode;
   ownerId: string | null;
   isActive: boolean;
+  emailVerified: boolean;
 }
 
 export interface UserProfile extends AuthUser {
   gender: number | null;
   dateOfBirth: string | null;
   createdAt: string;
+  updatedAt: string | null;
   kycBypass: boolean;
   kycStatus: KycStatus;
   subscriptionStatus: SubscriptionStatus;
   subscriptionPlanId: string | null;
   subscriptionCycle: 'monthly' | 'yearly' | null;
+  subscriptionProvider: SubscriptionProvider;
+  subscriptionPriceOverride: number | null;
+  subscriptionFrozenAt: string | null;
+  subscriptionFrozenReason: string | null;
   trialEndsAt: string | null;
   nextChargeAt: string | null;
   permissions: Permission[];

@@ -166,13 +166,6 @@ export default async function HostStaffPage() {
         </aside>
       </div>
 
-      <div className="mt-6 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-100">
-        <p className="font-semibold">📱 Lưu ý về dọn phòng</p>
-        <p className="mt-1">
-          Hiện tại BE chỉ hỗ trợ mời SALE qua flow `/staff/invites`.
-          Nhân viên dọn phòng dùng app mobile riêng — sẽ tích hợp khi BE bổ sung.
-        </p>
-      </div>
     </div>
   );
 }

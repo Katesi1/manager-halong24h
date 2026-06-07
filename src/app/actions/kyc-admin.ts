@@ -11,7 +11,6 @@ import {
 } from '@/application/kyc-admin/actions';
 import type { KycAdminFilters } from '@/core/entities/kyc-admin';
 import { kycAdminRepository } from '@/infrastructure/container';
-import { recordAudit } from '@/lib/audit-recorder';
 import { requireAdmin } from '@/lib/auth-guard';
 
 import { toResult } from './_helpers';
@@ -37,16 +36,6 @@ export async function approveKycAdminAction(submissionId: string) {
       kycAdminRepository(),
       submissionId,
     );
-    await recordAudit(
-      profile,
-      'kyc_approve',
-      {
-        type: 'kyc',
-        id: submission.id,
-        label: `Hồ sơ ${submission.ownerName}`,
-      },
-      null,
-    );
     return submission;
   });
   if (result.ok) {
@@ -64,16 +53,6 @@ export async function rejectKycAdminAction(submissionId: string, reason: string)
       submissionId,
       reason,
     });
-    await recordAudit(
-      profile,
-      'kyc_reject',
-      {
-        type: 'kyc',
-        id: submission.id,
-        label: `Hồ sơ ${submission.ownerName}`,
-      },
-      reason,
-    );
     return submission;
   });
   if (result.ok) {

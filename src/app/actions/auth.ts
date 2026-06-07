@@ -163,7 +163,9 @@ export async function forgotPasswordAction(
   } catch (raw) {
     const err = mapApiErrorToDomain(raw);
     if (err.code === 'NETWORK' || err.code === 'UNKNOWN') {
-      console.error('[forgotPassword] backend unreachable', err);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[forgotPassword] backend unreachable', err);
+      }
       return { ok: true };
     }
     return { error: err.message };
@@ -212,7 +214,21 @@ export async function logoutAction(): Promise<void> {
 export async function getCurrentProfile() {
   try {
     return await getProfileUseCase(authRepository());
-  } catch {
+  } catch (err) {
+    // Phân biệt unauth (401/403 — user chưa login hoặc token revoke) vs lỗi
+    // hệ thống (5xx, network). Cả 2 đều trả null để layout redirect login,
+    // nhưng log lỗi hệ thống ra để phát hiện sớm.
+    const status =
+      err instanceof Error && 'status' in err
+        ? (err as { status: number }).status
+        : null;
+    const isAuthError = status === 401 || status === 403;
+    if (!isAuthError && process.env.NODE_ENV !== 'production') {
+      console.warn('[getCurrentProfile] unexpected error', {
+        status,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
     return null;
   }
 }
