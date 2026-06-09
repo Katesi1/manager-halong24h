@@ -7,6 +7,7 @@ import {
   deletePropertyImageAction,
   setPropertyCoverImageAction,
 } from '@/app/actions/properties';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { PropertyImage } from '@/core/entities/property';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +20,7 @@ export function ImageGrid({ propertyId, images }: ImageGridProps) {
   const [pending, startTransition] = useTransition();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   if (images.length === 0) {
     return (
@@ -29,7 +31,13 @@ export function ImageGrid({ propertyId, images }: ImageGridProps) {
   }
 
   function onDelete(imageId: string) {
-    if (!confirm('Xóa ảnh này?')) return;
+    setPendingDeleteId(imageId);
+  }
+
+  function confirmDelete() {
+    const imageId = pendingDeleteId;
+    if (!imageId) return;
+    setPendingDeleteId(null);
     setBusyId(imageId);
     setError(null);
     startTransition(async () => {
@@ -110,6 +118,16 @@ export function ImageGrid({ propertyId, images }: ImageGridProps) {
           );
         })}
       </div>
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        title="Xoá ảnh này?"
+        description="Ảnh sẽ bị xoá vĩnh viễn khỏi cơ sở. Không thể khôi phục."
+        confirmLabel="Xoá"
+        variant="danger"
+        pending={pending}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </div>
   );
 }

@@ -8,7 +8,7 @@ import type {
   StaffInviteFilters,
   StaffMember,
 } from '@/core/entities/staff';
-import type { AuthSession } from '@/core/entities/user';
+import type { AuthTokens } from '@/core/entities/user';
 import type {
   AcceptStaffInviteInput,
   StaffInviteVerification,
@@ -94,7 +94,7 @@ export class MockStaffRepository implements StaffRepository {
     throw new NotFoundError('Mock staff repository: chưa hỗ trợ verifyInvite');
   }
 
-  async acceptInvite(_input: AcceptStaffInviteInput): Promise<AuthSession> {
+  async acceptInvite(_input: AcceptStaffInviteInput): Promise<AuthTokens> {
     throw new NotFoundError('Mock staff repository: chưa hỗ trợ acceptInvite');
   }
 }

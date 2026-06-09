@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ValidationError } from '@/core/errors';
 import type {
   KycAdminFilters,
+  KycAdminListResult,
   KycAdminSubmission,
 } from '@/core/entities/kyc-admin';
 import type { KycAdminRepository } from '../ports/kyc-admin-repository';
@@ -10,7 +11,7 @@ import type { KycAdminRepository } from '../ports/kyc-admin-repository';
 export async function listKycSubmissionsUseCase(
   repo: KycAdminRepository,
   filters?: KycAdminFilters,
-): Promise<KycAdminSubmission[]> {
+): Promise<KycAdminListResult> {
   return repo.list(filters);
 }
 

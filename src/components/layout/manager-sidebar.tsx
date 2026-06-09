@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useState, useCallback } from 'react';
 import {
   AlertTriangle,
+  Banknote,
   BedDouble,
   Building,
   Building2,
@@ -84,7 +85,8 @@ const ADMIN_GROUPS: NavGroup[] = [
     label: 'Tài chính & hỗ trợ',
     collapsible: true,
     items: [
-      { href: '/admin/payments', label: 'Subscription chủ nhà', icon: Wallet },
+      { href: '/admin/payments', label: 'Subscription chủ nhà', icon: Wallet, exact: true },
+      { href: '/admin/payments/sessions', label: 'Duyệt gói cước đã mua', icon: Banknote },
       { href: '/admin/disputes', label: 'Khiếu nại', icon: AlertTriangle },
       { href: '/admin/reviews', label: 'Kiểm duyệt review', icon: MessageSquare },
       { href: '/admin/reports', label: 'Báo cáo hệ thống', icon: TrendingUp },

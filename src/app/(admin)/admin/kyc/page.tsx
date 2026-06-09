@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Search, ShieldCheck } from 'lucide-react';
 
 import { listKycAdminAction } from '@/app/actions/kyc-admin';
+import { KycRowActions } from '@/components/admin/kyc-row-actions';
 import { PageHeader } from '@/components/host/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Pagination } from '@/components/ui/pagination';
@@ -10,19 +11,29 @@ import {
   KYC_STATUS_LABEL,
   type KycSubmissionStatus,
 } from '@/core/entities/kyc';
-import type { KycAdminSubmission } from '@/core/entities/kyc-admin';
+import type {
+  KycAdminListResult,
+  KycQueueFilter,
+} from '@/core/entities/kyc-admin';
 import { formatDateTime } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Duyệt KYC' };
 
 const PAGE_SIZE = 10;
 
-const TABS: { key: '' | KycSubmissionStatus; label: string }[] = [
-  { key: '', label: 'Tất cả' },
-  { key: 'awaiting_approval', label: 'Chờ duyệt' },
-  { key: 'approved', label: 'Đã duyệt' },
-  { key: 'rejected', label: 'Đã từ chối' },
+const TABS: { key: KycQueueFilter; label: string }[] = [
+  { key: 0, label: 'Tất cả' },
+  { key: 1, label: 'Chờ duyệt' },
+  { key: 2, label: 'Đã duyệt' },
+  { key: 3, label: 'Đã từ chối' },
 ];
+
+function parseFilter(raw: string | undefined): KycQueueFilter {
+  if (raw === '0') return 0;
+  if (raw === '2') return 2;
+  if (raw === '3') return 3;
+  return 1;
+}
 
 const STATUS_VARIANT: Record<
   KycSubmissionStatus,
@@ -38,19 +49,6 @@ const STATUS_VARIANT: Record<
   refunded: 'default',
 };
 
-function isStatus(s: string | undefined): s is KycSubmissionStatus {
-  return (
-    s === 'draft' ||
-    s === 'kyc_submitted' ||
-    s === 'payment_pending' ||
-    s === 'paid' ||
-    s === 'awaiting_approval' ||
-    s === 'approved' ||
-    s === 'rejected' ||
-    s === 'refunded'
-  );
-}
-
 function buildHref(base: string, params: Record<string, string | undefined>) {
   const sp = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
@@ -60,25 +58,36 @@ function buildHref(base: string, params: Record<string, string | undefined>) {
   return qs ? `${base}?${qs}` : base;
 }
 
+const EMPTY_RESULT: KycAdminListResult = {
+  filter: 1,
+  pendingCount: 0,
+  total: 0,
+  page: 1,
+  pageSize: PAGE_SIZE,
+  items: [],
+};
+
 export default async function AdminKycPage(props: {
-  searchParams: Promise<{ status?: string; q?: string; page?: string }>;
+  searchParams: Promise<{ filter?: string; q?: string; page?: string }>;
 }) {
   const sp = await props.searchParams;
-  const status = isStatus(sp.status) ? sp.status : undefined;
-  const result = await listKycAdminAction({ status, search: sp.q });
-  const allSubmissions: KycAdminSubmission[] = result.ok ? result.data : [];
+  const filter: KycQueueFilter = parseFilter(sp.filter);
+  const currentPage = Math.max(1, parseInt(sp.page ?? '1', 10) || 1);
+  const result = await listKycAdminAction({
+    filter,
+    page: currentPage,
+    pageSize: PAGE_SIZE,
+    search: sp.q,
+  });
+  const queue: KycAdminListResult = result.ok ? result.data : EMPTY_RESULT;
   const apiError = !result.ok ? result.error : null;
 
-  const currentPage = Math.max(1, parseInt(sp.page ?? '1', 10) || 1);
-  const totalPages = Math.ceil(allSubmissions.length / PAGE_SIZE);
-  const paginated = allSubmissions.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
-  );
+  const totalPages = Math.max(1, Math.ceil(queue.total / PAGE_SIZE));
+  const paginated = queue.items;
 
   function pageHref(page: number) {
     return buildHref('/admin/kyc', {
-      status: sp.status,
+      filter: filter === 1 ? undefined : String(filter),
       q: sp.q,
       page: page > 1 ? String(page) : undefined,
     });
@@ -102,12 +111,12 @@ export default async function AdminKycPage(props: {
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-1.5">
           {TABS.map((t) => {
-            const active = (sp.status ?? '') === t.key;
+            const active = filter === t.key;
             return (
               <Link
                 key={t.key}
                 href={buildHref('/admin/kyc', {
-                  status: t.key || undefined,
+                  filter: t.key === 1 ? undefined : String(t.key),
                   q: sp.q,
                 })}
                 className={
@@ -118,13 +127,27 @@ export default async function AdminKycPage(props: {
                 }
               >
                 {t.label}
+                {t.key === 1 && queue.pendingCount > 0 && (
+                  <span
+                    className={
+                      'ml-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold ' +
+                      (active
+                        ? 'bg-white text-navy-900'
+                        : 'bg-rose-100 text-rose-700')
+                    }
+                  >
+                    {queue.pendingCount}
+                  </span>
+                )}
               </Link>
             );
           })}
         </div>
 
         <form action="/admin/kyc" method="GET" className="relative max-w-xs w-full sm:w-auto">
-          {status && <input type="hidden" name="status" value={status} />}
+          {filter !== 1 && (
+            <input type="hidden" name="filter" value={String(filter)} />
+          )}
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
           <input
             type="search"
@@ -136,13 +159,13 @@ export default async function AdminKycPage(props: {
         </form>
       </div>
 
-      {allSubmissions.length === 0 ? (
+      {queue.total === 0 ? (
         <div className="rounded-2xl border border-dashed border-ink-200 bg-white p-16 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-cream-200">
             <ShieldCheck className="h-7 w-7 text-ink-400" />
           </div>
           <p className="text-sm font-medium text-ink-700">
-            {status === 'awaiting_approval'
+            {filter === 1
               ? 'Không có hồ sơ chờ duyệt.'
               : 'Không có hồ sơ phù hợp.'}
           </p>
@@ -214,12 +237,11 @@ export default async function AdminKycPage(props: {
                       {formatDateTime(s.submittedAt)}
                     </td>
                     <td className="px-5 py-4 text-right">
-                      <Link
-                        href={`/admin/kyc/${s.id}`}
-                        className="inline-flex h-8 items-center rounded-lg bg-cream-100 px-3 text-xs font-semibold text-navy-800 transition-colors hover:bg-navy-900 hover:text-white"
-                      >
-                        Xem chi tiết
-                      </Link>
+                      <KycRowActions
+                        submissionId={s.id}
+                        status={s.status}
+                        ownerName={s.ownerName}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -230,7 +252,7 @@ export default async function AdminKycPage(props: {
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
-            totalItems={allSubmissions.length}
+            totalItems={queue.total}
             pageSize={PAGE_SIZE}
             buildHref={pageHref}
           />

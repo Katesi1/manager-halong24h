@@ -8,6 +8,11 @@ import { getProfileUseCase } from '@/application/auth/get-profile';
 import { loginUseCase } from '@/application/auth/login';
 import { logoutUseCase } from '@/application/auth/logout';
 import { ValidationError } from '@/core/errors';
+import { isOAuthNewUserPrompt } from '@/core/entities/user';
+import type {
+  AuthTokens,
+  OAuthNewUserPrompt,
+} from '@/core/entities/user';
 import { RoleCode } from '@/core/value-objects/role';
 import { authRepository } from '@/infrastructure/container';
 import { mapApiErrorToDomain } from '@/infrastructure/http/api-error';
@@ -51,9 +56,10 @@ export async function loginAction(
 
   const values = { email };
 
-  let session;
+  const repo = authRepository();
+  let tokens;
   try {
-    session = await loginUseCase(authRepository(), { email, password });
+    tokens = await loginUseCase(repo, { email, password });
   } catch (raw) {
     const err = raw instanceof ValidationError ? raw : mapApiErrorToDomain(raw);
     if (err instanceof ValidationError) {
@@ -66,12 +72,19 @@ export async function loginAction(
     return { error: err.message, values };
   }
 
-  await writeTokens({
-    accessToken: session.accessToken,
-    refreshToken: session.refreshToken,
-  });
+  // Spec v1.7 §2.4 — token write trước, sau đó fetch profile để biết role.
+  await writeTokens(tokens);
 
-  if (session.user.role === RoleCode.CUSTOMER) {
+  let profile;
+  try {
+    profile = await repo.getProfile();
+  } catch (raw) {
+    await clearTokens();
+    const err = mapApiErrorToDomain(raw);
+    return { error: err.message || 'Không lấy được thông tin tài khoản', values };
+  }
+
+  if (profile.role === RoleCode.CUSTOMER) {
     await clearTokens();
     return {
       error: 'Tài khoản này không được phép truy cập trang quản lý',
@@ -84,10 +97,70 @@ export async function loginAction(
   const destination =
     redirectTo !== '/'
       ? sanitizeRedirect(redirectTo)
-      : session.user.role === RoleCode.ADMIN
+      : profile.role === RoleCode.ADMIN
         ? '/admin'
         : '/host';
   redirect(destination);
+}
+
+/**
+ * Spec v1.7 §2.3 — `POST /auth/google`.
+ *
+ * Trả 2 shape:
+ * - User cũ: `AuthTokens` → write tokens, fetch profile, redirect theo role
+ * - User mới chưa chọn role: `OAuthNewUserPrompt` → return prompt cho UI hỏi
+ *   user chọn OWNER/CUSTOMER, sau đó gọi lại action này kèm `role`.
+ *
+ * Form FE truyền: `idToken` (JWT Google trả từ GIS) + optional `role`.
+ */
+export type GoogleSignInResult =
+  | { ok: true; kind: 'redirect'; redirectTo: string }
+  | { ok: true; kind: 'needs-role'; prompt: OAuthNewUserPrompt }
+  | { ok: false; error: string };
+
+export async function loginWithGoogleAction(
+  idToken: string,
+  role?: RoleCode,
+): Promise<GoogleSignInResult> {
+  if (!idToken || typeof idToken !== 'string') {
+    return { ok: false, error: 'Thiếu Google idToken' };
+  }
+  const repo = authRepository();
+
+  let result;
+  try {
+    result = await repo.loginWithGoogle(idToken, role);
+  } catch (raw) {
+    const err = mapApiErrorToDomain(raw);
+    return { ok: false, error: err.message };
+  }
+
+  if (isOAuthNewUserPrompt(result)) {
+    return { ok: true, kind: 'needs-role', prompt: result };
+  }
+
+  const tokens: AuthTokens = result;
+  await writeTokens(tokens);
+
+  let profile;
+  try {
+    profile = await repo.getProfile();
+  } catch {
+    await clearTokens();
+    return { ok: false, error: 'Không lấy được thông tin tài khoản sau khi đăng nhập' };
+  }
+
+  if (profile.role === RoleCode.CUSTOMER) {
+    await clearTokens();
+    return {
+      ok: false,
+      error: 'Tài khoản này không được phép truy cập trang quản lý',
+    };
+  }
+
+  revalidatePath('/', 'layout');
+  const redirectTo = profile.role === RoleCode.ADMIN ? '/admin' : '/host';
+  return { ok: true, kind: 'redirect', redirectTo };
 }
 
 const SignupSchema = z.object({
@@ -126,9 +199,9 @@ export async function signupAction(
   }
 
   const repo = authRepository();
-  let session;
+  let tokens;
   try {
-    session = await repo.register({
+    tokens = await repo.register({
       name: parsed.data.name,
       email: parsed.data.email,
       password: parsed.data.password,
@@ -140,10 +213,13 @@ export async function signupAction(
     return { error: err.message, values };
   }
 
-  await writeTokens({
-    accessToken: session.accessToken,
-    refreshToken: session.refreshToken,
-  });
+  // Spec v1.7 — token write trước, sau đó fetch profile để confirm role.
+  await writeTokens(tokens);
+  try {
+    await repo.getProfile();
+  } catch {
+    // Profile fail không block đăng ký — user vẫn login được, layout sẽ redirect.
+  }
 
   revalidatePath('/', 'layout');
   redirect(parsed.data.role === 'owner' ? '/host' : '/');

@@ -2,12 +2,14 @@ import 'server-only';
 
 import type { AuditLogRepository } from '@/application/ports/audit-log-repository';
 import type { AuthRepository } from '@/application/ports/auth-repository';
+import type { BillingPlanRepository } from '@/application/ports/billing-plan-repository';
 import type { BookingRepository } from '@/application/ports/booking-repository';
 import type { CalendarRepository } from '@/application/ports/calendar-repository';
 import type { ChatRepository } from '@/application/ports/chat-repository';
 import type { DashboardRepository } from '@/application/ports/dashboard-repository';
 import type { DisputeRepository } from '@/application/ports/dispute-repository';
 import type { NotificationRepository } from '@/application/ports/notification-repository';
+import type { PaymentSessionRepository } from '@/application/ports/payment-session-repository';
 import type { PropertyRepository } from '@/application/ports/property-repository';
 import type { ReviewRepository } from '@/application/ports/review-repository';
 import type { SubscriptionRepository } from '@/application/ports/subscription-repository';
@@ -21,6 +23,7 @@ import type { StaffRepository } from '@/application/ports/staff-repository';
 import { ApiAdminUserRepository } from './repositories/api-admin-user-repository';
 import { ApiAuditLogRepository } from './repositories/api-audit-log-repository';
 import { ApiAuthRepository } from './repositories/api-auth-repository';
+import { ApiBillingPlanRepository } from './repositories/api-billing-plan-repository';
 import { ApiBookingRepository } from './repositories/api-booking-repository';
 import { ApiCalendarRepository } from './repositories/api-calendar-repository';
 import { ApiChatRepository } from './repositories/api-chat-repository';
@@ -31,6 +34,7 @@ import { ApiKycRepository } from './repositories/api-kyc-repository';
 import { ApiLeadRepository } from './repositories/api-lead-repository';
 import { ApiPermissionRepository } from './repositories/api-permission-repository';
 import { ApiNotificationRepository } from './repositories/api-notification-repository';
+import { ApiPaymentSessionRepository } from './repositories/api-payment-session-repository';
 import { ApiPropertyRepository } from './repositories/api-property-repository';
 import { ApiReviewRepository } from './repositories/api-review-repository';
 import { ApiStaffRepository } from './repositories/api-staff-repository';
@@ -84,6 +88,11 @@ export function dashboardRepository(): DashboardRepository {
   return new ApiDashboardRepository();
 }
 
+export function billingPlanRepository(): BillingPlanRepository {
+  // Spec §10.1 — `GET /billing/plans` public, không cần auth.
+  return new ApiBillingPlanRepository();
+}
+
 export function bookingRepository(): BookingRepository {
   return modeFor('NEXT_PUBLIC_DATA_MODE_BOOKINGS', 'api') === 'mock'
     ? new MockBookingRepository()
@@ -92,6 +101,11 @@ export function bookingRepository(): BookingRepository {
 
 export function notificationRepository(): NotificationRepository {
   return new ApiNotificationRepository();
+}
+
+export function paymentSessionRepository(): PaymentSessionRepository {
+  // Spec v1.6 §10.3 — /admin/payments live (manual reconcile flow).
+  return new ApiPaymentSessionRepository();
 }
 
 export function disputeRepository(): DisputeRepository {

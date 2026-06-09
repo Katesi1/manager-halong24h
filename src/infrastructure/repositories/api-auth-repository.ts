@@ -1,6 +1,10 @@
 import 'server-only';
 
-import type { AuthSession, UserProfile } from '@/core/entities/user';
+import type {
+  AuthTokens,
+  OAuthSignInResult,
+  UserProfile,
+} from '@/core/entities/user';
 import type { RoleCode } from '@/core/value-objects/role';
 import type {
   AuthRepository,
@@ -12,28 +16,31 @@ import type {
 import { apiClient } from '../http/api-client';
 
 export class ApiAuthRepository implements AuthRepository {
-  async login(input: LoginCredentials): Promise<AuthSession> {
-    return apiClient.post<AuthSession>('/auth/login', input, {
+  async login(input: LoginCredentials): Promise<AuthTokens> {
+    return apiClient.post<AuthTokens>('/auth/login', input, {
       skipAuth: true,
     });
   }
 
-  async register(input: RegisterInput): Promise<AuthSession> {
-    return apiClient.post<AuthSession>('/auth/register', input, {
+  async register(input: RegisterInput): Promise<AuthTokens> {
+    return apiClient.post<AuthTokens>('/auth/register', input, {
       skipAuth: true,
     });
   }
 
-  async loginWithGoogle(idToken: string, role?: RoleCode): Promise<AuthSession> {
-    return apiClient.post<AuthSession>(
+  async loginWithGoogle(
+    idToken: string,
+    role?: RoleCode,
+  ): Promise<OAuthSignInResult> {
+    return apiClient.post<OAuthSignInResult>(
       '/auth/google',
       { idToken, role },
       { skipAuth: true },
     );
   }
 
-  async refresh(refreshToken: string) {
-    return apiClient.post<{ accessToken: string; refreshToken: string }>(
+  async refresh(refreshToken: string): Promise<AuthTokens> {
+    return apiClient.post<AuthTokens>(
       '/auth/refresh',
       { refreshToken },
       { skipAuth: true },

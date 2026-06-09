@@ -5,7 +5,7 @@ import type {
   StaffInviteFilters,
   StaffMember,
 } from '@/core/entities/staff';
-import type { AuthSession } from '@/core/entities/user';
+import type { AuthTokens } from '@/core/entities/user';
 
 /** Spec §11.2 — info hiển thị trên landing accept invite. */
 export interface StaffInviteVerification {
@@ -42,6 +42,9 @@ export interface StaffRepository {
 
   /** Public — GET /staff/invites/verify/:token (token đầy đủ hoặc HL-XXXXXX). */
   verifyInvite(token: string): Promise<StaffInviteVerification>;
-  /** Public — POST /staff/invites/accept. Trả AuthSession khi accept thành công. */
-  acceptInvite(input: AcceptStaffInviteInput): Promise<AuthSession>;
+  /**
+   * Public — POST /staff/invites/accept. Spec v1.7: chỉ trả tokens, caller phải
+   * gọi `getProfile()` sau để có user info.
+   */
+  acceptInvite(input: AcceptStaffInviteInput): Promise<AuthTokens>;
 }

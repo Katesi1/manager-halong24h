@@ -23,6 +23,23 @@ export function formatVND(amount: number | null | undefined): string {
 /** Alias rõ tên cho call-site mới — cùng output với `formatVND`. */
 export const formatCurrency = formatVND;
 
+/**
+ * Tên hiển thị fallback: ưu tiên `name`, nếu trống dùng phần local của email
+ * (`huynguyen.053219@gmail.com` → `Huynguyen.053219`). Nếu cả 2 cùng trống → "—".
+ *
+ * Dùng cho list view khi user chưa cập nhật profile (vd: vừa Google sign-in).
+ */
+export function displayName(
+  name: string | null | undefined,
+  email?: string | null,
+): string {
+  const trimmed = name?.trim();
+  if (trimmed) return trimmed;
+  const local = email?.split('@')[0]?.trim();
+  if (local) return local.charAt(0).toUpperCase() + local.slice(1);
+  return '—';
+}
+
 /** Format VND ngắn: 1500000 -> "1.5tr" */
 export function formatVNDShort(amount: number | null | undefined): string {
   if (amount == null) return '0';

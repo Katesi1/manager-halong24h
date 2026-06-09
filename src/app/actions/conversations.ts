@@ -23,11 +23,19 @@ const AttachmentSchema = z.object({
   size: z.number().int().nonnegative(),
 });
 
-const SendSchema = z.object({
-  conversationId: z.string().uuid(),
-  content: z.string().min(1).max(5000),
-  attachments: z.array(AttachmentSchema).max(5).optional(),
-});
+const SendSchema = z
+  .object({
+    conversationId: z.string().uuid(),
+    content: z.string().max(5000),
+    attachments: z.array(AttachmentSchema).max(5).optional(),
+  })
+  .refine(
+    (v) => v.content.trim().length > 0 || (v.attachments?.length ?? 0) > 0,
+    {
+      message: 'Tin nhắn phải có nội dung hoặc đính kèm',
+      path: ['content'],
+    },
+  );
 
 const CreateSchema = z.object({
   type: z.enum(['booking', 'support', 'staff']),

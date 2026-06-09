@@ -3,8 +3,10 @@ import 'server-only';
 import type {
   ApproveKycInput,
   KycAdminFilters,
+  KycAdminListResult,
   KycAdminSubmission,
   KycField,
+  KycQueueFilter,
   RejectKycInput,
 } from '@/core/entities/kyc-admin';
 import type { KycSubmissionStatus } from '@/core/entities/kyc';
@@ -13,84 +15,124 @@ import type { KycAdminRepository } from '@/application/ports/kyc-admin-repositor
 import { apiClient } from '../http/api-client';
 
 /**
- * Spec §9.2 — BE chỉ expose 4-state (`none|pending|approved|rejected`) v1.3
- * confirm web admin dùng 4-state. Entity local có 8-state (8 internal) — map
- * sang subset 4 spec hỗ trợ. `fields[]` (7 verification yếu tố) chưa có trong
- * spec response → trả mảng rỗng. UI section "Verification fields" sẽ blank
- * khi BE chưa expose; đợi v2.
+ * Spec v1.11 §9.2 — Admin KYC list dùng một endpoint
+ * `GET /admin/kyc/queue?filter=0|1|2|3&page&pageSize`. Response trả về
+ * `{ filter, pendingCount, total, page, pageSize, items[] }`.
+ *
+ * Status BE trả camelCase: `kycSubmitted | paymentPending | awaitingApproval |
+ * approved | rejected | refunded | draft`. Map sang entity snake_case
+ * `KycSubmissionStatus` 8-state.
+ *
+ * `fields[]` (7 yếu tố verify) chưa có trong response queue → mảng rỗng.
+ * UI section verify sẽ blank cho đến khi BE expose v2.
+ *
+ * User info shape mới (v1.11): nested `user: { id, name, phone, email }`.
  */
+type SpecKycStatus =
+  | 'draft'
+  | 'kycSubmitted'
+  | 'paymentPending'
+  | 'awaitingApproval'
+  | 'approved'
+  | 'rejected'
+  | 'refunded';
+
+interface SpecKycUser {
+  id?: string;
+  name?: string;
+  email?: string;
+  phone?: string | null;
+}
+
 interface SpecKycSubmission {
   id: string;
-  ownerId: string;
+  status: SpecKycStatus;
+  statusFilter?: 1 | 2 | 3;
+  user?: SpecKycUser;
+  // Legacy flat fields (giữ tương thích nếu BE còn trả)
+  ownerId?: string;
   ownerName?: string;
   ownerEmail?: string;
   ownerPhone?: string;
-  status: 'none' | 'pending' | 'approved' | 'rejected';
   rejectedReason?: string | null;
+  rejectReason?: string | null;
   rejectedAt?: string | null;
   approvedAt?: string | null;
   submittedAt?: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
   fields?: KycField[];
 }
 
-function mapStatus(s: SpecKycSubmission['status']): KycSubmissionStatus {
-  // Entity 8-state có superset, dùng đúng subset spec.
+interface SpecQueueResponse {
+  filter: KycQueueFilter;
+  pendingCount: number;
+  total: number;
+  page: number;
+  pageSize: number;
+  items: SpecKycSubmission[];
+}
+
+function mapStatus(s: SpecKycStatus): KycSubmissionStatus {
   switch (s) {
-    case 'pending':
+    case 'kycSubmitted':
+      return 'kyc_submitted';
+    case 'paymentPending':
+      return 'payment_pending';
+    case 'awaitingApproval':
       return 'awaiting_approval';
     case 'approved':
       return 'approved';
     case 'rejected':
       return 'rejected';
-    case 'none':
+    case 'refunded':
+      return 'refunded';
+    case 'draft':
       return 'draft';
   }
 }
 
 function mapSubmission(s: SpecKycSubmission): KycAdminSubmission {
+  const now = s.updatedAt ?? s.createdAt;
   return {
     id: s.id,
-    ownerId: s.ownerId,
-    ownerName: s.ownerName ?? '',
-    ownerEmail: s.ownerEmail ?? '',
-    ownerPhone: s.ownerPhone ?? '',
+    ownerId: s.user?.id ?? s.ownerId ?? '',
+    ownerName: s.user?.name ?? s.ownerName ?? '',
+    ownerEmail: s.user?.email ?? s.ownerEmail ?? '',
+    ownerPhone: s.user?.phone ?? s.ownerPhone ?? '',
     status: mapStatus(s.status),
     fields: s.fields ?? [],
-    rejectedReason: s.rejectedReason ?? null,
+    rejectedReason: s.rejectedReason ?? s.rejectReason ?? null,
     rejectedAt: s.rejectedAt ?? null,
     approvedAt: s.approvedAt ?? null,
     submittedAt: s.submittedAt ?? s.createdAt,
     createdAt: s.createdAt,
-    updatedAt: s.updatedAt,
+    updatedAt: now,
   };
 }
 
-function reverseStatus(
-  status: KycSubmissionStatus | undefined,
-): string | undefined {
-  if (!status) return undefined;
-  if (status === 'awaiting_approval' || status === 'kyc_submitted')
-    return 'pending';
-  if (status === 'approved') return 'approved';
-  if (status === 'rejected') return 'rejected';
-  return undefined;
-}
-
 export class ApiKycAdminRepository implements KycAdminRepository {
-  async list(filters?: KycAdminFilters): Promise<KycAdminSubmission[]> {
-    const data = await apiClient.get<
-      SpecKycSubmission[] | { items: SpecKycSubmission[] }
-    >('/admin/kyc/queue', {
+  async list(filters?: KycAdminFilters): Promise<KycAdminListResult> {
+    const filter: KycQueueFilter = filters?.filter ?? 1;
+    const page = filters?.page ?? 1;
+    const pageSize = filters?.pageSize ?? 20;
+    const data = await apiClient.get<SpecQueueResponse>('/admin/kyc/queue', {
       query: {
-        status: reverseStatus(filters?.status),
+        filter,
+        page,
+        pageSize,
         search: filters?.search,
       },
       cache: 'no-store',
     });
-    const arr = Array.isArray(data) ? data : (data.items ?? []);
-    return arr.map(mapSubmission);
+    return {
+      filter: data.filter ?? filter,
+      pendingCount: data.pendingCount ?? 0,
+      total: data.total ?? data.items.length,
+      page: data.page ?? page,
+      pageSize: data.pageSize ?? pageSize,
+      items: data.items.map(mapSubmission),
+    };
   }
 
   async getById(id: string): Promise<KycAdminSubmission | null> {
@@ -115,6 +157,7 @@ export class ApiKycAdminRepository implements KycAdminRepository {
   async approve(input: ApproveKycInput): Promise<KycAdminSubmission> {
     const data = await apiClient.post<SpecKycSubmission>(
       `/admin/kyc/submissions/${input.submissionId}/approve`,
+      // trialDays mặc định 7 do BE quyết định
     );
     return mapSubmission(data);
   }
@@ -127,11 +170,13 @@ export class ApiKycAdminRepository implements KycAdminRepository {
     return mapSubmission(data);
   }
 
+  /**
+   * Spec v1.11: ưu tiên `pendingCount` từ `list()`. Endpoint cũ vẫn chạy
+   * (deprecated) — dùng làm fallback khi caller chưa migrate. Để tránh
+   * gọi 2 round trip, gọi list với pageSize=1 filter=1.
+   */
   async countPending(): Promise<number> {
-    const data = await apiClient.get<number | { count: number }>(
-      '/admin/kyc/count-pending',
-      { cache: 'no-store' },
-    );
-    return typeof data === 'number' ? data : data.count;
+    const result = await this.list({ filter: 1, page: 1, pageSize: 1 });
+    return result.pendingCount;
   }
 }

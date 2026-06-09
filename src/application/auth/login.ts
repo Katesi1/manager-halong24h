@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { ValidationError } from '@/core/errors';
-import type { AuthSession } from '@/core/entities/user';
+import type { AuthTokens } from '@/core/entities/user';
 import type { AuthRepository } from '../ports/auth-repository';
 
 export const LoginSchema = z.object({
@@ -14,7 +14,7 @@ export type LoginInput = z.infer<typeof LoginSchema>;
 export async function loginUseCase(
   repo: AuthRepository,
   raw: unknown,
-): Promise<AuthSession> {
+): Promise<AuthTokens> {
   const parsed = LoginSchema.safeParse(raw);
   if (!parsed.success) {
     throw new ValidationError(

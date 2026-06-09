@@ -7,7 +7,7 @@ import type {
   StaffInviteFilters,
   StaffMember,
 } from '@/core/entities/staff';
-import type { AuthSession } from '@/core/entities/user';
+import type { AuthTokens } from '@/core/entities/user';
 import type {
   AcceptStaffInviteInput,
   StaffInviteVerification,
@@ -60,8 +60,8 @@ export class ApiStaffRepository implements StaffRepository {
     );
   }
 
-  async acceptInvite(input: AcceptStaffInviteInput): Promise<AuthSession> {
-    return apiClient.post<AuthSession>('/staff/invites/accept', input, {
+  async acceptInvite(input: AcceptStaffInviteInput): Promise<AuthTokens> {
+    return apiClient.post<AuthTokens>('/staff/invites/accept', input, {
       skipAuth: true,
     });
   }

@@ -38,11 +38,13 @@ export type SubscriptionStatus =
   | 'frozen'
   | 'expired';
 
+/** Spec v1.4 §10.4 — VNPay loại bỏ. v1.6 thêm casso, sepay. */
 export type SubscriptionProvider =
   | 'apple_iap'
-  | 'vnpay'
   | 'manual_bank'
   | 'manual'
+  | 'casso'
+  | 'sepay'
   | null;
 
 export interface Subscription {

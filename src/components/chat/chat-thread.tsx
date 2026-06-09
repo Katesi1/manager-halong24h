@@ -1,17 +1,29 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
+import { ArrowDown } from 'lucide-react';
 
 import {
   listMessagesAction,
   markConversationReadAction,
   sendMessageAction,
 } from '@/app/actions/conversations';
+import {
+  AttachmentPicker,
+  type PendingAttachment,
+} from '@/components/chat/attachment-picker';
 import { MessageBubble } from '@/components/chat/message-bubble';
-import type { Message } from '@/core/entities/chat';
+import { ChatStatusBar } from '@/components/chat/status-bar';
+import type { Message, MessageAttachment } from '@/core/entities/chat';
 import { emitTypingStart, emitTypingStop } from '@/lib/chat-socket';
 import { useChatSocket } from '@/lib/use-chat-socket';
-import { cn } from '@/lib/utils';
 
 /** Throttle window cho `typing:start` — spec §17.6 gợi ý 3s. */
 const TYPING_EMIT_INTERVAL_MS = 3000;
@@ -52,7 +64,12 @@ export function ChatThread({
   const [error, setError] = useState<string | null>(null);
   const [typingUsers, setTypingUsers] = useState<Set<string>>(() => new Set());
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(() => new Set());
+  const [atBottom, setAtBottom] = useState(true);
+  const [pendingAttachments, setPendingAttachments] = useState<
+    PendingAttachment[]
+  >([]);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   // Throttle state cho typing:start emit + auto-stop timer.
   const lastTypingEmitRef = useRef(0);
@@ -120,35 +137,40 @@ export function ChatThread({
     onError: (p) => setError(p.message),
   });
 
-  // Clear error khi kết nối lại được.
   useEffect(() => {
     if (connected) setError(null);
   }, [connected]);
 
-  // Auto-scroll xuống cuối CHỈ khi append (tin mới), không khi prepend (load older).
+  // Auto-scroll chỉ khi append tin mới VÀ user đang gần cuối.
   useEffect(() => {
-    if (lastAppendRef.current) {
+    if (lastAppendRef.current && atBottom) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages.length]);
+  }, [messages.length, atBottom]);
 
-  // Mark read khi mount + khi nhận tin mới TỪ NGƯỜI KHÁC.
-  // Tránh spam BE khi user tự gửi nhiều tin liên tiếp.
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setAtBottom(distance < 100);
+  }, []);
+
+  function scrollToBottom() {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // Mark read khi mount + khi nhận tin mới TỪ NGƯỜI KHÁC (tránh spam BE).
   const lastMessage = messages[messages.length - 1];
   const lastFromOther =
     lastMessage && lastMessage.senderId !== currentUserId;
   useEffect(() => {
-    if (lastFromOther) {
-      void markConversationReadAction(conversationId);
-    }
+    if (lastFromOther) void markConversationReadAction(conversationId);
   }, [conversationId, lastFromOther, lastMessage?.id]);
 
-  // Mark read 1 lần khi mount (initial unread).
   useEffect(() => {
     void markConversationReadAction(conversationId);
   }, [conversationId]);
 
-  // Cleanup typing timer khi unmount + emit stop nếu đang typing.
   useEffect(() => {
     return () => {
       if (typingStopTimerRef.current) {
@@ -159,6 +181,25 @@ export function ChatThread({
       }
     };
   }, [socket, conversationId]);
+
+  // Revoke ObjectURL pending khi unmount. Orphan BE cron dọn sau 24h.
+  useEffect(() => {
+    return () => {
+      for (const a of pendingAttachments) {
+        if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handleTextKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    // Enter để gửi; Shift+Enter cho dòng mới (chuẩn chat UX).
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      const form = e.currentTarget.form;
+      if (form) form.requestSubmit();
+    }
+  }
 
   function handleTextChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     setText(e.target.value);
@@ -197,9 +238,23 @@ export function ChatThread({
   async function handleSend(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const content = text.trim();
-    if (!content || sending) return;
+    const hasAttachments = pendingAttachments.length > 0;
+    // Cho phép gửi nếu có content HOẶC attachments.
+    if ((!content && !hasAttachments) || sending) return;
     setSending(true);
     setError(null);
+
+    // Snapshot attachments — BE markAttached gắn upload → message.
+    const attachmentsForSend: MessageAttachment[] = pendingAttachments.map(
+      (a) => ({
+        url: a.upload.url,
+        type: a.upload.type,
+        name: a.upload.name,
+        size: a.upload.size,
+      }),
+    );
+    const snapshotAttachments = pendingAttachments;
+
     // Unique id để tránh collision khi gửi 2 tin trong cùng ms.
     const localId =
       typeof crypto !== 'undefined' && crypto.randomUUID
@@ -210,7 +265,7 @@ export function ChatThread({
       conversationId,
       senderId: currentUserId,
       content,
-      attachments: [],
+      attachments: attachmentsForSend,
       isSystem: false,
       editedAt: null,
       deletedAt: null,
@@ -219,25 +274,38 @@ export function ChatThread({
     lastAppendRef.current = true;
     setMessages((prev) => [...prev, optimistic]);
     setText('');
+    setPendingAttachments([]);
 
-    const res = await sendMessageAction({ conversationId, content });
+    const res = await sendMessageAction({
+      conversationId,
+      content,
+      attachments: attachmentsForSend.length > 0 ? attachmentsForSend : undefined,
+    });
     setSending(false);
     if (res.ok) {
-      // Replace optimistic với message thật (BE trả id chính thức).
+      // Revoke preview ObjectURLs để giải phóng memory.
+      for (const a of snapshotAttachments) {
+        if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
+      }
       setMessages((prev) =>
         prev.map((m) => (m.id === optimistic.id ? res.data : m)),
       );
     } else {
-      // Rollback optimistic + show error.
+      // Rollback optimistic + restore composer state để user retry.
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+      setPendingAttachments(snapshotAttachments);
+      setText(content);
       setError(res.error);
-      setText(content); // Cho user retry
     }
   }
 
   return (
-    <>
-      <div className="flex-1 space-y-3 overflow-y-auto bg-cream-50 px-4 py-4">
+    <div className="relative flex flex-col flex-1 min-h-0">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 space-y-3 overflow-y-auto bg-cream-50 px-4 py-4"
+      >
         {nextCursor && (
           <div className="text-center">
             <button
@@ -278,54 +346,54 @@ export function ChatThread({
         <div ref={bottomRef} />
       </div>
 
+      {!atBottom && (
+        <button
+          type="button"
+          onClick={scrollToBottom}
+          aria-label="Cuộn xuống tin mới nhất"
+          className="absolute bottom-28 right-6 grid h-10 w-10 place-items-center rounded-full bg-white shadow-lg ring-1 ring-ink-200 hover:bg-cream-100 transition-transform hover:scale-105"
+        >
+          <ArrowDown className="h-4 w-4 text-ink-700" />
+        </button>
+      )}
+
       <div className="border-t border-ink-200 bg-white">
-        <div className="flex items-center justify-between px-4 py-1 text-[10px] text-ink-400">
-          <span
-            className={cn(
-              'inline-flex items-center gap-1',
-              connected ? 'text-emerald-600' : 'text-ink-400',
-            )}
-          >
-            <span
-              className={cn(
-                'inline-block h-1.5 w-1.5 rounded-full',
-                connected ? 'bg-emerald-500' : 'bg-ink-300',
-              )}
-            />
-            {connected ? 'Trực tuyến' : 'Đang kết nối...'}
-          </span>
-          {peerUserId && onlineUsers.has(peerUserId) && (
-            <span className="text-emerald-600">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 mr-1" />
-              Đang online
-            </span>
-          )}
-          {typingUsers.size > 0 && (
-            <span className="italic text-ink-500">
-              Đang nhập tin nhắn...
-            </span>
-          )}
-          {error && <span className="text-rose-600">{error}</span>}
-        </div>
-        <form onSubmit={handleSend} className="flex items-end gap-2 p-3">
+        <ChatStatusBar
+          connected={connected}
+          peerOnline={!!peerUserId && onlineUsers.has(peerUserId)}
+          someoneTyping={typingUsers.size > 0}
+          error={error}
+        />
+        <AttachmentPicker
+          attachments={pendingAttachments}
+          onAdd={(a) => setPendingAttachments((prev) => [...prev, a])}
+          onRemove={(uploadId) =>
+            setPendingAttachments((prev) =>
+              prev.filter((a) => a.upload.id !== uploadId),
+            )
+          }
+          disabled={sending}
+        />
+        <form onSubmit={handleSend} className="flex items-end gap-2 p-3 pt-2">
           <textarea
             value={text}
             onChange={handleTextChange}
+            onKeyDown={handleTextKeyDown}
             rows={2}
-            placeholder="Nhập tin nhắn..."
+            placeholder="Nhập tin nhắn... (Enter để gửi, Shift+Enter để xuống dòng)"
             disabled={sending}
             className="flex-1 resize-none rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-700/30 disabled:bg-cream-100"
             aria-label="Nội dung tin nhắn"
           />
           <button
             type="submit"
-            disabled={!text.trim() || sending}
+            disabled={(!text.trim() && pendingAttachments.length === 0) || sending}
             className="h-10 rounded-xl bg-navy-900 px-4 text-sm font-semibold text-white hover:bg-navy-800 disabled:opacity-50"
           >
             {sending ? '...' : 'Gửi'}
           </button>
         </form>
       </div>
-    </>
+    </div>
   );
 }

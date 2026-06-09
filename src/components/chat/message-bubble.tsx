@@ -1,14 +1,100 @@
 'use client';
 
 import { useState, type KeyboardEvent } from 'react';
+import { FileText, Download } from 'lucide-react';
+import Image from 'next/image';
 
 import {
   deleteMessageAction,
   editMessageAction,
 } from '@/app/actions/conversations';
-import type { Message } from '@/core/entities/chat';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import type { Message, MessageAttachment } from '@/core/entities/chat';
+import { isImageMime } from '@/core/entities/upload';
 import { formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n}B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)}KB`;
+  return `${(n / 1024 / 1024).toFixed(1)}MB`;
+}
+
+function AttachmentList({
+  attachments,
+  fromMe,
+}: {
+  attachments: MessageAttachment[];
+  fromMe: boolean;
+}) {
+  return (
+    <div className="mt-2 space-y-1.5">
+      {attachments.map((a, i) => {
+        const isImg = isImageMime(a.type);
+        if (isImg) {
+          return (
+            <a
+              key={`${a.url}-${i}`}
+              href={a.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block max-w-[240px] overflow-hidden rounded-lg ring-1 ring-black/10 hover:opacity-90"
+            >
+              <Image
+                src={a.url}
+                alt={a.name}
+                width={240}
+                height={180}
+                className="h-auto w-full object-cover"
+                sizes="240px"
+                unoptimized
+              />
+            </a>
+          );
+        }
+        return (
+          <a
+            key={`${a.url}-${i}`}
+            href={a.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            download={a.name}
+            className={cn(
+              'flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs ring-1',
+              fromMe
+                ? 'bg-white/10 ring-white/20 hover:bg-white/15'
+                : 'bg-cream-100 ring-ink-200 hover:bg-cream-200',
+            )}
+          >
+            <FileText
+              className={cn(
+                'h-4 w-4 shrink-0',
+                fromMe ? 'text-white/80' : 'text-ink-500',
+              )}
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-medium">{a.name}</p>
+              <p
+                className={cn(
+                  'text-[10px]',
+                  fromMe ? 'text-white/60' : 'text-ink-500',
+                )}
+              >
+                {formatBytes(a.size)}
+              </p>
+            </div>
+            <Download
+              className={cn(
+                'h-3 w-3 shrink-0',
+                fromMe ? 'text-white/60' : 'text-ink-400',
+              )}
+            />
+          </a>
+        );
+      })}
+    </div>
+  );
+}
 
 /** Spec §17.1 — sender chỉ edit/delete trong 15 phút sau gửi. */
 const EDIT_WINDOW_MS = 15 * 60 * 1000;
@@ -25,6 +111,7 @@ export function MessageBubble({ message, fromMe, onEdited, onDeleted }: Props) {
   const [editText, setEditText] = useState(message.content);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const isDeleted = message.deletedAt !== null;
   const isOptimistic = message.id.startsWith('local-');
@@ -70,12 +157,12 @@ export function MessageBubble({ message, fromMe, onEdited, onDeleted }: Props) {
     }
   }
 
-  async function handleDelete() {
-    if (!confirm('Xoá tin nhắn này?')) return;
+  async function confirmDelete() {
     setBusy(true);
     setError(null);
     const res = await deleteMessageAction(message.id);
     setBusy(false);
+    setConfirmingDelete(false);
     if (res.ok) {
       onDeleted(message.id);
     } else {
@@ -135,9 +222,20 @@ export function MessageBubble({ message, fromMe, onEdited, onDeleted }: Props) {
           </div>
         ) : (
           <>
-            <p className="whitespace-pre-wrap">
-              {isDeleted ? '(Tin nhắn đã xoá)' : message.content}
-            </p>
+            {message.content.trim() && (
+              <p className="whitespace-pre-wrap">
+                {isDeleted ? '(Tin nhắn đã xoá)' : message.content}
+              </p>
+            )}
+            {!isDeleted && message.attachments.length > 0 && (
+              <AttachmentList
+                attachments={message.attachments}
+                fromMe={fromMe}
+              />
+            )}
+            {isDeleted && !message.content.trim() && (
+              <p className="whitespace-pre-wrap">(Tin nhắn đã xoá)</p>
+            )}
             <p
               className={cn(
                 'mt-1 text-[10px]',
@@ -170,7 +268,7 @@ export function MessageBubble({ message, fromMe, onEdited, onDeleted }: Props) {
                 {canDelete && (
                   <button
                     type="button"
-                    onClick={() => void handleDelete()}
+                    onClick={() => setConfirmingDelete(true)}
                     disabled={busy}
                     className="rounded-md bg-white px-2 py-0.5 text-[10px] font-medium text-rose-700 shadow ring-1 ring-rose-200 hover:bg-rose-50 disabled:opacity-50"
                     aria-label="Xoá tin nhắn"
@@ -186,6 +284,16 @@ export function MessageBubble({ message, fromMe, onEdited, onDeleted }: Props) {
           <p className="mt-1 text-[10px] text-rose-200">{error}</p>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Xoá tin nhắn này?"
+        description="Tin nhắn sẽ bị xoá khỏi hội thoại. Người nhận sẽ thấy '(Tin nhắn đã xoá)'."
+        confirmLabel="Xoá"
+        variant="danger"
+        pending={busy}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }

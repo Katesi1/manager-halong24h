@@ -21,18 +21,47 @@ export type SubscriptionStatus =
   | 'expired'
   | null;
 
+/** Spec v1.4 §10.4 — VNPay loại bỏ. v1.6 thêm casso, sepay. */
 export type SubscriptionProvider =
   | 'apple_iap'
-  | 'vnpay'
   | 'manual_bank'
   | 'manual'
+  | 'casso'
+  | 'sepay'
   | null;
 
-export interface AuthSession {
+/**
+ * Spec v1.7 §2.3 — Login/register/refresh CHỈ trả tokens, không kèm user.
+ * FE phải gọi `GET /auth/profile` sau để lấy user info.
+ */
+export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
-  user: AuthUser;
 }
+
+/**
+ * Spec v1.7 §2.3 — Google sign-in lần đầu chưa chọn role: BE trả
+ * `isNewUser: true` + profile thô để FE prompt user chọn OWNER/CUSTOMER.
+ * (Apple sign-in đã bỏ scope ở Phase 17.)
+ */
+export interface OAuthNewUserPrompt {
+  isNewUser: true;
+  googleProfile: {
+    email: string;
+    name: string;
+    avatar: string | null;
+    sub: string;
+  };
+}
+
+export type OAuthSignInResult = AuthTokens | OAuthNewUserPrompt;
+
+export function isOAuthNewUserPrompt(
+  r: OAuthSignInResult,
+): r is OAuthNewUserPrompt {
+  return 'isNewUser' in r && r.isNewUser === true;
+}
+
 
 export interface AuthUser {
   id: string;

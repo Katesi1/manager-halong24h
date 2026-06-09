@@ -19,7 +19,21 @@ import {
   type SubscriptionFilters,
   type SubscriptionStatus,
 } from '@/core/entities/subscription';
-import { formatVND } from '@/lib/format';
+import { displayName, formatVND } from '@/lib/format';
+
+function avatarColor(seed: string): string {
+  const palette = [
+    'bg-rose-100 text-rose-700',
+    'bg-amber-100 text-amber-700',
+    'bg-emerald-100 text-emerald-700',
+    'bg-sky-100 text-sky-700',
+    'bg-violet-100 text-violet-700',
+    'bg-fuchsia-100 text-fuchsia-700',
+  ];
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return palette[h % palette.length]!;
+}
 
 export const metadata: Metadata = { title: 'Subscription chủ nhà' };
 
@@ -143,7 +157,17 @@ export default async function AdminPaymentsPage(props: {
         eyebrow="Tài chính"
         title="Subscription chủ nhà"
         description="Doanh thu = phí gói cước chủ nhà trả theo số phòng/tháng. Khách chuyển khoản trực tiếp cho chủ nhà qua STK đã xác minh KYC."
-        actions={<PaymentsExport />}
+        actions={
+          <div className="flex items-center gap-2">
+            <Link
+              href="/admin/payments/sessions"
+              className="rounded-lg bg-amber-100 px-3.5 py-2 text-sm font-medium text-amber-900 ring-1 ring-amber-200 hover:bg-amber-200"
+            >
+              💸 Đối soát thủ công
+            </Link>
+            <PaymentsExport />
+          </div>
+        }
       />
 
       {/* Stats */}
@@ -259,22 +283,31 @@ export default async function AdminPaymentsPage(props: {
                       {s.startAt.slice(0, 7)}
                     </td>
                     <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cream-200 text-xs font-bold text-navy-800 uppercase">
-                          {s.ownerName.charAt(0)}
-                        </div>
-                        <div className="min-w-0">
-                          <Link
-                            href={`/admin/users/${s.ownerId}`}
-                            className="font-semibold text-ink-900 hover:text-navy-900 hover:underline"
-                          >
-                            {s.ownerName}
-                          </Link>
-                          <p className="text-[11px] font-mono text-ink-400 truncate">
-                            {s.ownerId}
-                          </p>
-                        </div>
-                      </div>
+                      {(() => {
+                        const name = displayName(s.ownerName);
+                        const initial = name.charAt(0).toUpperCase() || '?';
+                        const color = avatarColor(s.ownerId || name);
+                        return (
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${color}`}
+                            >
+                              {initial}
+                            </div>
+                            <div className="min-w-0">
+                              <Link
+                                href={`/admin/users/${s.ownerId}`}
+                                className="font-semibold text-ink-900 hover:text-navy-900 hover:underline truncate block"
+                              >
+                                {name}
+                              </Link>
+                              <p className="text-[11px] font-mono text-ink-400 truncate">
+                                {s.ownerId.slice(0, 12)}…
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-5 py-4">
                       <Badge variant={PLAN_VARIANT[s.plan] ?? 'default'}>
@@ -284,8 +317,10 @@ export default async function AdminPaymentsPage(props: {
                     <td className="px-5 py-4 text-right font-medium text-ink-700">
                       {s.roomCount}
                     </td>
-                    <td className="px-5 py-4 text-right font-semibold text-emerald-700">
-                      {formatVND(s.amount)}
+                    <td className="px-5 py-4 text-right">
+                      <span className="font-mono text-sm font-bold tabular-nums text-emerald-700">
+                        {formatVND(s.amount)}
+                      </span>
                     </td>
                     <td className="px-5 py-4 text-xs text-ink-500">
                       <FormattedDate iso={s.expireAt} />
