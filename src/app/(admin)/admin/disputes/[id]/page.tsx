@@ -48,7 +48,7 @@ export default async function AdminDisputeDetailPage(props: {
   const dispute = result.data;
 
   return (
-    <div className="p-6 lg:p-8 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader
         eyebrow={`${DISPUTE_TYPE_ICON[dispute.type]} ${DISPUTE_TYPE_LABEL[dispute.type]}`}
         title={dispute.subject}

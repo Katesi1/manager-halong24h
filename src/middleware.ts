@@ -1,12 +1,71 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-/**
- * Middleware — kiểm tra token cookie tồn tại (defense-in-depth tier 1).
- *
- * Auth check chi tiết (role/permission) nằm ở `(admin)/layout.tsx`,
- * `(host)/layout.tsx`, và `requireXXX()` trong các Server Action.
- */
-export function middleware(request: NextRequest) {
+const COOKIE_ACCESS = 'h24h_access';
+const COOKIE_REFRESH = 'h24h_refresh';
+const ACCESS_MAX_AGE = 15 * 60;
+const REFRESH_MAX_AGE = 7 * 24 * 60 * 60;
+
+const COOKIE_OPTS = {
+  httpOnly: true,
+  sameSite: 'lax' as const,
+  secure: process.env.NODE_ENV === 'production',
+  path: '/',
+};
+
+interface RefreshResponse {
+  success?: boolean;
+  data?: {
+    accessToken?: string;
+    refreshToken?: string;
+    access_token?: string;
+    refresh_token?: string;
+  };
+  accessToken?: string;
+  refreshToken?: string;
+}
+
+type RefreshResult =
+  | { accessToken: string; refreshToken: string }
+  | 'network-error'
+  | null;
+
+async function refreshAtBackend(refreshToken: string): Promise<RefreshResult> {
+  const base = process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (!base) return null;
+  try {
+    const res = await fetch(`${base}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+      cache: 'no-store',
+    });
+    if (!res.ok) {
+      // 401/403 = refresh token thật sự invalid → logout đúng
+      // 5xx = BE đang lỗi → giữ cookie, đừng force logout
+      return res.status >= 500 ? 'network-error' : null;
+    }
+    const json = (await res.json()) as RefreshResponse;
+    const access =
+      json.data?.accessToken ??
+      json.data?.access_token ??
+      json.accessToken;
+    const refresh =
+      json.data?.refreshToken ??
+      json.data?.refresh_token ??
+      json.refreshToken;
+    if (!access || !refresh) return null;
+    return { accessToken: access, refreshToken: refresh };
+  } catch (err) {
+    // TypeError = network down (fetch failed). Phân biệt với "refresh invalid"
+    // để middleware không xoá cookie chỉ vì BE tạm sập vài giây.
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[middleware] refresh network error', err);
+    }
+    return 'network-error';
+  }
+}
+
+export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   const publicPaths = ['/login', '/signup', '/forgot-password', '/legal'];
@@ -18,14 +77,60 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const hasAccessToken = request.cookies.has('h24h_access');
-  const hasRefreshToken = request.cookies.has('h24h_refresh');
+  const access = request.cookies.get(COOKIE_ACCESS)?.value;
+  const refresh = request.cookies.get(COOKIE_REFRESH)?.value;
 
-  if (!hasAccessToken && !hasRefreshToken) {
+  if (!access && !refresh) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('redirect', path);
     return NextResponse.redirect(url);
+  }
+
+  if (!access && refresh) {
+    const pair = await refreshAtBackend(refresh);
+    if (pair === 'network-error') {
+      // BE tạm sập — giữ cookie, cho request đi qua. Layout sẽ redirect /login
+      // nếu getCurrentProfile cũng fail, nhưng cookie còn để retry kỳ sau.
+      return NextResponse.next();
+    }
+    if (!pair) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      url.searchParams.set('redirect', path);
+      const response = NextResponse.redirect(url);
+      response.cookies.delete(COOKIE_ACCESS);
+      response.cookies.delete(COOKIE_REFRESH);
+      return response;
+    }
+
+    const forwarded = new Headers(request.headers);
+    const existingCookie = forwarded.get('cookie') ?? '';
+    const merged = existingCookie
+      .split(';')
+      .map((c) => c.trim())
+      .filter(
+        (c) =>
+          !c.startsWith(`${COOKIE_ACCESS}=`) &&
+          !c.startsWith(`${COOKIE_REFRESH}=`),
+      )
+      .concat([
+        `${COOKIE_ACCESS}=${pair.accessToken}`,
+        `${COOKIE_REFRESH}=${pair.refreshToken}`,
+      ])
+      .join('; ');
+    forwarded.set('cookie', merged);
+
+    const response = NextResponse.next({ request: { headers: forwarded } });
+    response.cookies.set(COOKIE_ACCESS, pair.accessToken, {
+      ...COOKIE_OPTS,
+      maxAge: ACCESS_MAX_AGE,
+    });
+    response.cookies.set(COOKIE_REFRESH, pair.refreshToken, {
+      ...COOKIE_OPTS,
+      maxAge: REFRESH_MAX_AGE,
+    });
+    return response;
   }
 
   return NextResponse.next();

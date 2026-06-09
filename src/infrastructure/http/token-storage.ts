@@ -29,16 +29,33 @@ export async function readTokens(): Promise<Partial<TokenPair>> {
   };
 }
 
-export async function writeTokens(pair: TokenPair): Promise<void> {
+/**
+ * Returns `true` nếu ghi cookie thành công, `false` nếu bị block bởi RSC context.
+ * Caller PHẢI xử lý case `false`: dùng token trả về trực tiếp cho retry, không
+ * dựa vào readTokens() (cookie chưa được ghi). Tránh module-level cache vì
+ * serverless reuse instance giữa user → cross-user token leak.
+ */
+export async function writeTokens(pair: TokenPair): Promise<boolean> {
   const store = await cookies();
-  store.set(COOKIE_ACCESS_TOKEN, pair.accessToken, {
-    ...COMMON_COOKIE_OPTS,
-    maxAge: ACCESS_TOKEN_MAX_AGE_SEC,
-  });
-  store.set(COOKIE_REFRESH_TOKEN, pair.refreshToken, {
-    ...COMMON_COOKIE_OPTS,
-    maxAge: REFRESH_TOKEN_MAX_AGE_SEC,
-  });
+  try {
+    store.set(COOKIE_ACCESS_TOKEN, pair.accessToken, {
+      ...COMMON_COOKIE_OPTS,
+      maxAge: ACCESS_TOKEN_MAX_AGE_SEC,
+    });
+    store.set(COOKIE_REFRESH_TOKEN, pair.refreshToken, {
+      ...COMMON_COOKIE_OPTS,
+      maxAge: REFRESH_TOKEN_MAX_AGE_SEC,
+    });
+    return true;
+  } catch (err) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(
+        '[token-storage] cookies().set() blocked (likely RSC context). Caller must pass fresh tokens explicitly. Move auth-mutating call to Server Action or Route Handler for persistence.',
+        err,
+      );
+    }
+    return false;
+  }
 }
 
 export async function clearTokens(): Promise<void> {

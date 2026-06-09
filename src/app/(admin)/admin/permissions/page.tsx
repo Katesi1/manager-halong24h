@@ -1,321 +1,140 @@
-import { Fragment } from 'react';
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { UserCog } from 'lucide-react';
 
+import { listAdminUsersAction } from '@/app/actions/admin-users';
+import { getPermissionsAction } from '@/app/actions/permissions';
+import { PermissionEditor } from '@/components/admin/permission-editor';
 import { PageHeader } from '@/components/host/page-header';
-import { Badge } from '@/components/ui/badge';
 import { RoleCode } from '@/core/value-objects/role';
 
-/**
- * Ma trận RBAC hiển thị-only.
- *
- * Hiện RBAC HARD-CODE trong code (xem `src/core/value-objects/role.ts` +
- * các guard rải rác). Trang này CHỈ hiển thị mapping cho admin reference —
- * KHÔNG persist. Sửa quyền vẫn cần đi qua code review + deploy.
- */
+export const metadata: Metadata = { title: 'Phân quyền' };
 
-type Role = 'ADMIN' | 'OWNER' | 'SALE' | 'CUSTOMER';
+export default async function AdminPermissionsPage(props: {
+  searchParams: Promise<{ userId?: string }>;
+}) {
+  const { userId } = await props.searchParams;
 
-const ROLES: Role[] = ['ADMIN', 'OWNER', 'SALE', 'CUSTOMER'];
+  if (userId) {
+    const res = await getPermissionsAction(userId);
+    if (!res.ok) {
+      return (
+        <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+          <PageHeader
+            eyebrow="Cấu hình"
+            title="Phân quyền"
+            description="Cấu hình quyền CRUD theo từng module cho nhân viên SALE."
+            breadcrumbs={[
+              { label: 'Phân quyền', href: '/admin/permissions' },
+              { label: 'Lỗi' },
+            ]}
+          />
+          <div className="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-900 ring-1 ring-rose-200">
+            Không tải được phân quyền: {res.error}
+          </div>
+        </div>
+      );
+    }
 
-const ROLE_META: Record<Role, { label: string; hint: string; code: number }> = {
-  ADMIN: {
-    label: 'ADMIN',
-    hint: 'Quản trị viên hệ thống',
-    code: RoleCode.ADMIN,
-  },
-  OWNER: {
-    label: 'OWNER',
-    hint: 'Chủ cơ sở',
-    code: RoleCode.OWNER,
-  },
-  SALE: {
-    label: 'SALE',
-    hint: 'Nhân viên chủ',
-    code: RoleCode.SALE,
-  },
-  CUSTOMER: {
-    label: 'CUSTOMER',
-    hint: 'Khách',
-    code: RoleCode.CUSTOMER,
-  },
-};
+    // Lấy tên user để hiển thị (best-effort)
+    const userListRes = await listAdminUsersAction({});
+    const user = userListRes.ok
+      ? userListRes.data.find((u) => u.id === userId)
+      : null;
+    const label = user ? `${user.name} (${user.email})` : userId;
 
-interface PermissionGroup {
-  id: string;
-  label: string;
-  permissions: Array<{
-    key: string;
-    label: string;
-    /** Roles cho phép. */
-    allow: Role[];
-    /** Ghi chú giới hạn (vd: "của mình"). */
-    note?: string;
-  }>;
-}
-
-const GROUPS: PermissionGroup[] = [
-  {
-    id: 'platform',
-    label: 'Vận hành hệ thống',
-    permissions: [
-      {
-        key: 'view_global_dashboard',
-        label: 'Xem dashboard tổng hệ thống',
-        allow: ['ADMIN'],
-      },
-      {
-        key: 'approve_kyc',
-        label: 'Duyệt KYC chủ nhà',
-        allow: ['ADMIN'],
-      },
-      {
-        key: 'approve_property',
-        label: 'Duyệt cơ sở mới',
-        allow: ['ADMIN'],
-      },
-      {
-        key: 'manage_users',
-        label: 'Quản lý user (khoá / mở)',
-        allow: ['ADMIN'],
-      },
-      {
-        key: 'change_role',
-        label: 'Đổi vai trò user',
-        allow: ['ADMIN'],
-      },
-      {
-        key: 'configure_email',
-        label: 'Cấu hình email template',
-        allow: ['ADMIN'],
-      },
-      {
-        key: 'configure_permissions',
-        label: 'Cấu hình quyền (trang này)',
-        allow: ['ADMIN'],
-      },
-    ],
-  },
-  {
-    id: 'disputes',
-    label: 'Khiếu nại & hỗ trợ',
-    permissions: [
-      {
-        key: 'view_disputes',
-        label: 'Xem khiếu nại',
-        allow: ['ADMIN'],
-      },
-      {
-        key: 'resolve_disputes',
-        label: 'Phán quyết khiếu nại',
-        allow: ['ADMIN'],
-      },
-      {
-        key: 'moderate_reviews',
-        label: 'Kiểm duyệt review',
-        allow: ['ADMIN'],
-      },
-    ],
-  },
-  {
-    id: 'host-ops',
-    label: 'Vận hành chủ nhà',
-    permissions: [
-      {
-        key: 'manage_own_properties',
-        label: 'Quản lý cơ sở của mình',
-        allow: ['ADMIN', 'OWNER', 'SALE'],
-        note: 'OWNER/SALE chỉ cơ sở thuộc tenant của mình',
-      },
-      {
-        key: 'manage_calendar_pricing',
-        label: 'Quản lý lịch + giá',
-        allow: ['ADMIN', 'OWNER', 'SALE'],
-      },
-      {
-        key: 'manage_bookings',
-        label: 'Quản lý đặt phòng',
-        allow: ['ADMIN', 'OWNER', 'SALE'],
-      },
-      {
-        key: 'invite_staff',
-        label: 'Mời nhân viên (SALE)',
-        allow: ['ADMIN', 'OWNER'],
-        note: 'SALE không thể tự mời người khác',
-      },
-      {
-        key: 'manage_billing',
-        label: 'Quản lý gói cước',
-        allow: ['ADMIN', 'OWNER'],
-      },
-      {
-        key: 'view_own_reports',
-        label: 'Xem báo cáo doanh thu của mình',
-        allow: ['ADMIN', 'OWNER', 'SALE'],
-      },
-    ],
-  },
-  {
-    id: 'customer',
-    label: 'Khách',
-    permissions: [
-      {
-        key: 'book_property',
-        label: 'Đặt phòng',
-        allow: ['CUSTOMER'],
-      },
-      {
-        key: 'review_property',
-        label: 'Đánh giá cơ sở sau khi ở',
-        allow: ['CUSTOMER'],
-      },
-      {
-        key: 'open_dispute',
-        label: 'Mở khiếu nại',
-        allow: ['CUSTOMER'],
-      },
-    ],
-  },
-];
-
-function Cell({ allowed }: { allowed: boolean }) {
-  if (allowed) {
     return (
-      <span
-        aria-label="Có quyền"
-        className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 font-bold"
-      >
-        ✓
-      </span>
+      <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
+        <PageHeader
+          eyebrow="Cấu hình"
+          title="Phân quyền nhân viên"
+          description="Spec §12. Bật/tắt từng quyền CRUD theo module. Lưu áp dụng ngay."
+          breadcrumbs={[
+            { label: 'Phân quyền', href: '/admin/permissions' },
+            { label: user?.name ?? 'Chi tiết' },
+          ]}
+        />
+        <PermissionEditor
+          userId={userId}
+          userLabel={label}
+          initial={res.data.permissions}
+        />
+      </div>
     );
   }
-  return (
-    <span
-      aria-label="Không có quyền"
-      className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-ink-100 text-ink-300"
-    >
-      —
-    </span>
-  );
-}
 
-export default function AdminPermissionsPage() {
+  // Chưa chọn user → hiển thị list SALE để admin pick.
+  const usersRes = await listAdminUsersAction({ role: RoleCode.SALE });
+  const saleUsers = usersRes.ok ? usersRes.data : [];
+
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader
-        eyebrow="Vận hành hệ thống"
-        title="Phân quyền"
-        description="Ma trận quyền hạn (RBAC) theo CONTRACTS §1. Trang chỉ hiển thị mapping — chỉnh thực tế cần sửa code và deploy."
-        breadcrumbs={[
-          { label: 'Quản trị' },
-          { label: 'Phân quyền' },
-        ]}
+        eyebrow="Cấu hình"
+        title="Phân quyền hệ thống"
+        description="Chọn 1 nhân viên SALE để cấu hình quyền CRUD theo từng module (Cơ sở, Booking, Lịch, Review)."
       />
 
-      <div className="rounded-2xl border-2 border-amber-200 bg-amber-50/50 p-4 text-sm text-ink-700">
-        <p className="font-semibold text-amber-900">⚠ Lưu ý</p>
-        <p className="mt-1 leading-relaxed">
-          RBAC hiện <strong>hard-code trong code</strong>. Trang này chỉ hiển
-          thị mapping. Sửa quyền cần edit{' '}
-          <code className="rounded bg-white px-1.5 py-0.5 font-mono text-xs">
-            src/core/value-objects/role.ts
-          </code>{' '}
-          + các guard liên quan và tạo PR.
-        </p>
-      </div>
-
-      {/* Role legend */}
-      <section className="mt-6 rounded-2xl bg-white p-5 shadow-card ring-1 ring-ink-200/60">
-        <h2 className="font-display text-xl font-semibold tracking-tight text-navy-900">
-          Vai trò trong hệ thống
-        </h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {ROLES.map((role) => {
-            const meta = ROLE_META[role];
-            return (
-              <div
-                key={role}
-                className="rounded-xl border border-ink-100 p-3"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-mono text-sm font-bold text-navy-900">
-                    {meta.label}
-                  </p>
-                  <Badge variant="default">code {meta.code}</Badge>
-                </div>
-                <p className="mt-1 text-xs text-ink-500">{meta.hint}</p>
-              </div>
-            );
-          })}
+      {!usersRes.ok && (
+        <div className="mb-4 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-900 ring-1 ring-rose-200">
+          Không tải được danh sách nhân viên: {usersRes.error}
         </div>
-      </section>
+      )}
 
-      {/* Permission matrix */}
-      <section className="mt-6 rounded-2xl bg-white p-5 shadow-card ring-1 ring-ink-200/60">
-        <h2 className="font-display text-xl font-semibold tracking-tight text-navy-900">
-          Ma trận quyền
-        </h2>
-        <p className="mt-1 text-sm text-ink-500">
-          ✓ = có quyền, — = không. Trang này read-only.
-        </p>
-
-        <div className="mt-4 overflow-x-auto">
+      {saleUsers.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-ink-200 bg-white p-12 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-cream-200">
+            <UserCog className="h-7 w-7 text-ink-400" />
+          </div>
+          <p className="text-sm font-medium text-ink-700">
+            Chưa có nhân viên SALE nào
+          </p>
+          <p className="mt-1 text-xs text-ink-500">
+            Nhân viên SALE được mời qua /staff/invites bởi OWNER hoặc tạo bởi
+            ADMIN.
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-ink-200/60 shadow-card">
           <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-ink-200 text-left">
-                <th className="px-3 py-3 text-[11px] font-medium uppercase tracking-wider text-ink-500">
-                  Quyền
+            <thead className="bg-cream-100 text-ink-600">
+              <tr>
+                <th className="px-4 py-3 text-left font-medium">Nhân viên</th>
+                <th className="px-4 py-3 text-left font-medium">Email</th>
+                <th className="px-4 py-3 text-left font-medium">Owner</th>
+                <th className="px-4 py-3 text-right font-medium w-32">
+                  Hành động
                 </th>
-                {ROLES.map((role) => (
-                  <th
-                    key={role}
-                    className="px-3 py-3 text-center text-[11px] font-medium uppercase tracking-wider text-ink-500"
-                  >
-                    {role}
-                  </th>
-                ))}
               </tr>
             </thead>
             <tbody>
-              {GROUPS.map((group) => (
-                <Fragment key={group.id}>
-                  <tr>
-                    <td
-                      colSpan={ROLES.length + 1}
-                      className="bg-cream-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500"
+              {saleUsers.map((u) => (
+                <tr key={u.id} className="border-t border-ink-100 hover:bg-cream-50">
+                  <td className="px-4 py-3 font-medium text-ink-900">
+                    {u.name}
+                  </td>
+                  <td className="px-4 py-3 text-ink-600">{u.email}</td>
+                  <td className="px-4 py-3 text-ink-600">
+                    {u.ownerId ? (
+                      <code className="text-xs">{u.ownerId.slice(0, 8)}</code>
+                    ) : (
+                      <span className="text-amber-700">Chưa gán</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Link
+                      href={`/admin/permissions?userId=${u.id}`}
+                      className="text-sm font-medium text-navy-700 hover:underline"
                     >
-                      {group.label}
-                    </td>
-                  </tr>
-                  {group.permissions.map((p) => (
-                    <tr
-                      key={p.key}
-                      className="border-t border-ink-100 align-top"
-                    >
-                      <td className="px-3 py-3">
-                        <p className="text-sm font-medium text-ink-900">
-                          {p.label}
-                        </p>
-                        {p.note && (
-                          <p className="mt-0.5 text-[11px] text-ink-500 leading-snug">
-                            {p.note}
-                          </p>
-                        )}
-                      </td>
-                      {ROLES.map((role) => (
-                        <td
-                          key={role}
-                          className="px-3 py-3 text-center align-middle"
-                        >
-                          <Cell allowed={p.allow.includes(role)} />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </Fragment>
+                      Cấu hình →
+                    </Link>
+                  </td>
+                </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </section>
+      )}
     </div>
   );
 }

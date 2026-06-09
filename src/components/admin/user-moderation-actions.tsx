@@ -11,6 +11,7 @@ import {
   updateUserSubscriptionAction,
 } from '@/app/actions/admin-users';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Dialog,
   DialogContent,
@@ -84,6 +85,12 @@ export function UserModerationActions({
   const [showBan, setShowBan] = useState(false);
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
+  type Confirm =
+    | { kind: 'unban' }
+    | { kind: 'revoke' }
+    | { kind: 'change-plan'; plan: 'free' | 'basic' | 'standard' | 'pro' }
+    | { kind: 'reset-pwd' };
+  const [pendingConfirm, setPendingConfirm] = useState<Confirm | null>(null);
 
   // Soft-delete (R14)
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -136,47 +143,74 @@ export function UserModerationActions({
   }
 
   function onUnban() {
-    if (!confirm('Mở chặn người dùng này?')) return;
-    startTransition(async () => {
-      const r = await unbanAdminUserAction(userId);
-      if (!r.ok) {
-        show(r.error || 'Có lỗi', 'error');
-        return;
-      }
-      show('✓ Đã mở chặn', 'success');
-      router.refresh();
-    });
+    setPendingConfirm({ kind: 'unban' });
   }
-
   function onRevoke() {
-    if (!confirm('Force logout — đá người dùng khỏi mọi phiên đang active?'))
-      return;
+    setPendingConfirm({ kind: 'revoke' });
+  }
+  function onChangePlan(plan: 'free' | 'basic' | 'standard' | 'pro') {
+    setPendingConfirm({ kind: 'change-plan', plan });
+  }
+
+  function executeConfirm() {
+    const c = pendingConfirm;
+    if (!c) return;
+    setPendingConfirm(null);
     startTransition(async () => {
-      const r = await revokeUserSessionAction(userId);
-      if (!r.ok) {
-        show(r.error || 'Có lỗi', 'error');
-        return;
+      if (c.kind === 'unban') {
+        const r = await unbanAdminUserAction(userId);
+        if (!r.ok) {
+          show(r.error || 'Có lỗi', 'error');
+          return;
+        }
+        show('✓ Đã mở chặn', 'success');
+        router.refresh();
+      } else if (c.kind === 'revoke') {
+        const r = await revokeUserSessionAction(userId);
+        if (!r.ok) {
+          show(r.error || 'Có lỗi', 'error');
+          return;
+        }
+        show('✓ Đã revoke session', 'success');
+      } else if (c.kind === 'change-plan') {
+        const r = await updateUserSubscriptionAction(userId, c.plan);
+        if (!r.ok) {
+          show(r.error || 'Có lỗi', 'error');
+          return;
+        }
+        show(`✓ Đã đổi sang ${PLAN_LABEL[c.plan]}`, 'success');
+        router.refresh();
+      } else if (c.kind === 'reset-pwd') {
+        const r = await resetUserPasswordAction(userId);
+        if (!r.ok) {
+          show(r.error || 'Có lỗi', 'error');
+          return;
+        }
+        show('✓ Đã gửi email reset', 'success');
       }
-      show('✓ Đã revoke session', 'success');
     });
   }
 
-  function onChangePlan(plan: 'free' | 'basic' | 'standard' | 'pro') {
-    if (
-      !confirm(
-        `Đổi gói cước người dùng này sang "${PLAN_LABEL[plan]}"? Áp dụng ngay.`,
-      )
-    )
-      return;
-    startTransition(async () => {
-      const r = await updateUserSubscriptionAction(userId, plan);
-      if (!r.ok) {
-        show(r.error || 'Có lỗi', 'error');
-        return;
-      }
-      show(`✓ Đã đổi sang ${PLAN_LABEL[plan]}`, 'success');
-      router.refresh();
-    });
+  function confirmMeta(c: Confirm): { title: string; description: string } {
+    switch (c.kind) {
+      case 'unban':
+        return { title: 'Mở chặn người dùng?', description: 'Người dùng sẽ được khôi phục quyền truy cập ngay.' };
+      case 'revoke':
+        return {
+          title: 'Force logout?',
+          description: 'Đá người dùng khỏi mọi phiên đang active. Họ phải đăng nhập lại.',
+        };
+      case 'change-plan':
+        return {
+          title: `Đổi sang "${PLAN_LABEL[c.plan]}"?`,
+          description: 'Đổi gói cước người dùng. Áp dụng ngay.',
+        };
+      case 'reset-pwd':
+        return {
+          title: 'Gửi email reset mật khẩu?',
+          description: 'Người dùng sẽ nhận link đặt lại mật khẩu qua email.',
+        };
+    }
   }
 
   function onConfirmSoftDelete() {
@@ -199,20 +233,7 @@ export function UserModerationActions({
   }
 
   function onResetPwd() {
-    if (
-      !confirm(
-        'Gửi email reset mật khẩu cho người dùng? Họ sẽ nhận link đặt lại mật khẩu.',
-      )
-    )
-      return;
-    startTransition(async () => {
-      const r = await resetUserPasswordAction(userId);
-      if (!r.ok) {
-        show(r.error || 'Có lỗi', 'error');
-        return;
-      }
-      show('✓ Đã gửi email reset', 'success');
-    });
+    setPendingConfirm({ kind: 'reset-pwd' });
   }
 
   return (
@@ -423,6 +444,28 @@ export function UserModerationActions({
           </div>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog
+        open={pendingConfirm !== null}
+        title={pendingConfirm ? confirmMeta(pendingConfirm).title : ''}
+        description={
+          pendingConfirm ? confirmMeta(pendingConfirm).description : undefined
+        }
+        confirmLabel={
+          pendingConfirm?.kind === 'unban'
+            ? 'Mở chặn'
+            : pendingConfirm?.kind === 'revoke'
+              ? 'Force logout'
+              : pendingConfirm?.kind === 'reset-pwd'
+                ? 'Gửi email'
+                : 'Đổi gói'
+        }
+        variant={
+          pendingConfirm?.kind === 'revoke' ? 'danger' : 'primary'
+        }
+        pending={pending}
+        onConfirm={executeConfirm}
+        onCancel={() => setPendingConfirm(null)}
+      />
     </div>
   );
 }

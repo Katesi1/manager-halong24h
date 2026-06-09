@@ -64,25 +64,26 @@ export async function sendTestEmailAction(input: {
     const key = parsed.template as EmailTemplateKey;
     const meta = EMAIL_TEMPLATE_META[key];
 
+    // Default = live (spec đã có endpoint). Mock chỉ khi env bật rõ ràng.
     const mode: 'mock' | 'live' =
-      process.env.NEXT_PUBLIC_EMAIL_LIVE === 'true' ? 'live' : 'mock';
+      process.env.NEXT_PUBLIC_EMAIL_LIVE === 'false' ? 'mock' : 'live';
 
     if (mode === 'live') {
-      // TODO: gọi BE endpoint thật khi sẵn sàng.
-      // const res = await httpClient.post('/admin/emails/test', { template: key, to: parsed.to });
-      // if (!res.ok) throw new Error(res.error);
-      throw new Error(
-        'Live mode chưa được wire — chờ BE expose POST /admin/emails/test',
-      );
+      // Spec §16 — POST /admin/emails/test { template, to } → { sent: boolean }
+      const { apiClient } = await import('@/infrastructure/http/api-client');
+      await apiClient.post<{ sent: boolean }>('/admin/emails/test', {
+        template: key,
+        to: parsed.to,
+      });
+    } else {
+      console.info('[admin-emails] mock send test', {
+        requestedBy: profile.id,
+        template: key,
+        to:
+          process.env.NODE_ENV === 'development' ? parsed.to : '[REDACTED]',
+        subject: meta.subject,
+      });
     }
-
-    console.info('[admin-emails] mock send test', {
-      requestedBy: profile.id,
-      template: key,
-      to:
-        process.env.NODE_ENV === 'development' ? parsed.to : '[REDACTED]',
-      subject: meta.subject,
-    });
 
     return {
       template: key,

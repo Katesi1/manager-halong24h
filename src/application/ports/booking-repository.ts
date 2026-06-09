@@ -5,21 +5,43 @@ import type {
   CreateBookingHoldInput,
 } from '@/core/entities/booking';
 
+export interface UpdateBookingInput {
+  id: string;
+  customerName?: string;
+  customerPhone?: string;
+  guestCount?: number;
+  notes?: string;
+  depositAmount?: number;
+}
+
+export interface PropertyMonthCalendarFilters {
+  propertyId: string;
+  year: number;
+  month: number;
+}
+
 export interface BookingRepository {
   list(filters?: BookingFilters): Promise<Booking[]>;
   getById(id: string): Promise<Booking | null>;
-  /** POST /bookings/hold — staff hold 30 phút */
+  /** Spec §5.1 — GET /bookings/my-bookings (CUSTOMER xem booking của mình). */
+  listMine(filters?: BookingFilters): Promise<Booking[]>;
+  /** Spec §5.1 — GET /bookings/calendar/:propertyId?year&month. */
+  monthCalendar(filters: PropertyMonthCalendarFilters): Promise<Booking[]>;
+  /** Spec §5.1 — POST /bookings/hold (staff 30 phút). */
   hold(input: CreateBookingHoldInput): Promise<Booking>;
-  /** PATCH /bookings/:id/confirm — chủ xác nhận có phòng, gửi email TT */
+  /** Spec §5.1 — POST /bookings/customer-hold (CUSTOMER 24h). */
+  customerHold(input: CreateBookingHoldInput): Promise<Booking>;
+  /** Spec §5.1 — PATCH /bookings/:id/confirm. */
   confirm(id: string): Promise<Booking>;
   /**
-   * PATCH /bookings/:id/mark-paid — chủ xác nhận đã nhận tiền.
-   *
-   * Nếu `amount` >= totalPrice → status = paid + auto gửi Email 2.
-   * Nếu `amount` < totalPrice → cộng dồn vào deposit, vẫn confirmed.
-   * Nếu không truyền `amount` → giả định khách đã chuyển đủ.
+   * Spec §5.1 — PATCH /bookings/:id/paid (đổi từ /mark-paid trong v1.2).
+   * Nếu booking đang HOLD → tự chuyển CONFIRMED.
    */
   markPaid(id: string, amount?: number): Promise<Booking>;
-  /** PATCH /bookings/:id/cancel */
+  /** Spec §5.1 — PATCH /bookings/:id/cancel (ADMIN/OWNER/SALE). */
   cancel(input: CancelBookingInput): Promise<Booking>;
+  /** Spec §5.1 — PATCH /bookings/:id/customer-cancel (Customer huỷ HOLD). */
+  customerCancel(id: string): Promise<Booking>;
+  /** Spec §5.1 — PUT /bookings/:id (ADMIN/OWNER/SALE update). */
+  update(input: UpdateBookingInput): Promise<Booking>;
 }

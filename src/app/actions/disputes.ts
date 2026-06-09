@@ -13,7 +13,6 @@ import { listDisputesUseCase } from '@/application/disputes/list';
 import { openDisputeUseCase } from '@/application/disputes/open';
 import type { DisputeFilters } from '@/core/entities/dispute';
 import { disputeRepository } from '@/infrastructure/container';
-import { recordAudit } from '@/lib/audit-recorder';
 import { requireAdmin, requireManagerRole } from '@/lib/auth-guard';
 import { RoleCode } from '@/core/value-objects/role';
 
@@ -47,16 +46,6 @@ export async function startDisputeInvestigationAction(id: string) {
       disputeRepository(),
       id,
     );
-    await recordAudit(
-      profile,
-      'dispute_start_investigation',
-      {
-        type: 'dispute',
-        id: dispute.id,
-        label: dispute.subject || `Khiếu nại ${dispute.id}`,
-      },
-      null,
-    );
     return dispute;
   });
   if (result.ok) {
@@ -70,16 +59,6 @@ export async function resolveDisputeAction(raw: unknown) {
   const result = await toResult(async () => {
     const profile = await requireAdmin();
     const dispute = await resolveDisputeUseCase(disputeRepository(), raw);
-    await recordAudit(
-      profile,
-      'dispute_resolve',
-      {
-        type: 'dispute',
-        id: dispute.id,
-        label: dispute.subject || `Khiếu nại ${dispute.id}`,
-      },
-      dispute.resolution ?? null,
-    );
     return dispute;
   });
   if (result.ok) {
@@ -94,16 +73,6 @@ export async function rejectDisputeAction(raw: unknown) {
   const result = await toResult(async () => {
     const profile = await requireAdmin();
     const dispute = await rejectDisputeUseCase(disputeRepository(), raw);
-    await recordAudit(
-      profile,
-      'dispute_reject',
-      {
-        type: 'dispute',
-        id: dispute.id,
-        label: dispute.subject || `Khiếu nại ${dispute.id}`,
-      },
-      dispute.resolution ?? null,
-    );
     return dispute;
   });
   if (result.ok) {

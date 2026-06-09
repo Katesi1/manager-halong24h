@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { LeadActions } from '@/components/host/lead-actions';
 import { formatDate, formatDateTime, formatVND, minutesAgo, dowLabel } from '@/lib/format';
-import type { LeadStatus } from '@/lib/legacy-types';
+import { getLeadAction } from '@/app/actions/leads';
+import type { Lead, LeadStatus } from '@/core/entities/lead';
 
 interface LeadDetail {
   id: string;
@@ -68,7 +69,35 @@ const DEMO: Record<string, LeadDetail> = {
   },
 };
 
+function adaptLeadDetail(lead: Lead): LeadDetail {
+  return {
+    id: lead.id,
+    guest_name: lead.guestName,
+    guest_phone: lead.guestPhone,
+    guest_email: lead.guestEmail,
+    check_in: lead.checkIn,
+    check_out: lead.checkOut,
+    num_guests: lead.numGuests,
+    message: lead.message,
+    status: lead.status,
+    created_at: lead.createdAt,
+    responded_at: lead.contactedAt,
+    property_id: lead.propertyId ?? '',
+    property_name: lead.propertyName ?? '—',
+    property_slug: lead.propertyId ?? '',
+    room_name: null,
+    room_id: null,
+    base_price: undefined,
+    weekend_price: null,
+  };
+}
+
 async function getLead(leadId: string): Promise<LeadDetail | null> {
+  const res = await getLeadAction(leadId);
+  if (res.ok && res.data) {
+    return adaptLeadDetail(res.data);
+  }
+  // BE chưa có lead này HOẶC chưa wire — thử DEMO fallback (giữ UI dev mượt).
   return DEMO[leadId] ?? null;
 }
 
@@ -143,7 +172,7 @@ export default async function LeadDetailPage(props: { params: Promise<{ id: stri
       : 0;
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto pb-28">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto pb-28">
       <div className="mb-4 flex items-center gap-3">
         <Link
           href="/host/leads"

@@ -22,18 +22,6 @@ interface PrefGroup {
 
 const GROUPS: PrefGroup[] = [
   {
-    id: 'booking',
-    title: 'Cập nhật đặt phòng',
-    caption: 'Luôn bật — không thể tắt theo NĐ 13/2023',
-    locked: true,
-    items: [
-      { key: 'booking_new', label: 'Có yêu cầu đặt phòng mới', defaultOn: true },
-      { key: 'booking_paid', label: 'Khách đã thanh toán cọc', defaultOn: true },
-      { key: 'booking_cancel', label: 'Khách hủy đặt phòng', defaultOn: true },
-      { key: 'booking_hold_expire', label: 'Yêu cầu giữ chỗ sắp hết hạn', defaultOn: true },
-    ],
-  },
-  {
     id: 'property',
     title: 'Hoạt động cơ sở của bạn',
     caption: 'Tùy chọn — bật/tắt tùy ý',
@@ -124,54 +112,28 @@ export function NotificationPrefs({ profileId }: NotificationPrefsProps = {}) {
             <h3 className="text-sm font-semibold text-ink-900">
               {group.title}
             </h3>
-            <p
-              className={cn(
-                'text-xs',
-                group.locked ? 'text-amber-700' : 'text-ink-500',
-              )}
-            >
+            <p className="text-xs text-ink-500">
               {group.caption}
             </p>
           </div>
           <ul className="space-y-2">
             {group.items.map((item) => {
-              // Khi locked: luôn ON, không dùng state.
-              const enabled = group.locked
-                ? true
-                : hydrated
-                  ? prefs[item.key]
-                  : item.defaultOn;
+              const enabled = hydrated ? prefs[item.key] : item.defaultOn;
               return (
                 <li
                   key={item.key}
-                  className={cn(
-                    'flex items-center justify-between rounded-lg px-4 py-3',
-                    group.locked
-                      ? 'bg-amber-50 ring-1 ring-amber-100'
-                      : 'bg-cream-100',
-                  )}
+                  className="flex items-center justify-between rounded-lg px-4 py-3 bg-cream-100"
                 >
-                  <div>
-                    <span className="text-sm text-ink-900">{item.label}</span>
-                    {group.locked && (
-                      <p className="text-[10px] text-amber-700">
-                        Bắt buộc — không thể tắt
-                      </p>
-                    )}
-                  </div>
+                  <span className="text-sm text-ink-900">{item.label}</span>
                   <button
                     type="button"
                     role="switch"
                     aria-checked={enabled}
-                    aria-disabled={group.locked}
                     aria-label={item.label}
-                    disabled={group.locked}
-                    onClick={() => toggle(item.key, group.locked)}
+                    onClick={() => toggle(item.key, false)}
                     className={cn(
                       'relative h-5 w-9 rounded-full transition',
                       enabled ? 'bg-emerald-500' : 'bg-ink-300',
-                      group.locked &&
-                        'cursor-not-allowed bg-amber-200 opacity-60',
                     )}
                   >
                     <span

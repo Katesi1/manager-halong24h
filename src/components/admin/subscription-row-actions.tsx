@@ -86,7 +86,7 @@ export function SubscriptionRowActions({
         <p className="text-[10px] text-rose-700 max-w-[200px]">{error}</p>
       )}
 
-      {(status === 'pending' || status === 'overdue') && (
+      {(status === 'past_due' || status === 'trial') && (
         <Button
           variant="primary"
           size="sm"
@@ -97,7 +97,7 @@ export function SubscriptionRowActions({
         </Button>
       )}
 
-      {status === 'overdue' && (
+      {status === 'past_due' && (
         <Button
           variant="outline"
           size="sm"
@@ -119,7 +119,7 @@ export function SubscriptionRowActions({
         </Button>
       )}
 
-      {(status === 'paid' || status === 'pending' || status === 'overdue') && !showFreeze && (
+      {(status === 'active' || status === 'trial' || status === 'past_due') && !showFreeze && (
         <button
           type="button"
           onClick={() => setShowFreeze(true)}

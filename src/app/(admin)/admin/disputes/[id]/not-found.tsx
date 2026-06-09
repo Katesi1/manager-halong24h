@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 export default function DisputeNotFound() {
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-md rounded-2xl border border-dashed border-ink-200 bg-white p-10 text-center shadow-card">
         <p className="text-3xl">⚖️</p>
         <p className="mt-3 text-sm font-medium text-gold-700">404</p>

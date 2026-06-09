@@ -36,7 +36,7 @@ export function DialogContent({ open, className, children }: DialogContentProps)
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
               className={cn(
-                'fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-ink-200 focus:outline-none',
+                'fixed left-1/2 top-1/2 z-50 w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-4 sm:p-6 shadow-2xl ring-1 ring-ink-200 focus:outline-none max-h-[calc(100vh-2rem)] overflow-y-auto',
                 className,
               )}
             >
@@ -60,7 +60,7 @@ export function DialogContent({ open, className, children }: DialogContentProps)
 
 export function DialogTitle({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <RDialog.Title className={cn('font-display text-2xl font-semibold tracking-tight text-navy-900', className)}>
+    <RDialog.Title className={cn('font-display text-xl sm:text-2xl font-semibold tracking-tight text-navy-900 pr-8', className)}>
       {children}
     </RDialog.Title>
   );

@@ -14,7 +14,7 @@ export default function AdminError({
   }, [error]);
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-xl rounded-2xl border-2 border-rose-200 bg-rose-50/40 p-8 text-center shadow-card">
         <p className="text-3xl">⚠️</p>
         <p className="mt-3 text-sm font-medium text-gold-700">Lỗi trang quản trị</p>

@@ -2,7 +2,7 @@ import Image from 'next/image';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen grid lg:grid-cols-[1fr_minmax(420px,560px)] bg-white">
+    <div className="min-h-screen grid bg-white lg:grid-cols-[1fr_480px]">
       {/* Visual side */}
       <div className="relative hidden lg:block">
         <Image

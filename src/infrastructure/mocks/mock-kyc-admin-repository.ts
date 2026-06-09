@@ -4,11 +4,29 @@ import { NotFoundError } from '@/core/errors';
 import type {
   ApproveKycInput,
   KycAdminFilters,
+  KycAdminListResult,
   KycAdminSubmission,
   KycField,
+  KycQueueFilter,
   RejectKycInput,
 } from '@/core/entities/kyc-admin';
+import type { KycSubmissionStatus } from '@/core/entities/kyc';
 import type { KycAdminRepository } from '@/application/ports/kyc-admin-repository';
+
+function matchesFilter(
+  status: KycSubmissionStatus,
+  filter: KycQueueFilter,
+): boolean {
+  if (filter === 0) return status !== 'draft';
+  if (filter === 1)
+    return (
+      status === 'kyc_submitted' ||
+      status === 'payment_pending' ||
+      status === 'awaiting_approval'
+    );
+  if (filter === 2) return status === 'approved' || status === 'refunded';
+  return status === 'rejected';
+}
 
 // SYNTHETIC TEST DATA — NOT REAL ACCOUNTS, do not use in production.
 const KYC_DOC_PLACEHOLDER = '/placeholder-kyc-doc.svg';
@@ -144,9 +162,13 @@ const SEED: KycAdminSubmission[] = [
 const store = new Map<string, KycAdminSubmission>(SEED.map((s) => [s.id, s]));
 
 export class MockKycAdminRepository implements KycAdminRepository {
-  async list(filters?: KycAdminFilters): Promise<KycAdminSubmission[]> {
-    let arr = Array.from(store.values());
-    if (filters?.status) arr = arr.filter((s) => s.status === filters.status);
+  async list(filters?: KycAdminFilters): Promise<KycAdminListResult> {
+    const filter: KycQueueFilter = filters?.filter ?? 1;
+    const page = filters?.page ?? 1;
+    const pageSize = filters?.pageSize ?? 20;
+    let arr = Array.from(store.values()).filter((s) =>
+      matchesFilter(s.status, filter),
+    );
     if (filters?.search) {
       const q = filters.search.toLowerCase();
       arr = arr.filter(
@@ -156,10 +178,22 @@ export class MockKycAdminRepository implements KycAdminRepository {
           s.ownerPhone.includes(q),
       );
     }
-    return arr.sort(
+    arr.sort(
       (a, b) =>
         new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
     );
+    const pendingCount = Array.from(store.values()).filter((s) =>
+      matchesFilter(s.status, 1),
+    ).length;
+    const start = (page - 1) * pageSize;
+    return {
+      filter,
+      pendingCount,
+      total: arr.length,
+      page,
+      pageSize,
+      items: arr.slice(start, start + pageSize),
+    };
   }
 
   async getById(id: string): Promise<KycAdminSubmission | null> {
@@ -198,11 +232,8 @@ export class MockKycAdminRepository implements KycAdminRepository {
   }
 
   async countPending(): Promise<number> {
-    return Array.from(store.values()).filter(
-      (s) =>
-        s.status === 'kyc_submitted' ||
-        s.status === 'awaiting_approval' ||
-        s.status === 'paid',
+    return Array.from(store.values()).filter((s) =>
+      matchesFilter(s.status, 1),
     ).length;
   }
 }

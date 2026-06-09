@@ -7,6 +7,16 @@ import type {
   UpdatePropertyInput,
 } from '@/core/entities/property';
 
+export interface PublicPropertyFilters {
+  checkinDate?: string;
+  checkoutDate?: string;
+  guests?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  type?: number;
+  view?: string;
+}
+
 export interface PropertyRepository {
   list(filters?: PropertyFilters): Promise<Property[]>;
   getById(id: string): Promise<Property | null>;
@@ -17,4 +27,14 @@ export interface PropertyRepository {
   uploadImages(id: string, files: File[]): Promise<PropertyImage[]>;
   deleteImage(propertyId: string, imageId: string): Promise<void>;
   setCoverImage(propertyId: string, imageId: string): Promise<void>;
+
+  /** Spec §4.1 — GET /properties/public (no auth). */
+  listPublic(filters?: PublicPropertyFilters): Promise<Property[]>;
+  /** Spec §4.1 — GET /properties/share/:id (no auth, no prices). */
+  getShare(id: string): Promise<Property | null>;
+
+  /** Spec §4.4 — moderation actions (admin only). */
+  approve(id: string): Promise<Property>;
+  reject(id: string, reason: string): Promise<Property>;
+  suspend(id: string, reason?: string): Promise<Property>;
 }

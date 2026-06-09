@@ -75,7 +75,7 @@ export default async function AdminEmailsPage(props: {
   const meta = EMAIL_TEMPLATE_META[current];
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       <PageHeader
         eyebrow="Cài đặt hệ thống"
         title="Mẫu email"

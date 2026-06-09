@@ -7,7 +7,12 @@ import type {
   StaffInviteFilters,
   StaffMember,
 } from '@/core/entities/staff';
-import type { StaffRepository } from '@/application/ports/staff-repository';
+import type { AuthTokens } from '@/core/entities/user';
+import type {
+  AcceptStaffInviteInput,
+  StaffInviteVerification,
+  StaffRepository,
+} from '@/application/ports/staff-repository';
 
 import { apiClient } from '../http/api-client';
 
@@ -46,5 +51,18 @@ export class ApiStaffRepository implements StaffRepository {
 
   async removeStaff(userId: string): Promise<void> {
     await apiClient.delete(`/staff/${userId}`);
+  }
+
+  async verifyInvite(token: string): Promise<StaffInviteVerification> {
+    return apiClient.get<StaffInviteVerification>(
+      `/staff/invites/verify/${encodeURIComponent(token)}`,
+      { skipAuth: true, cache: 'no-store' },
+    );
+  }
+
+  async acceptInvite(input: AcceptStaffInviteInput): Promise<AuthTokens> {
+    return apiClient.post<AuthTokens>('/staff/invites/accept', input, {
+      skipAuth: true,
+    });
   }
 }

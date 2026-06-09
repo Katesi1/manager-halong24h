@@ -8,6 +8,8 @@ import { listBookingsAction } from '@/app/actions/bookings';
 import { getDashboardStatsAction } from '@/app/actions/dashboard';
 import { countPendingKycAdminAction } from '@/app/actions/kyc-admin';
 import { listPropertiesAction } from '@/app/actions/properties';
+import { RevenueBarChart } from '@/components/admin/revenue-bar-chart';
+import { UserRoleDonut } from '@/components/admin/user-role-donut';
 import { PageHeader, StatCard } from '@/components/host/page-header';
 import { Badge } from '@/components/ui/badge';
 import type { Booking } from '@/core/entities/booking';
@@ -52,7 +54,7 @@ export default async function AdminOverviewPage() {
   const recentBookings = bookings.slice(0, 5);
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       <PageHeader
         eyebrow="Quản trị hệ thống"
         title="Tổng quan hệ thống"
@@ -117,6 +119,46 @@ export default async function AdminOverviewPage() {
         />
       </div>
 
+      {/* Charts */}
+      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        <section className="rounded-2xl bg-white p-6 ring-1 ring-ink-200/60 shadow-card">
+          <h2 className="font-display text-xl font-semibold tracking-tight text-navy-900">
+            Doanh thu subscription 6 tháng
+          </h2>
+          <p className="mt-1 text-xs text-ink-500">Đơn vị: triệu VNĐ</p>
+          <div className="mt-5">
+            <RevenueBarChart
+              data={[
+                { month: 'T12', revenue: 8_200_000 },
+                { month: 'T1', revenue: 9_500_000 },
+                { month: 'T2', revenue: 11_800_000 },
+                { month: 'T3', revenue: 12_400_000 },
+                { month: 'T4', revenue: 13_600_000 },
+                { month: 'T5', revenue: 15_900_000 },
+              ]}
+            />
+          </div>
+        </section>
+
+        <section className="rounded-2xl bg-white p-6 ring-1 ring-ink-200/60 shadow-card">
+          <h2 className="font-display text-xl font-semibold tracking-tight text-navy-900">
+            Phân bổ người dùng
+          </h2>
+          <p className="mt-1 text-xs text-ink-500">Theo vai trò hiện tại</p>
+          <div className="mt-5 flex justify-center">
+            <UserRoleDonut
+              segments={[
+                { label: 'Chủ nhà (Owner)', value: totalOwners, color: '#1e3a5f' },
+                { label: 'Nhân viên (Sale)', value: totalSales, color: '#c9973f' },
+                { label: 'Khách hàng', value: totalCustomers, color: '#94a3b8' },
+                { label: 'Bị chặn', value: bannedUsers, color: '#e11d48' },
+              ]}
+            />
+          </div>
+        </section>
+      </div>
+
+      {/* Lists */}
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <section className="rounded-2xl bg-white p-6 ring-1 ring-ink-200/60 shadow-card">
           <div className="flex items-center justify-between">
@@ -198,8 +240,8 @@ function AlertCard({
 }) {
   const toneClass: Record<typeof tone, string> = {
     ok: 'bg-white ring-ink-200/60',
-    warning: 'bg-amber-50 ring-amber-200',
-    danger: 'bg-rose-50 ring-rose-200',
+    warning: 'bg-white ring-ink-200/60',
+    danger: 'bg-white ring-ink-200/60',
     default: 'bg-white ring-ink-200/60',
   };
   const valueClass: Record<typeof tone, string> = {

@@ -22,7 +22,6 @@ const ROLE_LABEL: Record<RoleCode, string> = {
 };
 
 const ROLE_OPTIONS: { value: RoleCode; label: string }[] = [
-  { value: RoleCode.ADMIN, label: ROLE_LABEL[RoleCode.ADMIN] },
   { value: RoleCode.OWNER, label: ROLE_LABEL[RoleCode.OWNER] },
   { value: RoleCode.SALE, label: ROLE_LABEL[RoleCode.SALE] },
   { value: RoleCode.CUSTOMER, label: ROLE_LABEL[RoleCode.CUSTOMER] },
@@ -69,7 +68,7 @@ export function UserRoleEditor({
       setSavedRole(draftRole);
       setConfirmOpen(false);
       toast.success(
-        `Đã đổi vai trò sang "${ROLE_LABEL[draftRole]}".`,
+        `Đã đổi vai trò sang "${ROLE_LABEL[draftRole]}". Đã ghi nhật ký thay đổi.`,
       );
       router.refresh();
     });
@@ -111,14 +110,6 @@ export function UserRoleEditor({
           </>
         )}
       </div>
-      <p className="text-[11px] text-ink-500">
-        Mỗi lần đổi vai trò được ghi vào{' '}
-        <a href="/admin/audit-log" className="underline hover:text-navy-900">
-          /admin/audit-log
-        </a>
-        .
-      </p>
-
       <Dialog
         open={confirmOpen}
         onOpenChange={(o: boolean) => setConfirmOpen(o)}

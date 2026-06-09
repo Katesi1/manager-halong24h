@@ -1,11 +1,23 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import {
+  ArrowLeft,
+  BedDouble,
+  Building2,
+  Calendar,
+  CreditCard,
+  Mail,
+  MessageSquare,
+  Phone,
+  ShieldCheck,
+  User,
+  UserCog,
+} from 'lucide-react';
 
 import { getAdminUserAction } from '@/app/actions/admin-users';
 import { UserModerationActions } from '@/components/admin/user-moderation-actions';
 import { UserRoleEditor } from '@/components/admin/user-role-editor';
-import { PageHeader } from '@/components/host/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { AdminUserStatus } from '@/core/entities/admin-user';
@@ -58,41 +70,70 @@ export default async function AdminUserDetailPage(props: {
   const isCustomer = user.role === RoleCode.CUSTOMER;
 
   return (
-    <div className="p-6 lg:p-8 max-w-6xl mx-auto">
-      <PageHeader
-        eyebrow={ROLE_LABEL[user.role]}
-        title={user.name}
-        description={`Mã: ${user.id} · Tham gia ${formatDateTime(user.createdAt)}`}
-        breadcrumbs={[
-          { label: 'Người dùng', href: '/admin/users' },
-          { label: user.name },
-        ]}
-        actions={
-          <Badge variant={STATUS_VARIANT[user.status]}>
-            {STATUS_LABEL[user.status]}
-          </Badge>
-        }
-      />
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+      <Link
+        href="/admin/users"
+        className="group mb-6 inline-flex items-center gap-2 text-sm text-ink-500 transition-colors hover:text-navy-900"
+      >
+        <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+        Quay lại danh sách người dùng
+      </Link>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      {/* Header card */}
+      <div className="mb-6 rounded-2xl bg-white p-6 ring-1 ring-ink-200/60 shadow-card">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-cream-200 text-lg font-bold text-navy-800 uppercase">
+              {user.name.charAt(0)}
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h1 className="font-display text-2xl font-semibold tracking-tight text-navy-900">
+                  {user.name}
+                </h1>
+                <Badge variant={STATUS_VARIANT[user.status]}>
+                  {STATUS_LABEL[user.status]}
+                </Badge>
+              </div>
+              <p className="mt-1 text-sm text-ink-500">
+                {ROLE_LABEL[user.role]} · Tham gia {formatDateTime(user.createdAt)}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <div className="space-y-6">
-          {/* Profile */}
-          <section className="rounded-2xl bg-white p-6 ring-1 ring-ink-200/60 shadow-card">
-            <h2 className="font-display text-2xl font-semibold tracking-tight text-navy-900">
-              Thông tin tài khoản
-            </h2>
-            <dl className="mt-4 grid gap-3 md:grid-cols-2">
-              <Field label="Email" value={user.email} mono />
-              <Field label="Số điện thoại" value={user.phone ?? '—'} />
-              <Field
+          {/* Thông tin cá nhân */}
+          <section className="rounded-2xl bg-white ring-1 ring-ink-200/60 shadow-card">
+            <div className="border-b border-ink-100 px-6 py-4">
+              <h2 className="flex items-center gap-2 font-display text-lg font-semibold text-navy-900">
+                <User className="h-5 w-5 text-ink-400" />
+                Thông tin cá nhân
+              </h2>
+            </div>
+            <div className="grid gap-px bg-ink-100 sm:grid-cols-2">
+              <InfoCell icon={<User className="h-4 w-4" />} label="Họ tên" value={user.name} />
+              <InfoCell icon={<Mail className="h-4 w-4" />} label="Email" value={user.email} mono />
+              <InfoCell icon={<Phone className="h-4 w-4" />} label="Số điện thoại" value={user.phone ?? '—'} />
+              <InfoCell
+                icon={<Calendar className="h-4 w-4" />}
                 label="Hoạt động gần nhất"
                 value={
                   user.lastActiveAt
-                    ? `${relativeTime(user.lastActiveAt)} (${formatDateTime(user.lastActiveAt)})`
+                    ? `${relativeTime(user.lastActiveAt)}`
                     : '—'
                 }
               />
-              <Field
+              <InfoCell
+                icon={<UserCog className="h-4 w-4" />}
+                label="Mã người dùng"
+                value={user.id}
+                mono
+              />
+              <InfoCell
+                icon={<UserCog className="h-4 w-4" />}
                 label="Vai trò"
                 value={
                   <UserRoleEditor
@@ -103,7 +144,8 @@ export default async function AdminUserDetailPage(props: {
                 }
               />
               {isSale && (
-                <Field
+                <InfoCell
+                  icon={<User className="h-4 w-4" />}
                   label="Thuộc Chủ nhà"
                   value={
                     user.ownerId ? (
@@ -114,29 +156,32 @@ export default async function AdminUserDetailPage(props: {
                         {user.ownerId}
                       </Link>
                     ) : (
-                      <span className="text-amber-700">— Chưa được gán</span>
+                      <span className="text-amber-700">Chưa được gán</span>
                     )
                   }
                 />
               )}
-            </dl>
+            </div>
           </section>
 
-          {/* Owner-specific: KYC + Subscription */}
+          {/* KYC & Gói cước (Owner only) */}
           {isOwner && (
-            <section className="rounded-2xl bg-white p-6 ring-1 ring-ink-200/60 shadow-card">
-              <h2 className="font-display text-2xl font-semibold tracking-tight text-navy-900">
-                Xác minh & Gói cước
-              </h2>
-              <dl className="mt-4 grid gap-3 md:grid-cols-2">
-                <Field
+            <section className="rounded-2xl bg-white ring-1 ring-ink-200/60 shadow-card">
+              <div className="border-b border-ink-100 px-6 py-4">
+                <h2 className="flex items-center gap-2 font-display text-lg font-semibold text-navy-900">
+                  <ShieldCheck className="h-5 w-5 text-ink-400" />
+                  Xác minh KYC & Gói cước
+                </h2>
+              </div>
+              <div className="grid gap-px bg-ink-100 sm:grid-cols-2">
+                <InfoCell
+                  icon={<ShieldCheck className="h-4 w-4" />}
                   label="Trạng thái KYC"
-                  value={
-                    <KycPill status={user.kycStatus} />
-                  }
+                  value={<KycPill status={user.kycStatus} />}
                 />
-                <Field
-                  label="Gói cước"
+                <InfoCell
+                  icon={<CreditCard className="h-4 w-4" />}
+                  label="Gói cước hiện tại"
                   value={
                     user.subscriptionPlan ? (
                       <span className="font-semibold text-navy-900">
@@ -147,36 +192,44 @@ export default async function AdminUserDetailPage(props: {
                     )
                   }
                 />
-              </dl>
+              </div>
               {user.kycStatus === 'pending' && (
-                <Link href={`/admin/kyc?q=${user.id}`} className="mt-4 inline-block">
-                  <Button variant="outline" size="sm">
-                    → Vào trang duyệt KYC
-                  </Button>
-                </Link>
+                <div className="px-6 py-4">
+                  <Link href={`/admin/kyc?q=${user.id}`}>
+                    <Button variant="outline" size="sm">
+                      → Vào trang duyệt KYC
+                    </Button>
+                  </Link>
+                </div>
               )}
             </section>
           )}
 
-          {/* Activity drill-down */}
-          <section className="rounded-2xl bg-white p-6 ring-1 ring-ink-200/60 shadow-card">
-            <h2 className="font-display text-2xl font-semibold tracking-tight text-navy-900">
-              Hoạt động
-            </h2>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          {/* Thống kê hoạt động */}
+          <section className="rounded-2xl bg-white ring-1 ring-ink-200/60 shadow-card">
+            <div className="border-b border-ink-100 px-6 py-4">
+              <h2 className="flex items-center gap-2 font-display text-lg font-semibold text-navy-900">
+                <BedDouble className="h-5 w-5 text-ink-400" />
+                Thống kê hoạt động
+              </h2>
+            </div>
+            <div className="grid gap-4 p-6 sm:grid-cols-3">
               {isOwner && (
-                <StatBox
+                <StatCard
+                  icon={<Building2 className="h-5 w-5 text-navy-600" />}
                   label="Cơ sở sở hữu"
                   value={user.propertyCount}
                   href={`/admin/properties?ownerId=${user.id}`}
                 />
               )}
-              <StatBox
-                label={isCustomer ? 'Lượt đặt phòng' : 'Đặt phòng đã làm'}
+              <StatCard
+                icon={<BedDouble className="h-5 w-5 text-emerald-600" />}
+                label={isCustomer ? 'Lượt đặt phòng' : 'Đặt phòng đã xử lý'}
                 value={user.bookingCount}
                 href={`/admin/bookings?${isOwner ? 'ownerId' : isSale ? 'saleId' : 'customerId'}=${user.id}`}
               />
-              <StatBox
+              <StatCard
+                icon={<MessageSquare className="h-5 w-5 text-rose-500" />}
                 label="Khiếu nại liên quan"
                 value={user.disputeCount}
                 tone={user.disputeCount > 0 ? 'warning' : 'default'}
@@ -186,10 +239,11 @@ export default async function AdminUserDetailPage(props: {
           </section>
         </div>
 
-        <aside className="space-y-4">
+        {/* Sidebar */}
+        <aside>
           <div className="sticky top-4 space-y-4">
             <div className="rounded-2xl bg-white p-5 ring-1 ring-ink-200/60 shadow-card">
-              <p className="overline muted no-dash text-[10px]">
+              <p className="text-xs font-semibold uppercase tracking-wider text-ink-500">
                 Hành động kiểm duyệt
               </p>
               <div className="mt-3">
@@ -208,33 +262,38 @@ export default async function AdminUserDetailPage(props: {
   );
 }
 
-function Field({
+function InfoCell({
+  icon,
   label,
   value,
   mono,
 }: {
+  icon: React.ReactNode;
   label: string;
   value: React.ReactNode;
   mono?: boolean;
 }) {
   return (
-    <div>
-      <dt className="overline muted no-dash text-[10px]">{label}</dt>
-      <dd
-        className={`mt-1 text-sm text-ink-900 ${mono ? 'font-mono break-all' : ''}`}
-      >
-        {value}
-      </dd>
+    <div className="flex items-start gap-3 bg-white px-6 py-4">
+      <span className="mt-0.5 shrink-0 text-ink-400">{icon}</span>
+      <div className="min-w-0">
+        <p className="text-xs font-medium text-ink-400">{label}</p>
+        <p className={`mt-0.5 text-sm text-ink-900 ${mono ? 'font-mono break-all' : ''}`}>
+          {value}
+        </p>
+      </div>
     </div>
   );
 }
 
-function StatBox({
+function StatCard({
+  icon,
   label,
   value,
   tone = 'default',
   href,
 }: {
+  icon: React.ReactNode;
   label: string;
   value: number;
   tone?: 'default' | 'warning';
@@ -243,15 +302,22 @@ function StatBox({
   return (
     <Link
       href={href}
-      className="rounded-xl bg-cream-100 p-4 hover:bg-cream-200 transition-colors"
+      className="group rounded-xl bg-cream-50 p-4 ring-1 ring-ink-100 transition-all hover:ring-navy-300 hover:shadow-md"
     >
-      <p className="overline muted no-dash text-[10px]">{label}</p>
+      <div className="flex items-center gap-2">
+        {icon}
+        <p className="text-xs font-medium text-ink-500">{label}</p>
+      </div>
       <p
-        className={`mt-2 font-display text-2xl font-semibold ${tone === 'warning' && value > 0 ? 'text-rose-700' : 'text-navy-900'}`}
+        className={`mt-2 font-display text-3xl font-semibold tracking-tight ${
+          tone === 'warning' && value > 0 ? 'text-rose-700' : 'text-navy-900'
+        }`}
       >
         {value}
       </p>
-      <p className="mt-1 text-[11px] text-ink-500">→ Xem chi tiết</p>
+      <p className="mt-1 text-[11px] text-ink-400 group-hover:text-navy-700">
+        Xem chi tiết →
+      </p>
     </Link>
   );
 }

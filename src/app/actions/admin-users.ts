@@ -14,7 +14,6 @@ import {
 import type { AdminUserFilters } from '@/core/entities/admin-user';
 import { RoleCode } from '@/core/value-objects/role';
 import { adminUserRepository } from '@/infrastructure/container';
-import { recordAudit } from '@/lib/audit-recorder';
 import { requireAdmin } from '@/lib/auth-guard';
 
 import { toResult } from './_helpers';
@@ -60,12 +59,6 @@ export async function banAdminUserAction(userId: string, reason: string) {
   const result = await toResult(async () => {
     const profile = await requireAdmin();
     const user = await banUserUseCase(adminUserRepository(), { userId, reason });
-    await recordAudit(
-      profile,
-      'user_ban',
-      { type: 'user', id: user.id, label: user.name || user.email },
-      reason,
-    );
     return user;
   });
   if (result.ok) {
@@ -79,12 +72,6 @@ export async function unbanAdminUserAction(userId: string) {
   const result = await toResult(async () => {
     const profile = await requireAdmin();
     const user = await unbanUserUseCase(adminUserRepository(), userId);
-    await recordAudit(
-      profile,
-      'user_unban',
-      { type: 'user', id: user.id, label: user.name || user.email },
-      null,
-    );
     return user;
   });
   if (result.ok) {
@@ -99,16 +86,6 @@ export async function revokeUserSessionAction(userId: string) {
     const profile = await requireAdmin();
     const user = await getAdminUserUseCase(adminUserRepository(), userId);
     await revokeSessionUseCase(adminUserRepository(), userId);
-    await recordAudit(
-      profile,
-      'user_revoke_session',
-      {
-        type: 'user',
-        id: userId,
-        label: user ? user.name || user.email : userId,
-      },
-      null,
-    );
     return true;
   });
 }
@@ -123,12 +100,6 @@ export async function updateUserSubscriptionAction(
       userId,
       plan,
     });
-    await recordAudit(
-      profile,
-      'user_change_plan',
-      { type: 'user', id: user.id, label: user.name || user.email },
-      `Đổi sang gói: ${PLAN_LABEL[plan]}`,
-    );
     return user;
   });
   if (result.ok) {
@@ -159,16 +130,6 @@ export async function changeUserRoleAction(
       throw new Error('Vai trò mới trùng vai trò hiện tại');
     }
     const user = await getAdminUserUseCase(adminUserRepository(), userId);
-    await recordAudit(
-      profile,
-      'user_change_role',
-      {
-        type: 'user',
-        id: userId,
-        label: user ? user.name || user.email : userId,
-      },
-      `Đổi vai trò: ${ROLE_LABEL[fromRole]} → ${ROLE_LABEL[toRole]}`,
-    );
     return true;
   });
   if (result.ok) {
@@ -183,16 +144,6 @@ export async function resetUserPasswordAction(userId: string) {
     const profile = await requireAdmin();
     const user = await getAdminUserUseCase(adminUserRepository(), userId);
     await resetPasswordUseCase(adminUserRepository(), userId);
-    await recordAudit(
-      profile,
-      'user_reset_password',
-      {
-        type: 'user',
-        id: userId,
-        label: user ? user.name || user.email : userId,
-      },
-      null,
-    );
     return true;
   });
 }

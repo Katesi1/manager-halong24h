@@ -37,7 +37,7 @@ export default async function AdminPropertyDetail(props: {
   const cover = property.images.find((i) => i.isCover) ?? property.images[0];
 
   return (
-    <div className="p-6 lg:p-8 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader
         title={property.name}
         description={

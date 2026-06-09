@@ -10,39 +10,85 @@ export interface Permission {
 
 export type KycStatus = 'none' | 'pending' | 'approved' | 'rejected';
 
+/** Spec §10.5 / §19. */
 export type SubscriptionStatus =
+  | 'none'
+  | 'trial'
   | 'active'
-  | 'trialing'
   | 'past_due'
   | 'cancelled'
+  | 'frozen'
   | 'expired'
   | null;
 
-export interface AuthSession {
+/** Spec v1.4 §10.4 — VNPay loại bỏ. v1.6 thêm casso, sepay. */
+export type SubscriptionProvider =
+  | 'apple_iap'
+  | 'manual_bank'
+  | 'manual'
+  | 'casso'
+  | 'sepay'
+  | null;
+
+/**
+ * Spec v1.7 §2.3 — Login/register/refresh CHỈ trả tokens, không kèm user.
+ * FE phải gọi `GET /auth/profile` sau để lấy user info.
+ */
+export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
-  user: AuthUser;
 }
+
+/**
+ * Spec v1.7 §2.3 — Google sign-in lần đầu chưa chọn role: BE trả
+ * `isNewUser: true` + profile thô để FE prompt user chọn OWNER/CUSTOMER.
+ * (Apple sign-in đã bỏ scope ở Phase 17.)
+ */
+export interface OAuthNewUserPrompt {
+  isNewUser: true;
+  googleProfile: {
+    email: string;
+    name: string;
+    avatar: string | null;
+    sub: string;
+  };
+}
+
+export type OAuthSignInResult = AuthTokens | OAuthNewUserPrompt;
+
+export function isOAuthNewUserPrompt(
+  r: OAuthSignInResult,
+): r is OAuthNewUserPrompt {
+  return 'isNewUser' in r && r.isNewUser === true;
+}
+
 
 export interface AuthUser {
   id: string;
   name: string;
   phone: string | null;
   email: string;
+  avatar: string | null;
   role: RoleCode;
   ownerId: string | null;
   isActive: boolean;
+  emailVerified: boolean;
 }
 
 export interface UserProfile extends AuthUser {
   gender: number | null;
   dateOfBirth: string | null;
   createdAt: string;
+  updatedAt: string | null;
   kycBypass: boolean;
   kycStatus: KycStatus;
   subscriptionStatus: SubscriptionStatus;
   subscriptionPlanId: string | null;
   subscriptionCycle: 'monthly' | 'yearly' | null;
+  subscriptionProvider: SubscriptionProvider;
+  subscriptionPriceOverride: number | null;
+  subscriptionFrozenAt: string | null;
+  subscriptionFrozenReason: string | null;
   trialEndsAt: string | null;
   nextChargeAt: string | null;
   permissions: Permission[];

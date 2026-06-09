@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { loginAction, type ActionResult } from '@/app/actions/auth';
 import { Input, Label } from '@/components/ui/input';
+import { GoogleLoginSection } from '@/components/auth/google-login-section';
 import { SubmitButton } from '@/components/auth/submit-button';
 
 export default function LoginPage() {
@@ -79,23 +80,25 @@ function LoginForm() {
         )}
 
         <SubmitButton pending="Đang đăng nhập...">Đăng nhập</SubmitButton>
-
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-ink-200" />
-          </div>
-          <div className="relative flex justify-center text-xs">
-            <span className="bg-white px-3 text-ink-500">hoặc</span>
-          </div>
-        </div>
-
-        <p className="text-center text-sm text-ink-700">
-          Chưa có tài khoản?{' '}
-          <Link href="/signup" className="font-semibold text-navy-700 hover:underline">
-            Đăng ký
-          </Link>
-        </p>
       </form>
+
+      <div className="relative my-6">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-ink-200" />
+        </div>
+        <div className="relative flex justify-center text-xs">
+          <span className="bg-white px-3 text-ink-500">hoặc</span>
+        </div>
+      </div>
+
+      <GoogleLoginSection />
+
+      <p className="mt-6 text-center text-sm text-ink-700">
+        Chưa có tài khoản?{' '}
+        <Link href="/signup" className="font-semibold text-navy-700 hover:underline">
+          Đăng ký
+        </Link>
+      </p>
     </div>
   );
 }

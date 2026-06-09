@@ -8,7 +8,12 @@ import type {
   StaffInviteFilters,
   StaffMember,
 } from '@/core/entities/staff';
-import type { StaffRepository } from '@/application/ports/staff-repository';
+import type { AuthTokens } from '@/core/entities/user';
+import type {
+  AcceptStaffInviteInput,
+  StaffInviteVerification,
+  StaffRepository,
+} from '@/application/ports/staff-repository';
 
 const invites = new Map<string, StaffInvite>();
 const staff = new Map<string, StaffMember>([
@@ -83,5 +88,13 @@ export class MockStaffRepository implements StaffRepository {
     const s = staff.get(userId);
     if (!s) throw new NotFoundError('Không tìm thấy nhân viên');
     staff.set(userId, { ...s, isActive: false });
+  }
+
+  async verifyInvite(_token: string): Promise<StaffInviteVerification> {
+    throw new NotFoundError('Mock staff repository: chưa hỗ trợ verifyInvite');
+  }
+
+  async acceptInvite(_input: AcceptStaffInviteInput): Promise<AuthTokens> {
+    throw new NotFoundError('Mock staff repository: chưa hỗ trợ acceptInvite');
   }
 }

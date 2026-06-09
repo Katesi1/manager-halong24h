@@ -17,7 +17,35 @@
 
 export type SubscriptionPlan = 'free' | 'basic' | 'standard' | 'pro';
 export type SubscriptionCycle = 'monthly' | 'yearly';
-export type SubscriptionStatus = 'pending' | 'paid' | 'overdue' | 'frozen';
+
+/**
+ * Spec §10.5 — 7-state lifecycle.
+ *
+ *   none      → owner chưa từng có sub
+ *   trial     → đang trial (admin cấp / sau KYC approve)
+ *   active    → đã thanh toán, đang trong kỳ hiệu lực
+ *   past_due  → hết kỳ chưa renew (= legacy 'overdue')
+ *   cancelled → user/admin huỷ chủ động
+ *   frozen    → admin tạm khoá vì vi phạm
+ *   expired   → hết hạn dứt khoát (cancelled + qua kỳ)
+ */
+export type SubscriptionStatus =
+  | 'none'
+  | 'trial'
+  | 'active'
+  | 'past_due'
+  | 'cancelled'
+  | 'frozen'
+  | 'expired';
+
+/** Spec v1.4 §10.4 — VNPay loại bỏ. v1.6 thêm casso, sepay. */
+export type SubscriptionProvider =
+  | 'apple_iap'
+  | 'manual_bank'
+  | 'manual'
+  | 'casso'
+  | 'sepay'
+  | null;
 
 export interface Subscription {
   id: string;
@@ -32,8 +60,23 @@ export interface Subscription {
   status: SubscriptionStatus;
   /** Bắt đầu kỳ */
   startAt: string;
-  /** Hết kỳ (sau ngày này = overdue) */
+  /**
+   * Hết kỳ — legacy alias cho `nextChargeAt`. Giữ tên `expireAt` để UI không
+   * vỡ; khi BE trả `nextChargeAt`/`endsAt`, repo set `expireAt = nextChargeAt`.
+   */
   expireAt: string;
+  /** Spec §10 — ngày charge kỳ tiếp theo. Cùng giá trị với `expireAt` khi BE expose. */
+  nextChargeAt?: string | null;
+  /** Spec §10 — thời điểm hết hạn trial (null nếu không trial). */
+  trialEndsAt?: string | null;
+  /** Spec §10.6 — admin override giá kỳ này (VND, null = dùng giá plan). */
+  priceOverride?: number | null;
+  /** Spec §10.5 — payment provider. */
+  provider?: SubscriptionProvider;
+  /** Spec §10.4 — thời điểm admin freeze. */
+  frozenAt?: string | null;
+  /** Spec §10.4 — lý do freeze (alias của `note` legacy). */
+  frozenReason?: string | null;
   paidAt: string | null;
   /** Ngày BE/admin gửi hoá đơn */
   invoicedAt: string;

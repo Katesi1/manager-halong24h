@@ -1,8 +1,10 @@
 import Link from 'next/link';
+import { Bell, Search, ShieldCheck, UserCog, Building, AlertTriangle, MessageSquare, CalendarCheck, CreditCard } from 'lucide-react';
 
 import { listAuditEntriesAction } from '@/app/actions/audit-log';
 import { PageHeader } from '@/components/host/page-header';
 import { Badge } from '@/components/ui/badge';
+import { Pagination } from '@/components/ui/pagination';
 import {
   AUDIT_ACTION_LABEL,
   AUDIT_TARGET_HREF,
@@ -11,9 +13,12 @@ import {
   type AuditFilters,
   type AuditTargetType,
 } from '@/core/entities/audit-log';
-import { formatDateTime, relativeTime } from '@/lib/format';
+import { relativeTime } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
-const ACTION_TONE: Record<
+const PAGE_SIZE = 15;
+
+const ACTION_VARIANT: Record<
   AuditAction,
   Parameters<typeof Badge>[0]['variant']
 > = {
@@ -21,221 +26,239 @@ const ACTION_TONE: Record<
   kyc_reject: 'danger',
   user_ban: 'danger',
   user_unban: 'success',
-  user_revoke_session: 'warning',
+  user_revoke_sessions: 'warning',
   user_reset_password: 'info',
   user_change_plan: 'gold',
   user_change_role: 'gold',
+  user_delete: 'danger',
+  user_kyc_bypass_toggle: 'info',
   property_approve: 'success',
   property_reject: 'danger',
   property_suspend: 'warning',
   dispute_resolve: 'success',
   dispute_reject: 'default',
-  dispute_start_investigation: 'info',
+  dispute_investigate: 'info',
   review_hide: 'warning',
+  review_restore: 'success',
+  booking_mark_paid: 'success',
+  subscription_trial_grant: 'gold',
+  subscription_trial_revoke: 'warning',
+  subscription_set_price: 'info',
+  subscription_mark_paid: 'success',
+  subscription_freeze: 'warning',
+  subscription_unfreeze: 'success',
 };
 
-const ACTION_OPTIONS: { value: AuditAction; label: string }[] = (
-  Object.keys(AUDIT_ACTION_LABEL) as AuditAction[]
-).map((a) => ({ value: a, label: AUDIT_ACTION_LABEL[a] }));
+const TARGET_ICON: Record<AuditTargetType, typeof Bell> = {
+  kyc: ShieldCheck,
+  user: UserCog,
+  property: Building,
+  booking: CalendarCheck,
+  dispute: AlertTriangle,
+  subscription: CreditCard,
+  review: MessageSquare,
+};
 
-const TARGET_OPTIONS: { value: AuditTargetType; label: string }[] = [
-  { value: 'user', label: 'Người dùng' },
-  { value: 'property', label: 'Cơ sở' },
-  { value: 'dispute', label: 'Khiếu nại' },
-  { value: 'kyc', label: 'KYC' },
-  { value: 'review', label: 'Review' },
+const TARGET_COLOR: Record<AuditTargetType, string> = {
+  kyc: 'bg-emerald-100 text-emerald-700',
+  user: 'bg-navy-100 text-navy-700',
+  property: 'bg-gold-100 text-gold-700',
+  booking: 'bg-sky-100 text-sky-700',
+  dispute: 'bg-rose-100 text-rose-700',
+  subscription: 'bg-violet-100 text-violet-700',
+  review: 'bg-amber-100 text-amber-700',
+};
+
+const TABS: { key: string; label: string }[] = [
+  { key: '', label: 'Tất cả' },
+  { key: 'kyc', label: 'KYC' },
+  { key: 'user', label: 'Người dùng' },
+  { key: 'property', label: 'Cơ sở' },
+  { key: 'dispute', label: 'Khiếu nại' },
+  { key: 'review', label: 'Review' },
 ];
 
-function parseAction(v: string | undefined): AuditAction | undefined {
-  if (!v) return undefined;
-  return (Object.keys(AUDIT_ACTION_LABEL) as AuditAction[]).includes(
-    v as AuditAction,
-  )
-    ? (v as AuditAction)
-    : undefined;
+function parseTarget(v: string | undefined): AuditTargetType | undefined {
+  const allowed: AuditTargetType[] = [
+    'kyc',
+    'user',
+    'property',
+    'booking',
+    'dispute',
+    'subscription',
+    'review',
+  ];
+  return allowed.includes(v as AuditTargetType) ? (v as AuditTargetType) : undefined;
 }
 
-function parseTarget(v: string | undefined): AuditTargetType | undefined {
-  if (!v) return undefined;
-  return TARGET_OPTIONS.some((o) => o.value === v)
-    ? (v as AuditTargetType)
-    : undefined;
+function buildHref(base: string, params: Record<string, string | undefined>) {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v) sp.set(k, v);
+  }
+  const qs = sp.toString();
+  return qs ? `${base}?${qs}` : base;
 }
 
 export default async function AdminAuditLogPage(props: {
   searchParams: Promise<{
-    action?: string;
     target?: string;
     q?: string;
+    page?: string;
   }>;
 }) {
   const sp = await props.searchParams;
   const filters: AuditFilters = {
-    action: parseAction(sp.action),
     targetType: parseTarget(sp.target),
     q: sp.q?.trim() || undefined,
     limit: 200,
   };
 
   const result = await listAuditEntriesAction(filters);
-  const entries: AuditEntry[] = result.ok ? result.data : [];
+  const allEntries: AuditEntry[] = result.ok ? result.data : [];
   const apiError = !result.ok ? result.error : null;
 
-  const activeFilterCount = [
-    filters.action,
-    filters.targetType,
-    filters.q,
-  ].filter(Boolean).length;
+  const currentPage = Math.max(1, parseInt(sp.page ?? '1', 10) || 1);
+  const totalPages = Math.ceil(allEntries.length / PAGE_SIZE);
+  const paginated = allEntries.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
+
+  function pageHref(page: number) {
+    return buildHref('/admin/audit-log', {
+      target: sp.target,
+      q: sp.q,
+      page: page > 1 ? String(page) : undefined,
+    });
+  }
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
       <PageHeader
         eyebrow="Vận hành hệ thống"
-        title="Nhật ký kiểm toán"
-        description="Mọi hành động quan trọng của quản trị viên đều được ghi lại để truy vết và đối chiếu khi có khiếu nại."
+        title="Thông báo hệ thống"
+        description="Mọi hành động quan trọng của quản trị viên: duyệt KYC, quản lý người dùng, xử lý khiếu nại, kiểm duyệt review."
       />
 
-      <div className="mb-4 rounded-lg bg-cream-100 px-4 py-3 text-xs text-ink-700">
-        ℹ️ Backend chưa expose endpoint <code>/admin/audit-log</code> —
-        đang dùng kho in-memory phía Manager. Mọi hành động (duyệt KYC, ban user,
-        giải quyết khiếu nại…) được ghi tự động vào đây.
-      </div>
-
-      <form
-        className="mb-5 rounded-2xl bg-white p-4 ring-1 ring-ink-200/60 shadow-card grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto]"
-        action="/admin/audit-log"
-      >
-        <div>
-          <label
-            htmlFor="action"
-            className="block text-[10px] font-semibold uppercase tracking-wider text-ink-500 mb-1"
-          >
-            Loại hành động
-          </label>
-          <select
-            id="action"
-            name="action"
-            defaultValue={filters.action ?? ''}
-            className="h-9 w-full rounded-md border border-ink-200 bg-white px-3 text-sm"
-          >
-            <option value="">Tất cả</option>
-            {ACTION_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label
-            htmlFor="target"
-            className="block text-[10px] font-semibold uppercase tracking-wider text-ink-500 mb-1"
-          >
-            Đối tượng
-          </label>
-          <select
-            id="target"
-            name="target"
-            defaultValue={filters.targetType ?? ''}
-            className="h-9 w-full rounded-md border border-ink-200 bg-white px-3 text-sm"
-          >
-            <option value="">Tất cả</option>
-            {TARGET_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label
-            htmlFor="q"
-            className="block text-[10px] font-semibold uppercase tracking-wider text-ink-500 mb-1"
-          >
-            Tìm theo tên / lý do
-          </label>
-          <input
-            type="search"
-            id="q"
-            name="q"
-            defaultValue={filters.q ?? ''}
-            placeholder="VD: Lê Hoàng Đức, no-show…"
-            className="h-9 w-full rounded-md border border-ink-200 bg-white px-3 text-sm"
-          />
-        </div>
-        <div className="flex items-end gap-2">
-          <button
-            type="submit"
-            className="h-9 rounded-md bg-navy-900 px-4 text-sm font-semibold text-white hover:bg-navy-800"
-          >
-            Lọc
-          </button>
-          {activeFilterCount > 0 && (
-            <Link
-              href="/admin/audit-log"
-              className="h-9 inline-flex items-center rounded-md border border-ink-200 px-3 text-sm text-ink-700 hover:bg-cream-100"
-            >
-              Xoá lọc
-            </Link>
-          )}
-        </div>
-      </form>
-
       {apiError && (
-        <div
-          role="alert"
-          aria-live="polite"
-          className="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200"
-        >
-          Không tải được nhật ký: {apiError}
+        <div className="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200">
+          Không tải được thông báo: {apiError}
         </div>
       )}
 
-      {entries.length === 0 ? (
-        <div className="rounded-2xl bg-white p-8 text-center ring-1 ring-ink-200/60 shadow-card">
-          <p className="text-2xl">📋</p>
-          <p className="mt-2 text-sm font-medium text-ink-900">
-            Không có entry phù hợp
+      {/* Tabs + Search */}
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-1.5">
+          {TABS.map((t) => {
+            const active = (sp.target ?? '') === t.key;
+            return (
+              <Link
+                key={t.key}
+                href={buildHref('/admin/audit-log', {
+                  target: t.key || undefined,
+                  q: sp.q,
+                })}
+                className={
+                  'rounded-lg px-3.5 py-2 text-sm font-medium transition-all ' +
+                  (active
+                    ? 'bg-navy-900 text-white shadow-sm'
+                    : 'text-ink-600 hover:bg-cream-200 hover:text-ink-900')
+                }
+              >
+                {t.label}
+              </Link>
+            );
+          })}
+        </div>
+
+        <form
+          action="/admin/audit-log"
+          method="get"
+          className="relative max-w-xs w-full sm:w-auto"
+        >
+          {sp.target && <input type="hidden" name="target" value={sp.target} />}
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+          <input
+            type="search"
+            name="q"
+            defaultValue={sp.q}
+            placeholder="Tìm tên, lý do..."
+            className="h-10 w-full rounded-lg border border-ink-200 bg-white pl-9 pr-3 text-sm text-ink-900 placeholder:text-ink-400 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-500/20"
+          />
+        </form>
+      </div>
+
+      {/* Timeline */}
+      {allEntries.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-ink-200 bg-white p-16 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-cream-200">
+            <Bell className="h-7 w-7 text-ink-400" />
+          </div>
+          <p className="text-sm font-medium text-ink-700">
+            Chưa có thông báo nào
           </p>
           <p className="mt-1 text-xs text-ink-500">
-            Thử điều chỉnh bộ lọc, hoặc thực hiện vài hành động ở /admin/kyc,
-            /admin/users, /admin/disputes để sinh log mới.
+            Các hành động quản trị sẽ xuất hiện ở đây.
           </p>
         </div>
       ) : (
-        <ol className="space-y-3">
-          {entries.map((entry) => (
-            <li
-              key={entry.id}
-              className="flex items-start gap-4 rounded-2xl bg-white p-4 ring-1 ring-ink-200/60 shadow-card"
-            >
-              <div className="shrink-0">
-                <Badge variant={ACTION_TONE[entry.action]}>
-                  {AUDIT_ACTION_LABEL[entry.action]}
-                </Badge>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-ink-900">
-                  <strong>{entry.actor.name}</strong> ·{' '}
-                  <Link
-                    href={AUDIT_TARGET_HREF[entry.target.type](entry.target.id)}
-                    className="text-navy-700 hover:underline"
-                  >
-                    {entry.target.label}
-                  </Link>
-                </p>
-                {entry.reason && (
-                  <p className="mt-1 text-sm text-ink-700 italic">
-                    Lý do: {entry.reason}
-                  </p>
-                )}
-                <p className="mt-1 text-xs text-ink-500">
-                  {relativeTime(entry.at)} · {formatDateTime(entry.at)}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <>
+          <div className="space-y-px rounded-2xl bg-white ring-1 ring-ink-200/60 shadow-card overflow-hidden">
+            {paginated.map((entry, i) => {
+              const Icon = TARGET_ICON[entry.target.type] ?? Bell;
+              const iconColor = TARGET_COLOR[entry.target.type] ?? 'bg-cream-200 text-ink-500';
+              const isLast = i === paginated.length - 1;
+
+              return (
+                <div
+                  key={entry.id}
+                  className={cn(
+                    'flex gap-4 px-5 py-4 transition-colors hover:bg-cream-50',
+                    !isLast && 'border-b border-ink-100',
+                  )}
+                >
+                  <div className={cn('mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full', iconColor)}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant={ACTION_VARIANT[entry.action]}>
+                        {AUDIT_ACTION_LABEL[entry.action]}
+                      </Badge>
+                      <span className="text-xs text-ink-400">
+                        {relativeTime(entry.at)}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-ink-800">
+                      <strong className="text-ink-900">{entry.actor.name}</strong>
+                      {' đã thao tác trên '}
+                      <Link
+                        href={AUDIT_TARGET_HREF[entry.target.type](entry.target.id)}
+                        className="font-medium text-navy-700 hover:underline"
+                      >
+                        {entry.target.label}
+                      </Link>
+                    </p>
+                    {entry.reason && (
+                      <p className="mt-1 text-sm text-ink-500 italic">
+                        {entry.reason}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={allEntries.length}
+            pageSize={PAGE_SIZE}
+            buildHref={pageHref}
+          />
+        </>
       )}
     </div>
   );

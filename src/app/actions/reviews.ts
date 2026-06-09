@@ -11,7 +11,6 @@ import {
 } from '@/application/reviews/actions';
 import type { ReviewFilters } from '@/core/entities/review';
 import { reviewRepository } from '@/infrastructure/container';
-import { recordAudit } from '@/lib/audit-recorder';
 import { requireAdmin } from '@/lib/auth-guard';
 
 import { toResult } from './_helpers';
@@ -44,16 +43,6 @@ export async function hideReviewAction(reviewId: string, reason: string) {
       reviewRepository(),
       { reviewId, reason },
       { id: profile.id, name: profile.name || profile.email || 'Admin' },
-    );
-    await recordAudit(
-      profile,
-      'review_hide',
-      {
-        type: 'review',
-        id: review.id,
-        label: `Review của ${review.customer.name} (${review.propertyName})`,
-      },
-      reason,
     );
     return review;
   });

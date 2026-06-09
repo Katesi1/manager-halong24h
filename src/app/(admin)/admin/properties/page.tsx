@@ -56,7 +56,7 @@ export default async function AdminPropertiesPage(props: {
   const pendingCount = all.filter(isPending).length;
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       <PageHeader
         eyebrow="Vận hành hệ thống"
         title="Cơ sở (toàn hệ thống)"
