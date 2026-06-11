@@ -34,12 +34,6 @@ const KYC_DOC_PLACEHOLDER = '/placeholder-kyc-doc.svg';
 function makeFields(): KycField[] {
   return [
     {
-      key: 'business_license',
-      label: 'Giấy phép kinh doanh / Hộ kinh doanh',
-      value: KYC_DOC_PLACEHOLDER,
-      verification: 'pending',
-    },
-    {
       key: 'cccd_front',
       label: 'CCCD mặt trước',
       value: KYC_DOC_PLACEHOLDER,
@@ -55,18 +49,6 @@ function makeFields(): KycField[] {
       key: 'selfie',
       label: 'Ảnh chân dung (selfie)',
       value: KYC_DOC_PLACEHOLDER,
-      verification: 'pending',
-    },
-    {
-      key: 'bank_account',
-      label: 'Số tài khoản ngân hàng',
-      value: 'Demo Bank · 9999999999 · NGUYEN VAN AN',
-      verification: 'pending',
-    },
-    {
-      key: 'vneid',
-      label: 'CCCD định danh điện tử (VNeID)',
-      value: 'Đã liên kết · ID 9999999999 · Mức 2',
       verification: 'pending',
     },
     {
@@ -108,11 +90,8 @@ const SEED: KycAdminSubmission[] = [
     ownerPhone: '0000 000 006',
     status: 'awaiting_approval',
     fields: makeFields().map((f) =>
-      f.key === 'bank_account'
-        ? {
-            ...f,
-            value: 'Techcombank · 1234567890 · TRAN THI BINH',
-          }
+      f.key === 'phone'
+        ? { ...f, value: '0000 000 006 · Đã xác thực OTP' }
         : f,
     ),
     rejectedReason: null,
@@ -130,12 +109,12 @@ const SEED: KycAdminSubmission[] = [
     ownerPhone: '0000 000 007',
     status: 'rejected',
     fields: makeFields().map((f) =>
-      f.key === 'bank_account'
+      f.key === 'selfie'
         ? { ...f, verification: 'mismatched' as const }
         : { ...f, verification: 'matched' as const },
     ),
     rejectedReason:
-      'Tên tài khoản ngân hàng không khớp với CCCD. Vui lòng cung cấp STK đúng chủ.',
+      'Ảnh chân dung không khớp với CCCD. Vui lòng chụp lại selfie rõ mặt.',
     rejectedAt: '2026-05-15T16:00:00.000Z',
     approvedAt: null,
     submittedAt: '2026-05-15T10:00:00.000Z',

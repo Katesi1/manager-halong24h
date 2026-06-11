@@ -253,8 +253,10 @@ function UserRow({ user: u }: { user: AdminUser }) {
         )}
       </td>
       <td className="px-5 py-4">
-        <p className="text-ink-800 truncate max-w-[200px]">{u.email}</p>
-        <p className="text-xs text-ink-400">{u.phone ?? '—'}</p>
+        <p className="text-ink-800 truncate max-w-[200px]">
+          {u.email?.trim() ? u.email : <span className="text-ink-400">—</span>}
+        </p>
+        <p className="text-xs text-ink-400">{u.phone?.trim() ? u.phone : '—'}</p>
       </td>
       <td className="px-5 py-4 text-right text-xs text-ink-700">
         {u.role === RoleCode.OWNER && (

@@ -115,7 +115,7 @@ export default async function AdminUserDetailPage(props: {
             </div>
             <div className="grid gap-px bg-ink-100 sm:grid-cols-2">
               <InfoCell icon={<User className="h-4 w-4" />} label="Họ tên" value={user.name} />
-              <InfoCell icon={<Mail className="h-4 w-4" />} label="Email" value={user.email} mono />
+              <InfoCell icon={<Mail className="h-4 w-4" />} label="Email" value={user.email?.trim() || '—'} mono />
               <InfoCell icon={<Phone className="h-4 w-4" />} label="Số điện thoại" value={user.phone ?? '—'} />
               <InfoCell
                 icon={<Calendar className="h-4 w-4" />}

@@ -60,3 +60,31 @@ export const PAYMENT_SESSION_STATUS_LABEL: Record<
   failed: 'Thất bại',
   refunded: 'Đã hoàn',
 };
+
+/**
+ * Session đã hết hạn (về mặt nghiệp vụ) hay chưa.
+ *
+ * BE không có cron tự flip `pending → expired` đúng mốc TTL 24h, nên một session
+ * quá `expiresAt` vẫn có thể mang `status: 'pending'`. Khi đó admin KHÔNG được
+ * xác nhận đã nhận tiền (subscription đã đóng phía BE/app). Hàm này coi như hết
+ * hạn nếu: status đã là `expired`, HOẶC còn `pending` nhưng đã quá `expiresAt`.
+ *
+ * `now` cho phép inject để test; mặc định `Date.now()`.
+ */
+export function isPaymentSessionExpired(
+  session: Pick<PaymentSession, 'status' | 'expiresAt'>,
+  now: number = Date.now(),
+): boolean {
+  if (session.status === 'expired') return true;
+  if (session.status !== 'pending') return false;
+  const expiresAtMs = Date.parse(session.expiresAt);
+  return Number.isFinite(expiresAtMs) && expiresAtMs < now;
+}
+
+/** Session còn xác nhận thanh toán được: đang `pending` VÀ chưa quá TTL. */
+export function isPaymentSessionActionable(
+  session: Pick<PaymentSession, 'status' | 'expiresAt'>,
+  now: number = Date.now(),
+): boolean {
+  return session.status === 'pending' && !isPaymentSessionExpired(session, now);
+}

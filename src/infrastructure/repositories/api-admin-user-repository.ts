@@ -82,7 +82,8 @@ export class ApiAdminUserRepository implements AdminUserRepository {
       query: {
         withStats: 'true',
         role: filters?.role,
-        search: filters?.search,
+        // Spec: `GET /users?q=...` search name/phone/email (BE tự trim + cap 100).
+        q: filters?.search,
         ownerId: filters?.ownerId,
         kycStatus: filters?.kycStatus,
       },

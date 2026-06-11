@@ -74,8 +74,10 @@ const TABS: { key: string; label: string }[] = [
   { key: 'trial', label: 'Trial' },
   { key: 'active', label: 'Đang hoạt động' },
   { key: 'past_due', label: 'Quá hạn' },
+  { key: 'expired', label: 'Hết hạn' },
   { key: 'frozen', label: 'Đã khoá' },
   { key: 'cancelled', label: 'Đã huỷ' },
+  { key: 'none', label: 'Chưa có' },
 ];
 
 function parseStatus(v: string | undefined): SubscriptionStatus | undefined {
