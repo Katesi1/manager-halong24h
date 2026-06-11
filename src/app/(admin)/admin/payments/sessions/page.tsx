@@ -18,6 +18,8 @@ import { Badge } from '@/components/ui/badge';
 import { FormattedDate } from '@/components/common/formatted-date';
 import {
   PAYMENT_SESSION_STATUS_LABEL,
+  isPaymentSessionActionable,
+  isPaymentSessionExpired,
   type PaymentSession,
   type PaymentSessionStatus,
 } from '@/core/entities/payment-session';
@@ -92,14 +94,26 @@ export default async function PaymentSessionsPage(props: {
   });
   const sessions: PaymentSession[] = res.ok ? res.data : [];
 
-  const pendingTotal = sessions
-    .filter((s) => s.status === 'pending')
-    .reduce((sum, s) => sum + s.totalAmount, 0);
+  // Mốc thời gian render — dùng chung cho mọi tính toán hết-hạn trong page này.
+  const now = Date.now();
+
+  // "Chờ duyệt" thật sự = pending VÀ chưa quá TTL 24h. Stale-pending (quá hạn mà
+  // BE chưa flip status) không tính là chờ thu, không cho xác nhận nhận tiền.
+  const actionable = sessions.filter((s) => isPaymentSessionActionable(s, now));
+  const pendingTotal = actionable.reduce((sum, s) => sum + s.totalAmount, 0);
   const paidTotal = sessions
     .filter((s) => s.status === 'paid')
     .reduce((sum, s) => sum + s.totalAmount, 0);
-  const pendingCount = sessions.filter((s) => s.status === 'pending').length;
+  const pendingCount = actionable.length;
   const paidCount = sessions.filter((s) => s.status === 'paid').length;
+
+  // Tab "Chờ thanh toán" chỉ hiện session còn xác nhận được — stale-pending (đã
+  // quá TTL) đẩy sang nhóm hết hạn để không lẫn vào hàng đợi cần xử lý. Các tab
+  // khác ("Tất cả", "Hết hạn"...) vẫn hiện đầy đủ, badge "Hết hạn" cho rõ.
+  const visibleSessions =
+    activeKey === 'pending'
+      ? sessions.filter((s) => isPaymentSessionActionable(s, now))
+      : sessions;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
@@ -216,7 +230,7 @@ export default async function PaymentSessionsPage(props: {
         </form>
       </div>
 
-      {sessions.length === 0 ? (
+      {visibleSessions.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-ink-200 bg-white p-16 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-cream-200">
             <Wallet className="h-7 w-7 text-ink-400" />
@@ -257,10 +271,11 @@ export default async function PaymentSessionsPage(props: {
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-100">
-              {sessions.map((s) => {
+              {visibleSessions.map((s) => {
                 const name = displayName(s.userName, s.userEmail);
                 const initial = name.charAt(0).toUpperCase() || '?';
                 const color = avatarColor(s.userId || s.userEmail || s.id);
+                const expired = isPaymentSessionExpired(s, now);
                 return (
                   <tr
                     key={s.id}
@@ -308,9 +323,18 @@ export default async function PaymentSessionsPage(props: {
                       <FormattedDate iso={s.expiresAt} />
                     </td>
                     <td className="px-5 py-4">
-                      <Badge variant={STATUS_VARIANT[s.status]}>
-                        {PAYMENT_SESSION_STATUS_LABEL[s.status]}
+                      <Badge
+                        variant={expired ? 'default' : STATUS_VARIANT[s.status]}
+                      >
+                        {expired
+                          ? PAYMENT_SESSION_STATUS_LABEL.expired
+                          : PAYMENT_SESSION_STATUS_LABEL[s.status]}
                       </Badge>
+                      {expired && s.status === 'pending' && (
+                        <p className="mt-1 text-[10px] text-ink-400">
+                          Quá hạn chuyển khoản 24h
+                        </p>
+                      )}
                       {s.paidAt && (
                         <p className="mt-1 text-[10px] text-emerald-600">
                           <FormattedDate iso={s.paidAt} />
@@ -318,13 +342,13 @@ export default async function PaymentSessionsPage(props: {
                       )}
                     </td>
                     <td className="px-5 py-4 text-right">
-                      {s.status === 'pending' ? (
+                      {isPaymentSessionActionable(s, now) ? (
                         <MarkSessionPaidButton
                           sessionId={s.id}
                           ckContent={s.ckContent}
                           amount={s.totalAmount}
                         />
-                      ) : s.status === 'expired' ? (
+                      ) : expired ? (
                         <span
                           className="inline-flex items-center gap-1 rounded-md bg-ink-100 px-2 py-1 text-[11px] font-medium text-ink-500 ring-1 ring-ink-200"
                           title="Session đã hết hạn 24h, không thể xác nhận"

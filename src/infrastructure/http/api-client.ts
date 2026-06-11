@@ -129,6 +129,11 @@ async function request<T>(
     clearTimeout(timer);
   }
 
+  if (process.env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line no-console
+    console.log(`[api-client] ${method} ${url} → ${res.status}`);
+  }
+
   if (res.status === 401 && !opts.skipAuth && !opts.skipRefresh) {
     const { refreshToken } = await readTokens();
     if (refreshToken) {

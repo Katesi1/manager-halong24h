@@ -1,8 +1,11 @@
 /**
- * KYC moderation (admin) — model 7 yếu tố theo business model 2026-05-15.
+ * KYC moderation (admin) — model 5 yếu tố khớp dữ liệu BE thật.
  *
- * Admin xem từng submission, verify 7 fields, approve hoặc reject (with reason).
+ * Admin xem từng submission, verify 5 fields, approve hoặc reject (with reason).
  * Đây là port riêng cho admin; user-side KYC vẫn chỉ getStatus (xem ./kyc.ts).
+ *
+ * Lưu ý: DB chỉ có 3 ảnh upload (cccd_front/back/selfie) + phone/email trên User.
+ * Không có business_license / bank_account / vneid → đã loại khỏi model.
  */
 
 import type { KycSubmissionStatus } from './kyc';
@@ -10,16 +13,8 @@ import type { KycSubmissionStatus } from './kyc';
 export type KycVerification = 'pending' | 'matched' | 'mismatched';
 
 export interface KycField {
-  /** 1 trong 7 yếu tố */
-  key:
-    | 'business_license' // GPKD hoặc GCN hộ kinh doanh
-    | 'cccd_front'
-    | 'cccd_back'
-    | 'selfie'
-    | 'bank_account' // STK ngân hàng + chủ TK
-    | 'vneid' // CCCD định danh điện tử
-    | 'phone'
-    | 'email';
+  /** 1 trong 5 yếu tố */
+  key: 'cccd_front' | 'cccd_back' | 'selfie' | 'phone' | 'email';
   label: string;
   /** URL ảnh / nội dung text */
   value: string | null;
@@ -36,15 +31,32 @@ export interface KycAdminSubmission {
   ownerEmail: string;
   ownerPhone: string;
   status: KycSubmissionStatus;
-  /** 7 yếu tố verify */
+  /** 5 yếu tố verify */
   fields: KycField[];
   /** Lý do reject nếu có */
   rejectedReason: string | null;
+  /** Các mục ảnh bị từ chối (BE: rejectedItems) — vd ['cccdFront','selfie'] */
+  rejectedItems?: string[];
   rejectedAt: string | null;
   approvedAt: string | null;
+  /** Số phòng chủ nhà đăng ký (BE: expectedRooms) */
+  expectedRooms?: number | null;
+  /** Thông tin thanh toán — chỉ có ở endpoint chi tiết */
+  payment?: KycPayment | null;
   submittedAt: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Thanh toán gắn với hồ sơ KYC (detail §2). */
+export interface KycPayment {
+  planId: string | null;
+  cycle: string | null;
+  rooms: number | null;
+  totalAmount: number | null;
+  method: string | null;
+  status: string | null;
+  paidAt: string | null;
 }
 
 /**
@@ -74,12 +86,9 @@ export interface KycAdminListResult {
 }
 
 export const KYC_FIELD_LABEL: Record<KycField['key'], string> = {
-  business_license: 'Giấy phép kinh doanh / Hộ kinh doanh',
   cccd_front: 'CCCD mặt trước',
   cccd_back: 'CCCD mặt sau',
   selfie: 'Ảnh chân dung (selfie)',
-  bank_account: 'Số tài khoản ngân hàng',
-  vneid: 'CCCD định danh điện tử (VNeID)',
   phone: 'Số điện thoại',
   email: 'Email Gmail',
 };

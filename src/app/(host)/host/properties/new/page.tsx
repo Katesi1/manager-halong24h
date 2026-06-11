@@ -2,12 +2,11 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { getCurrentProfile } from '@/app/actions/auth';
-import { getMySubscriptionAction } from '@/app/actions/subscriptions';
 import { GuardBanner } from '@/components/host/guard-banner';
 import { PageHeader } from '@/components/host/page-header';
 import { PropertyWizard } from '@/components/host/property-wizard';
 import { RoleCode } from '@/core/value-objects/role';
-import { blockedReason } from '@/lib/subscription-guard';
+import { ownerEntitlement } from '@/lib/entitlement';
 
 export const metadata: Metadata = { title: 'Thêm cơ sở' };
 
@@ -51,23 +50,25 @@ export default async function NewPropertyPage() {
     );
   }
 
-  // Subscription overdue/frozen → block
-  const subResult = await getMySubscriptionAction();
-  const subBlock = subResult.ok ? blockedReason(subResult.data) : null;
-  if (subBlock) {
-    return (
-      <div className="p-4 sm:p-6 lg:p-8">
-        <GuardBanner
-          icon="💸"
-          title="Gói cước cần được kích hoạt"
-          description={subBlock}
-          ctaLabel="Xem & thanh toán"
-          ctaHref="/host/settings/subscription"
-          secondaryLabel="Về tổng quan"
-          secondaryHref="/host"
-        />
-      </div>
-    );
+  // v1.12 entitlement (§2A.5) — hết trial / chưa đủ quyền → block.
+  // Nguồn tin cậy: profile (`GET /auth/profile`), không phụ thuộc sub repo mock.
+  if (profile.role === RoleCode.OWNER) {
+    const entitlement = ownerEntitlement(profile);
+    if (entitlement.blockReason) {
+      return (
+        <div className="p-4 sm:p-6 lg:p-8">
+          <GuardBanner
+            icon="💸"
+            title="Tài khoản chưa đủ quyền đăng phòng"
+            description={entitlement.blockReason}
+            ctaLabel="Đăng ký gói"
+            ctaHref="/host/settings/subscription"
+            secondaryLabel="Về tổng quan"
+            secondaryHref="/host"
+          />
+        </div>
+      );
+    }
   }
 
   return (

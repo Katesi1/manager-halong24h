@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import {
@@ -10,6 +11,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
+import {
+  SUBSCRIPTION_SETTINGS_PATH,
+  isFeatureLockedError,
+} from '@/lib/entitlement';
 import type {
   CreatePropertyInput,
   Property,
@@ -348,6 +353,14 @@ export function PropertyWizard({ property }: PropertyWizardProps) {
       {error && (
         <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100">
           {error}
+          {isFeatureLockedError(error) && (
+            <Link
+              href={SUBSCRIPTION_SETTINGS_PATH}
+              className="ml-1 font-semibold underline"
+            >
+              Đăng ký / gia hạn gói
+            </Link>
+          )}
         </div>
       )}
       {success && (

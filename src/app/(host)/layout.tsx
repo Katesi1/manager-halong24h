@@ -2,11 +2,13 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { getCurrentProfile } from '@/app/actions/auth';
-import { getMySubscriptionAction } from '@/app/actions/subscriptions';
 import { ManagerSidebar } from '@/components/layout/manager-sidebar';
 import { ManagerTopbar } from '@/components/layout/topbar';
 import { RoleCode, isManagerRole } from '@/core/value-objects/role';
-import { blockedReason } from '@/lib/subscription-guard';
+import {
+  SUBSCRIPTION_SETTINGS_PATH,
+  ownerEntitlement,
+} from '@/lib/entitlement';
 
 export default async function HostLayout({
   children,
@@ -25,8 +27,10 @@ export default async function HostLayout({
     profile.kycStatus !== 'approved' &&
     !profile.kycBypass;
 
-  const subResult = await getMySubscriptionAction();
-  const subBlocked = subResult.ok ? blockedReason(subResult.data) : null;
+  // v1.12 entitlement — suy ra từ profile (`GET /auth/profile`), nguồn tin cậy
+  // nhất. Web được phép hiển thị countdown trial (§4.4); chỉ áp dụng cho OWNER.
+  const entitlement =
+    profile.role === RoleCode.OWNER ? ownerEntitlement(profile) : null;
 
   return (
     <div className="flex min-h-screen bg-cream-50">
@@ -57,12 +61,25 @@ export default async function HostLayout({
               — vui lòng liên hệ Admin để được kích hoạt quyền.
             </div>
           )}
-          {subBlocked && (
+          {entitlement?.blockReason && (
             <div className="border-b border-rose-200 bg-rose-50 px-6 py-2 text-xs text-rose-900">
-              <span className="font-semibold">Gói cước bị chặn</span> —{' '}
-              {subBlocked}{' '}
-              <Link href="/host/settings/subscription" className="underline">
-                Xem chi tiết
+              <span className="font-semibold">Tài khoản chưa đủ quyền</span> —{' '}
+              {entitlement.blockReason}{' '}
+              <Link href={SUBSCRIPTION_SETTINGS_PATH} className="underline">
+                Đăng ký gói
+              </Link>
+            </div>
+          )}
+          {entitlement?.isTrial && entitlement.trialDaysLeft !== null && (
+            <div className="border-b border-sky-200 bg-sky-50 px-6 py-2 text-xs text-sky-900">
+              <span className="font-semibold">
+                Đang dùng thử — còn {entitlement.trialDaysLeft} ngày
+              </span>{' '}
+              {needsKyc
+                ? '· Hoàn tất KYC để bắt đầu đăng phòng.'
+                : '· Đăng ký gói trước khi hết hạn để dùng liên tục.'}{' '}
+              <Link href={SUBSCRIPTION_SETTINGS_PATH} className="underline">
+                Xem gói
               </Link>
             </div>
           )}

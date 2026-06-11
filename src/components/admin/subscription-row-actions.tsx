@@ -9,6 +9,7 @@ import {
   unfreezeSubscriptionAction,
 } from '@/app/actions/subscriptions';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,7 @@ import {
 import { Textarea } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
 import type { SubscriptionStatus } from '@/core/entities/subscription';
+import { formatVND } from '@/lib/format';
 
 interface Props {
   subscriptionId: string;
@@ -37,16 +39,21 @@ export function SubscriptionRowActions({
   const [error, setError] = useState<string | null>(null);
   const [callOpen, setCallOpen] = useState(false);
   const [callNote, setCallNote] = useState('');
+  const [confirmPaid, setConfirmPaid] = useState(false);
 
   function onSubmitCallNote() {
     if (callNote.trim().length < 3) return;
-    toast.success('Đã ghi note.');
+    // BE chưa có endpoint lưu ghi chú cuộc gọi → đây là nhắc việc tạm trên
+    // trình duyệt, KHÔNG đồng bộ server. Toast nói đúng sự thật, không giả
+    // vờ đã lưu. Khi BE ra endpoint sẽ wire vào use case thật.
+    toast.success('Đã đánh dấu đã gọi (ghi chú tạm, chưa lưu server)');
     setCallOpen(false);
     setCallNote('');
   }
 
   function onMarkPaid() {
     setError(null);
+    setConfirmPaid(false);
     startTransition(async () => {
       const r = await markSubscriptionPaidAction(subscriptionId, amount);
       if (!r.ok) setError(r.error);
@@ -90,7 +97,7 @@ export function SubscriptionRowActions({
         <Button
           variant="primary"
           size="sm"
-          onClick={onMarkPaid}
+          onClick={() => setConfirmPaid(true)}
           disabled={pending}
         >
           {pending ? '…' : '💰 Ghi nhận thu'}
@@ -163,6 +170,17 @@ export function SubscriptionRowActions({
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmPaid}
+        title="Xác nhận đã thu phí gói cước"
+        description={`Ghi nhận đã thu ${formatVND(amount)} cho kỳ này. Subscription sẽ được gia hạn ngay. Chỉ xác nhận sau khi đã đối soát chuyển khoản.`}
+        confirmLabel="Đã thu tiền"
+        variant="primary"
+        pending={pending}
+        onConfirm={onMarkPaid}
+        onCancel={() => setConfirmPaid(false)}
+      />
 
       <Dialog
         open={callOpen}

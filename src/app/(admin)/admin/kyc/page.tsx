@@ -29,10 +29,10 @@ const TABS: { key: KycQueueFilter; label: string }[] = [
 ];
 
 function parseFilter(raw: string | undefined): KycQueueFilter {
-  if (raw === '0') return 0;
+  if (raw === '1') return 1;
   if (raw === '2') return 2;
   if (raw === '3') return 3;
-  return 1;
+  return 0;
 }
 
 const STATUS_VARIANT: Record<
@@ -59,7 +59,7 @@ function buildHref(base: string, params: Record<string, string | undefined>) {
 }
 
 const EMPTY_RESULT: KycAdminListResult = {
-  filter: 1,
+  filter: 0,
   pendingCount: 0,
   total: 0,
   page: 1,
@@ -87,7 +87,7 @@ export default async function AdminKycPage(props: {
 
   function pageHref(page: number) {
     return buildHref('/admin/kyc', {
-      filter: filter === 1 ? undefined : String(filter),
+      filter: filter === 0 ? undefined : String(filter),
       q: sp.q,
       page: page > 1 ? String(page) : undefined,
     });
@@ -98,7 +98,7 @@ export default async function AdminKycPage(props: {
       <PageHeader
         eyebrow="Vận hành hệ thống"
         title="Duyệt hồ sơ KYC"
-        description="Kiểm tra 7 yếu tố xác minh (GPKD/HKD, CCCD trước/sau, selfie, STK, VNeID, SĐT, Gmail) trước khi duyệt cho chủ nhà nhận booking."
+        description="Kiểm tra 5 yếu tố xác minh (CCCD trước/sau, ảnh chân dung, SĐT, Gmail) trước khi duyệt cho chủ nhà nhận booking."
       />
 
       {apiError && (
@@ -116,7 +116,7 @@ export default async function AdminKycPage(props: {
               <Link
                 key={t.key}
                 href={buildHref('/admin/kyc', {
-                  filter: t.key === 1 ? undefined : String(t.key),
+                  filter: t.key === 0 ? undefined : String(t.key),
                   q: sp.q,
                 })}
                 className={
@@ -145,7 +145,7 @@ export default async function AdminKycPage(props: {
         </div>
 
         <form action="/admin/kyc" method="GET" className="relative max-w-xs w-full sm:w-auto">
-          {filter !== 1 && (
+          {filter !== 0 && (
             <input type="hidden" name="filter" value={String(filter)} />
           )}
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />

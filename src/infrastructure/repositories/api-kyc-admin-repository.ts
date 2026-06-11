@@ -1,13 +1,16 @@
 import 'server-only';
 
-import type {
-  ApproveKycInput,
-  KycAdminFilters,
-  KycAdminListResult,
-  KycAdminSubmission,
-  KycField,
-  KycQueueFilter,
-  RejectKycInput,
+import {
+  KYC_FIELD_LABEL,
+  type ApproveKycInput,
+  type KycAdminFilters,
+  type KycAdminListResult,
+  type KycAdminSubmission,
+  type KycField,
+  type KycPayment,
+  type KycQueueFilter,
+  type KycVerification,
+  type RejectKycInput,
 } from '@/core/entities/kyc-admin';
 import type { KycSubmissionStatus } from '@/core/entities/kyc';
 import type { KycAdminRepository } from '@/application/ports/kyc-admin-repository';
@@ -15,27 +18,37 @@ import type { KycAdminRepository } from '@/application/ports/kyc-admin-repositor
 import { apiClient } from '../http/api-client';
 
 /**
- * Spec v1.11 §9.2 — Admin KYC list dùng một endpoint
- * `GET /admin/kyc/queue?filter=0|1|2|3&page&pageSize`. Response trả về
- * `{ filter, pendingCount, total, page, pageSize, items[] }`.
+ * Admin KYC.
  *
- * Status BE trả camelCase: `kycSubmitted | paymentPending | awaitingApproval |
- * approved | rejected | refunded | draft`. Map sang entity snake_case
- * `KycSubmissionStatus` 8-state.
+ * Danh sách: `GET /admin/kyc/queue?filter&q&page&pageSize` →
+ *   `{ filter, pendingCount, items[], total, page, pageSize }`.
+ * Chi tiết: `GET /kyc/submissions/:id` (ADMIN xem mọi hồ sơ, OWNER chỉ của mình).
  *
- * `fields[]` (7 yếu tố verify) chưa có trong response queue → mảng rỗng.
- * UI section verify sẽ blank cho đến khi BE expose v2.
+ * Status BE rút gọn còn `pending | approved | rejected` → map sang entity 8-state.
+ * `uploads` là object `{ cccdFront, cccdBack, selfie }`, mỗi cái có `imageUrl`,
+ * `confidence`, `faceMatchScore`, `ocrResult`. `rejectedItems` liệt kê ảnh bị từ
+ * chối → đánh dấu field verification = `mismatched`.
  *
- * User info shape mới (v1.11): nested `user: { id, name, phone, email }`.
+ * Cả queue lẫn detail đều trả nested `user: { id, name, phone, email }` (+ `userId`
+ * phẳng ở detail) → thông tin chủ nhà có sẵn, không cần fetch `/users/:id`.
  */
-type SpecKycStatus =
-  | 'draft'
-  | 'kycSubmitted'
-  | 'paymentPending'
-  | 'awaitingApproval'
-  | 'approved'
-  | 'rejected'
-  | 'refunded';
+
+/** 1 ảnh upload — queue & detail dùng chung shape (detail thêm thumb/uploadedAt). */
+interface SpecUpload {
+  id?: string;
+  imageUrl?: string | null;
+  imageUrlThumb?: string | null;
+  ocrResult?: unknown;
+  confidence?: number | null;
+  faceMatchScore?: number | null;
+  uploadedAt?: string | null;
+}
+
+interface SpecKycUploads {
+  cccdFront?: SpecUpload | null;
+  cccdBack?: SpecUpload | null;
+  selfie?: SpecUpload | null;
+}
 
 interface SpecKycUser {
   id?: string;
@@ -44,24 +57,37 @@ interface SpecKycUser {
   phone?: string | null;
 }
 
+interface SpecKycPayment {
+  id?: string;
+  planId?: string | null;
+  cycle?: string | null;
+  rooms?: number | null;
+  totalAmount?: number | null;
+  method?: string | null;
+  status?: string | null;
+  paidAt?: string | null;
+}
+
 interface SpecKycSubmission {
   id: string;
-  status: SpecKycStatus;
-  statusFilter?: 1 | 2 | 3;
+  status: string;
+  statusFilter?: number;
   user?: SpecKycUser;
-  // Legacy flat fields (giữ tương thích nếu BE còn trả)
-  ownerId?: string;
-  ownerName?: string;
-  ownerEmail?: string;
-  ownerPhone?: string;
-  rejectedReason?: string | null;
+  /** Fallback nếu BE trả phẳng. */
+  userId?: string;
   rejectReason?: string | null;
-  rejectedAt?: string | null;
+  rejectedItems?: string[];
   approvedAt?: string | null;
-  submittedAt?: string;
+  trialEndsAt?: string | null;
+  chargeStartsAt?: string | null;
+  expectedRooms?: number | null;
+  plan?: string | null;
+  totalPaid?: number | null;
+  uploads?: SpecKycUploads;
+  payment?: SpecKycPayment | null;
+  submittedAt?: string | null;
   createdAt: string;
   updatedAt?: string;
-  fields?: KycField[];
 }
 
 interface SpecQueueResponse {
@@ -73,38 +99,135 @@ interface SpecQueueResponse {
   items: SpecKycSubmission[];
 }
 
-function mapStatus(s: SpecKycStatus): KycSubmissionStatus {
+/** Map status BE (rút gọn) sang entity 8-state; nhận cả camelCase legacy. */
+function mapStatus(s: string): KycSubmissionStatus {
   switch (s) {
-    case 'kycSubmitted':
-      return 'kyc_submitted';
-    case 'paymentPending':
-      return 'payment_pending';
+    case 'pending':
     case 'awaitingApproval':
       return 'awaiting_approval';
     case 'approved':
       return 'approved';
     case 'rejected':
       return 'rejected';
+    case 'kycSubmitted':
+      return 'kyc_submitted';
+    case 'paymentPending':
+      return 'payment_pending';
+    case 'paid':
+      return 'paid';
     case 'refunded':
       return 'refunded';
     case 'draft':
       return 'draft';
+    default:
+      return 'awaiting_approval';
   }
+}
+
+/** Map key upload BE → key field entity. */
+const UPLOAD_FIELD: Record<
+  keyof SpecKycUploads,
+  Extract<KycField['key'], 'cccd_front' | 'cccd_back' | 'selfie'>
+> = {
+  cccdFront: 'cccd_front',
+  cccdBack: 'cccd_back',
+  selfie: 'selfie',
+};
+
+/** Điểm số BE có thể là 0–1 hoặc 0–100 — quy về phần trăm để hiển thị. */
+function toPercent(v: number): string {
+  const n = v <= 1 ? v * 100 : v;
+  return `${Math.round(n)}%`;
+}
+
+function uploadNote(up: SpecUpload): string | null {
+  const parts: string[] = [];
+  if (typeof up.confidence === 'number')
+    parts.push(`OCR ${toPercent(up.confidence)}`);
+  if (typeof up.faceMatchScore === 'number')
+    parts.push(`Khớp mặt ${toPercent(up.faceMatchScore)}`);
+  return parts.length ? parts.join(' · ') : null;
+}
+
+/**
+ * Dựng checklist 5 yếu tố: 3 ảnh (CCCD trước/sau, selfie) lấy `imageUrl` thật từ
+ * `uploads`; SĐT + email lấy từ thông tin chủ nhà. Verification: ảnh nằm trong
+ * `rejectedItems` → `mismatched`; hồ sơ đã approved → `matched`; còn lại `pending`.
+ */
+function buildFields(
+  s: SpecKycSubmission,
+  owner: { email: string; phone: string },
+): KycField[] {
+  const u = s.uploads ?? {};
+  const rejected = new Set(s.rejectedItems ?? []);
+  const approved = s.status === 'approved';
+
+  const verifFor = (uploadKey: string): KycVerification => {
+    if (rejected.has(uploadKey)) return 'mismatched';
+    if (approved) return 'matched';
+    return 'pending';
+  };
+
+  const imageField = (uploadKey: keyof SpecKycUploads): KycField => {
+    const fieldKey = UPLOAD_FIELD[uploadKey];
+    const up = u[uploadKey] ?? null;
+    return {
+      key: fieldKey,
+      label: KYC_FIELD_LABEL[fieldKey],
+      value: typeof up?.imageUrl === 'string' ? up.imageUrl : null,
+      verification: verifFor(uploadKey),
+      note: up ? uploadNote(up) : null,
+    };
+  };
+
+  const textField = (key: 'phone' | 'email', value: string): KycField => ({
+    key,
+    label: KYC_FIELD_LABEL[key],
+    value: value || null,
+    verification: approved ? 'matched' : 'pending',
+    note: null,
+  });
+
+  return [
+    imageField('cccdFront'),
+    imageField('cccdBack'),
+    imageField('selfie'),
+    textField('phone', owner.phone),
+    textField('email', owner.email),
+  ];
+}
+
+function mapPayment(p: SpecKycPayment | null | undefined): KycPayment | null {
+  if (!p) return null;
+  return {
+    planId: p.planId ?? null,
+    cycle: p.cycle ?? null,
+    rooms: p.rooms ?? null,
+    totalAmount: p.totalAmount ?? null,
+    method: p.method ?? null,
+    status: p.status ?? null,
+    paidAt: p.paidAt ?? null,
+  };
 }
 
 function mapSubmission(s: SpecKycSubmission): KycAdminSubmission {
   const now = s.updatedAt ?? s.createdAt;
+  const ownerEmail = s.user?.email ?? '';
+  const ownerPhone = s.user?.phone ?? '';
   return {
     id: s.id,
-    ownerId: s.user?.id ?? s.ownerId ?? '',
-    ownerName: s.user?.name ?? s.ownerName ?? '',
-    ownerEmail: s.user?.email ?? s.ownerEmail ?? '',
-    ownerPhone: s.user?.phone ?? s.ownerPhone ?? '',
+    ownerId: s.user?.id ?? s.userId ?? '',
+    ownerName: s.user?.name ?? '',
+    ownerEmail,
+    ownerPhone,
     status: mapStatus(s.status),
-    fields: s.fields ?? [],
-    rejectedReason: s.rejectedReason ?? s.rejectReason ?? null,
-    rejectedAt: s.rejectedAt ?? null,
+    fields: buildFields(s, { email: ownerEmail, phone: ownerPhone }),
+    rejectedReason: s.rejectReason ?? null,
+    rejectedItems: s.rejectedItems ?? [],
+    rejectedAt: null,
     approvedAt: s.approvedAt ?? null,
+    expectedRooms: s.expectedRooms ?? null,
+    payment: mapPayment(s.payment),
     submittedAt: s.submittedAt ?? s.createdAt,
     createdAt: s.createdAt,
     updatedAt: now,
@@ -121,7 +244,7 @@ export class ApiKycAdminRepository implements KycAdminRepository {
         filter,
         page,
         pageSize,
-        search: filters?.search,
+        q: filters?.search,
       },
       cache: 'no-store',
     });
@@ -136,12 +259,11 @@ export class ApiKycAdminRepository implements KycAdminRepository {
   }
 
   async getById(id: string): Promise<KycAdminSubmission | null> {
+    let data: SpecKycSubmission;
     try {
-      const data = await apiClient.get<SpecKycSubmission>(
-        `/kyc/submissions/${id}`,
-        { cache: 'no-store' },
-      );
-      return mapSubmission(data);
+      data = await apiClient.get<SpecKycSubmission>(`/kyc/submissions/${id}`, {
+        cache: 'no-store',
+      });
     } catch (err) {
       if (
         err instanceof Error &&
@@ -152,6 +274,8 @@ export class ApiKycAdminRepository implements KycAdminRepository {
       }
       throw err;
     }
+
+    return mapSubmission(data);
   }
 
   async approve(input: ApproveKycInput): Promise<KycAdminSubmission> {
