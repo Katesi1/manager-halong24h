@@ -124,7 +124,7 @@ export function PermissionEditor({ userId, userLabel, initial }: Props) {
           {userLabel}
         </h2>
         <p className="mt-1 text-xs text-ink-500">
-          Chỉ áp dụng cho vai trò SALE. Spec §12 — 4 module × 4 thao tác CRUD.
+          Chỉ áp dụng cho vai trò SALE — 4 module × 4 thao tác (thêm, xem, sửa, xoá).
         </p>
       </div>
 

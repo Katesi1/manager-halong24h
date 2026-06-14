@@ -140,7 +140,7 @@ export function BillingPlanEditor({ initialPlans }: Props) {
       if (res.ok) {
         toast.success(
           res.data.mode === 'soft'
-            ? `Gói "${target.id}" còn ref → đã chuyển sang inactive`
+            ? `Gói "${target.id}" đang có người dùng nên đã được ẩn thay vì xoá`
             : `Đã xoá gói "${target.id}"`,
         );
         router.refresh();
@@ -155,14 +155,11 @@ export function BillingPlanEditor({ initialPlans }: Props) {
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-200 px-5 py-4">
         <div>
           <h2 className="font-display text-lg font-semibold text-navy-900">
-            Catalog admin (read/write)
+            Danh mục gói cước
           </h2>
           <p className="mt-0.5 text-xs text-ink-500">
-            CRUD trực tiếp qua{' '}
-            <code className="rounded bg-cream-100 px-1.5 py-0.5">
-              /admin/billing-plans
-            </code>
-            . Bao gồm gói inactive (soft-deleted).
+            Thêm, sửa, xoá gói cước. Bao gồm cả gói đang tạm ẩn (không hiển thị
+            cho chủ nhà).
           </p>
         </div>
         {!adding && (
@@ -237,7 +234,7 @@ export function BillingPlanEditor({ initialPlans }: Props) {
                     </p>
                   </td>
                   <td className="px-5 py-3.5 text-ink-700">
-                    {plan.rooms === -1 ? '∞' : plan.rooms}
+                    {plan.rooms == null ? '—' : plan.rooms === -1 ? '∞' : plan.rooms}
                   </td>
                   <td className="px-5 py-3.5 font-semibold text-navy-900">
                     {plan.monthlyPrice === 0 ? '—' : formatVND(plan.monthlyPrice)}
@@ -246,7 +243,9 @@ export function BillingPlanEditor({ initialPlans }: Props) {
                     {plan.yearlyPrice === 0 ? '—' : formatVND(plan.yearlyPrice)}
                   </td>
                   <td className="px-5 py-3.5 text-xs text-ink-600">
-                    {plan.features.length} tính năng
+                    {plan.features?.length
+                      ? `${plan.features.length} tính năng`
+                      : '—'}
                   </td>
                   <td className="px-5 py-3.5">
                     {isActive ? (
@@ -306,7 +305,7 @@ export function BillingPlanEditor({ initialPlans }: Props) {
         onCancel={() => setConfirmDelete(null)}
         title={`Xoá gói "${confirmDelete?.id ?? ''}"?`}
         description={
-          'BE sẽ xoá hẳn nếu chưa có user/subscription tham chiếu, ngược lại chuyển sang inactive (soft delete). Gói inactive không hiển thị ở trang public nhưng user đang dùng vẫn giữ.'
+          'Nếu chưa có chủ nhà nào đang dùng, gói sẽ bị xoá hẳn. Nếu đang có người dùng, gói sẽ được ẩn khỏi trang đăng ký nhưng chủ nhà đang dùng vẫn giữ nguyên.'
         }
         confirmLabel="Xoá gói"
         cancelLabel="Huỷ"
@@ -441,9 +440,9 @@ export function AdminWriteHint() {
     <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
       <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
       <div>
-        <strong>Cảnh báo:</strong> Mọi thay đổi áp dụng ngay cho user mới đăng
-        ký. Sửa giá KHÔNG ảnh hưởng subscription đang chạy — chỉ áp dụng từ kỳ
-        renew kế tiếp. Xoá gói còn ref → BE tự soft delete.
+        <strong>Cảnh báo:</strong> Mọi thay đổi áp dụng ngay cho chủ nhà đăng ký
+        mới. Sửa giá KHÔNG ảnh hưởng gói đang chạy — chỉ áp dụng từ kỳ gia hạn kế
+        tiếp. Xoá gói đang có người dùng sẽ tự động chuyển sang ẩn.
       </div>
     </div>
   );

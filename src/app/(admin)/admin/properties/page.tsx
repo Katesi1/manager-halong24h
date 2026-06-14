@@ -18,19 +18,23 @@ import {
 } from '@/components/admin/property-filters';
 import { PageHeader } from '@/components/host/page-header';
 import { Badge } from '@/components/ui/badge';
+import { Pagination } from '@/components/ui/pagination';
 import type { Property } from '@/core/entities/property';
 import { propertyTypeLabel } from '@/core/value-objects/property-type';
 import { formatVNDShort } from '@/lib/format';
+import { buildPageHref, pageCount, paginate, parsePage } from '@/lib/pagination';
 
 export const metadata: Metadata = { title: 'Cơ sở (toàn hệ thống)' };
 
+const PAGE_SIZE = 12;
+
 /**
- * Property moderation (BE chỉ có isActive boolean, chưa có moderationStatus):
- *  - "Chờ duyệt" = isActive=false AND bookingCount=0 (proxy: mới tạo)
- *  - "Đã duyệt" = isActive=true
- *  - "Tạm khoá" = isActive=false AND bookingCount>0 (đã từng active → bị khoá)
+ * Trạng thái cơ sở (không còn luồng "duyệt": OWNER đã KYC tạo phòng là active
+ * ngay — BE set isActive=true khi tạo). Admin chỉ tạm khoá cơ sở vi phạm:
+ *  - "Đang hoạt động" = isActive=true
+ *  - "Tạm khoá" = isActive=false (admin đã khoá)
  */
-type Status = 'pending' | 'active' | 'suspended' | '';
+type Status = 'active' | 'suspended' | '';
 
 function coverImage(p: Property): string | null {
   return (
@@ -38,15 +42,11 @@ function coverImage(p: Property): string | null {
   );
 }
 
-function isPending(p: Property): boolean {
-  return !p.isActive && p.bookingCount === 0;
-}
 function isSuspended(p: Property): boolean {
-  return !p.isActive && p.bookingCount > 0;
+  return !p.isActive;
 }
 
 function matchesStatus(p: Property, status: Status): boolean {
-  if (status === 'pending') return isPending(p);
   if (status === 'active') return p.isActive;
   if (status === 'suspended') return isSuspended(p);
   return true;
@@ -91,13 +91,12 @@ export default async function AdminPropertiesPage(props: {
     q?: string;
     type?: string;
     sort?: string;
+    page?: string;
   }>;
 }) {
   const sp = await props.searchParams;
   const status: Status = (
-    ['pending', 'active', 'suspended'].includes(sp.status ?? '')
-      ? sp.status
-      : ''
+    ['active', 'suspended'].includes(sp.status ?? '') ? sp.status : ''
   ) as Status;
   const q = (sp.q ?? '').trim().toLowerCase();
   const typeFilter = sp.type ?? '';
@@ -110,7 +109,6 @@ export default async function AdminPropertiesPage(props: {
   const counts = {
     total: all.length,
     active: all.filter((p) => p.isActive).length,
-    pending: all.filter(isPending).length,
     suspended: all.filter(isSuspended).length,
   };
 
@@ -126,27 +124,30 @@ export default async function AdminPropertiesPage(props: {
 
   const statusOptions: StatusOption[] = [
     { key: '', label: 'Tất cả', count: counts.total },
-    { key: 'pending', label: 'Chờ duyệt', count: counts.pending },
-    { key: 'active', label: 'Đã duyệt', count: counts.active },
+    { key: 'active', label: 'Đang hoạt động', count: counts.active },
     { key: 'suspended', label: 'Tạm khoá', count: counts.suspended },
   ];
+
+  const currentPage = parsePage(sp.page);
+  const totalPages = pageCount(filtered.length, PAGE_SIZE);
+  const pageItems = paginate(filtered, currentPage, PAGE_SIZE);
+
+  function pageHref(page: number) {
+    return buildPageHref('/admin/properties', {
+      status: status || undefined,
+      q: sp.q,
+      type: typeFilter || undefined,
+      sort: sort !== 'name' ? sort : undefined,
+      page: page > 1 ? String(page) : undefined,
+    });
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       <PageHeader
         eyebrow="Vận hành hệ thống"
         title="Cơ sở (toàn hệ thống)"
-        description="Duyệt cơ sở mới · Tạm khoá cơ sở vi phạm · Theo dõi hoạt động."
-        actions={
-          counts.pending > 0 ? (
-            <Link
-              href="/admin/properties?status=pending"
-              className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-gold-500 px-4 text-sm font-semibold text-white transition-colors hover:bg-gold-600"
-            >
-              ⏳ {counts.pending} chờ duyệt
-            </Link>
-          ) : null
-        }
+        description="Tạm khoá cơ sở vi phạm · Theo dõi hoạt động toàn hệ thống."
       />
 
       {apiError && (
@@ -160,7 +161,7 @@ export default async function AdminPropertiesPage(props: {
       )}
 
       {/* Stat summary — clickable để lọc nhanh */}
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-6 grid grid-cols-3 gap-3">
         <StatTile
           label="Tổng cơ sở"
           value={counts.total}
@@ -169,18 +170,11 @@ export default async function AdminPropertiesPage(props: {
           accent="navy"
         />
         <StatTile
-          label="Đã duyệt"
+          label="Đang hoạt động"
           value={counts.active}
           href="/admin/properties?status=active"
           active={status === 'active'}
           accent="emerald"
-        />
-        <StatTile
-          label="Chờ duyệt"
-          value={counts.pending}
-          href="/admin/properties?status=pending"
-          active={status === 'pending'}
-          accent="gold"
         />
         <StatTile
           label="Tạm khoá"
@@ -210,10 +204,17 @@ export default async function AdminPropertiesPage(props: {
             {filtered.length !== counts.total && ` / ${counts.total} tổng`}
           </p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {filtered.map((p) => (
+            {pageItems.map((p) => (
               <PropertyCard key={p.id} property={p} />
             ))}
           </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filtered.length}
+            pageSize={PAGE_SIZE}
+            buildHref={pageHref}
+          />
         </>
       )}
     </div>
@@ -237,12 +238,6 @@ const ACCENT_CLASSES: Record<
     hoverRing: 'ring-ink-200/60 hover:ring-emerald-300',
     dot: 'bg-emerald-500',
     value: 'text-emerald-700',
-  },
-  gold: {
-    activeRing: 'ring-2 ring-gold-400',
-    hoverRing: 'ring-ink-200/60 hover:ring-gold-400',
-    dot: 'bg-gold-500',
-    value: 'text-gold-700',
   },
   rose: {
     activeRing: 'ring-2 ring-rose-300',
@@ -292,7 +287,6 @@ function StatTile({
 
 function PropertyCard({ property: p }: { property: Property }) {
   const cover = coverImage(p);
-  const pending = isPending(p);
   const suspended = isSuspended(p);
   const ownerLabel = p.owner?.name ?? `${p.ownerId.slice(0, 12)}…`;
 
@@ -316,12 +310,10 @@ function PropertyCard({ property: p }: { property: Property }) {
           </div>
         )}
         <div className="absolute left-2.5 top-2.5">
-          {pending ? (
-            <Badge variant="gold">⏳ Chờ duyệt</Badge>
-          ) : suspended ? (
+          {suspended ? (
             <Badge variant="danger">🔒 Tạm khoá</Badge>
           ) : (
-            <Badge variant="success">✓ Đã duyệt</Badge>
+            <Badge variant="success">✓ Đang hoạt động</Badge>
           )}
         </div>
         <div className="absolute right-2.5 top-2.5">
@@ -399,16 +391,14 @@ function EmptyState({
         <SearchX className="h-7 w-7 text-ink-400" />
       </div>
       <p className="text-sm font-medium text-ink-700">
-        {status === 'pending'
-          ? 'Không có cơ sở chờ duyệt'
+        {status === 'suspended'
+          ? 'Không có cơ sở bị tạm khoá'
           : 'Không có cơ sở phù hợp'}
       </p>
       <p className="mt-1 text-xs text-ink-500">
-        {status === 'pending'
-          ? 'Mọi cơ sở đều đã được xử lý.'
-          : filtered
-            ? 'Thử bỏ bộ lọc hoặc đổi từ khoá tìm kiếm.'
-            : 'Chưa có cơ sở nào trong hệ thống.'}
+        {filtered
+          ? 'Thử bỏ bộ lọc hoặc đổi từ khoá tìm kiếm.'
+          : 'Chưa có cơ sở nào trong hệ thống.'}
       </p>
     </div>
   );

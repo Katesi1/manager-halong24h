@@ -1,267 +1,267 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
 
-import { PageHeader, StatCard } from '@/components/host/page-header';
+import { getRiskKpisAction } from '@/app/actions/dashboard';
+import { listDisputesAction } from '@/app/actions/disputes';
+import { PageHeader } from '@/components/host/page-header';
 import { Badge } from '@/components/ui/badge';
+import {
+  DISPUTE_STATUS_LABEL,
+  DISPUTE_TYPE_ICON,
+  type Dispute,
+  type DisputeStatus,
+} from '@/core/entities/dispute';
+import {
+  RISK_RANGES,
+  RISK_RANGE_LABEL,
+  isRiskRange,
+  type RiskKpis,
+  type RiskMetric,
+  type RiskRange,
+} from '@/core/entities/risk-kpi';
+import { formatDate, formatVND } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Báo cáo' };
 
 /**
- * Admin reports — KPI dashboard cho BUSINESS_RISKS §7 review checklist.
- * 5 chỉ số chính giúp admin nhận diện rủi ro vận hành theo quý.
- *
- * Hiện chạy MOCK — khi BE expose `GET /admin/reports/risk-kpis?range=...`
- * thay block `MOCK_DATA` bằng fetch.
+ * Admin reports — 100% dữ liệu thật từ `GET /admin/reports/risk-kpis` (spec
+ * §7A.5) cho 8 KPI rủi ro vận hành + delta vs kỳ trước + bảng top chủ huỷ.
+ * Bảng "Dispute đang chờ" lấy thêm từ `GET /admin/disputes`.
  */
 
-type RangeKey = 'week' | 'month' | 'quarter' | 'year';
+type Tone = 'danger' | 'warning' | 'info' | 'success';
+type Kind = 'count' | 'rate' | 'money';
 
-const RANGE_LABEL: Record<RangeKey, string> = {
-  week: 'Tuần này',
-  month: 'Tháng này',
-  quarter: 'Quý hiện tại',
-  year: 'Năm hiện tại',
+const TONE_VALUE: Record<Tone, string> = {
+  danger: 'text-rose-600',
+  warning: 'text-amber-600',
+  info: 'text-navy-700',
+  success: 'text-emerald-600',
 };
 
-const VALID_RANGES: RangeKey[] = ['week', 'month', 'quarter', 'year'];
+const TONE_DOT: Record<Tone, string> = {
+  danger: 'bg-rose-500',
+  warning: 'bg-amber-500',
+  info: 'bg-navy-600',
+  success: 'bg-emerald-500',
+};
 
-function isRange(r?: string): r is RangeKey {
-  return !!r && (VALID_RANGES as string[]).includes(r);
-}
-
-interface RiskKpi {
+interface CardCfg {
   key: string;
   label: string;
   hint: string;
-  /** Số tuyệt đối hoặc %. */
-  value: string;
-  raw: number;
-  /** Spark trend (7 mốc) — chỉ để render bar mini. */
-  spark: number[];
-  /** Delta vs prev period. */
-  delta: { value: string; positive: boolean };
-  variant: 'danger' | 'warning' | 'success' | 'info';
+  href: string;
+  cta: string;
+  tone: Tone;
+  kind: Kind;
+  metric: RiskMetric;
+  /** Metric snapshot (prev = value) → ẩn delta. */
+  hideDelta?: boolean;
+  /** Tăng là tốt (vd doanh thu). Mặc định: giảm là tốt (risk metric). */
+  goodWhenUp?: boolean;
 }
 
-interface MockData {
-  range: RangeKey;
-  kpis: RiskKpi[];
-  topHostCancel: Array<{
-    hostName: string;
-    propertyCount: number;
-    bookingCount: number;
-    cancelRate: number;
-    flag: 'red' | 'amber' | 'green';
-  }>;
-  recentDisputes: Array<{
-    code: string;
-    openedAt: string;
-    propertyName: string;
-    issue: string;
-    status: 'open' | 'investigating' | 'resolved';
-  }>;
+function formatMetric(kind: Kind, value: number): string {
+  if (kind === 'money') return formatVND(value);
+  if (kind === 'rate') return `${value.toFixed(1)}%`;
+  return String(value);
 }
 
-function getMock(range: RangeKey): MockData {
-  // Giá trị mặc định "quý hiện tại" theo brief BUSINESS_RISKS §7.
-  // Các range khác scale tương đối để demo trend.
-  const scale = range === 'week' ? 0.12 : range === 'month' ? 0.4 : range === 'year' ? 3.6 : 1;
-
-  const kpis: RiskKpi[] = [
-    {
-      key: 'disputes',
-      label: 'Dispute mở',
-      hint: 'Khiếu nại đang chờ phán quyết',
-      value: String(Math.max(1, Math.round(5 * scale))),
-      raw: 5 * scale,
-      spark: [2, 3, 1, 4, 3, 5, 5],
-      delta: { value: '+25%', positive: false },
-      variant: 'danger',
-    },
-    {
-      key: 'host_cancel',
-      label: 'Chủ huỷ sau confirmed',
-      hint: 'Tỉ lệ booking chủ huỷ sau khi đã xác nhận',
-      value: `${(3.2 * Math.sqrt(scale)).toFixed(1)}%`,
-      raw: 3.2,
-      spark: [4.1, 3.6, 3.4, 3.0, 3.5, 3.2, 3.2],
-      delta: { value: '−0.4pp', positive: true },
-      variant: 'warning',
-    },
-    {
-      key: 'no_show',
-      label: 'Khách no-show',
-      hint: 'Khách đã cọc nhưng không tới nhận phòng',
-      value: `${(1.8 * Math.sqrt(scale)).toFixed(1)}%`,
-      raw: 1.8,
-      spark: [2.0, 2.2, 1.9, 1.6, 1.7, 1.8, 1.8],
-      delta: { value: '−0.2pp', positive: true },
-      variant: 'warning',
-    },
-    {
-      key: 'scam_reports',
-      label: 'Report scam · fake listing',
-      hint: 'Khách hoặc chủ report nội dung gian lận',
-      value: String(Math.max(1, Math.round(4 * scale))),
-      raw: 4 * scale,
-      spark: [1, 2, 2, 3, 3, 4, 4],
-      delta: { value: '+33%', positive: false },
-      variant: 'danger',
-    },
-    {
-      key: 'deletion_requests',
-      label: 'Yêu cầu xoá account',
-      hint: 'User yêu cầu xoá theo NĐ 13 — grace 30 ngày',
-      value: String(Math.max(0, Math.round(2 * scale))),
-      raw: 2 * scale,
-      spark: [0, 1, 1, 0, 2, 2, 2],
-      delta: { value: '+1', positive: false },
-      variant: 'info',
-    },
-  ];
-
-  return {
-    range,
-    kpis,
-    topHostCancel: [
-      {
-        hostName: 'Phạm Hữu Cường',
-        propertyCount: 3,
-        bookingCount: 42,
-        cancelRate: 14.3,
-        flag: 'red',
-      },
-      {
-        hostName: 'Vũ Minh Châu',
-        propertyCount: 2,
-        bookingCount: 38,
-        cancelRate: 7.9,
-        flag: 'amber',
-      },
-      {
-        hostName: 'Lê Thị Hà',
-        propertyCount: 5,
-        bookingCount: 86,
-        cancelRate: 4.7,
-        flag: 'amber',
-      },
-      {
-        hostName: 'Nguyễn Quang Huy',
-        propertyCount: 4,
-        bookingCount: 74,
-        cancelRate: 2.7,
-        flag: 'green',
-      },
-    ],
-    recentDisputes: [
-      {
-        code: 'DSP-2026-05-014',
-        openedAt: '2026-05-15',
-        propertyName: 'Villa B1716 — View biển Bãi Cháy',
-        issue: 'Khách báo phòng không khớp ảnh',
-        status: 'investigating',
-      },
-      {
-        code: 'DSP-2026-05-013',
-        openedAt: '2026-05-12',
-        propertyName: 'Homestay Hòn Gai Sky',
-        issue: 'Chủ giữ cọc không trả sau huỷ hợp lệ',
-        status: 'open',
-      },
-      {
-        code: 'DSP-2026-05-012',
-        openedAt: '2026-05-10',
-        propertyName: 'Sunset Cottage Tuần Châu',
-        issue: 'Khách phá đồ — yêu cầu trừ deposit',
-        status: 'open',
-      },
-      {
-        code: 'DSP-2026-05-011',
-        openedAt: '2026-05-08',
-        propertyName: 'OceanView Suite Bãi Cháy',
-        issue: 'Đôi bên không thống nhất check-out time',
-        status: 'investigating',
-      },
-      {
-        code: 'DSP-2026-05-010',
-        openedAt: '2026-05-05',
-        propertyName: 'Hidden Bay Retreat',
-        issue: 'Nghi ngờ fake listing — ảnh stock',
-        status: 'open',
-      },
-    ],
-  };
-}
-
-function variantToColor(v: RiskKpi['variant']): string {
-  switch (v) {
-    case 'danger':
-      return 'bg-rose-500';
-    case 'warning':
-      return 'bg-amber-500';
-    case 'success':
-      return 'bg-emerald-500';
-    default:
-      return 'bg-navy-700';
+function deltaInfo(cfg: CardCfg): { text: string; up: boolean; good: boolean } | null {
+  if (cfg.hideDelta) return null;
+  const { value, prev } = cfg.metric;
+  const raw = value - prev;
+  if (raw === 0) return null;
+  let text: string;
+  if (cfg.kind === 'rate') {
+    text = `${Math.abs(raw).toFixed(1)}pp`;
+  } else if (cfg.kind === 'money') {
+    if (prev === 0) return null;
+    text = `${Math.abs((raw / prev) * 100).toFixed(0)}%`;
+  } else {
+    text = String(Math.abs(raw));
   }
+  const up = raw > 0;
+  const good = cfg.goodWhenUp ? up : !up;
+  return { text, up, good };
 }
 
-function Sparkbar({
-  values,
-  variant,
-}: {
-  values: number[];
-  variant: RiskKpi['variant'];
-}) {
-  const max = Math.max(...values, 1);
-  return (
-    <div className="mt-3 flex h-8 items-end gap-1">
-      {values.map((v, i) => {
-        const h = Math.max(8, Math.round((v / max) * 100));
-        return (
-          <span
-            key={i}
-            className={`block w-full rounded-sm ${variantToColor(variant)} opacity-60`}
-            style={{ height: `${h}%` }}
-          />
-        );
-      })}
-    </div>
-  );
+function disputeBadge(status: DisputeStatus) {
+  const variant: Parameters<typeof Badge>[0]['variant'] =
+    status === 'open'
+      ? 'danger'
+      : status === 'investigating'
+        ? 'warning'
+        : status === 'resolved'
+          ? 'success'
+          : 'default';
+  return <Badge variant={variant}>{DISPUTE_STATUS_LABEL[status]}</Badge>;
 }
 
-function statusBadge(status: 'open' | 'investigating' | 'resolved') {
-  if (status === 'open') return <Badge variant="danger">Mở</Badge>;
-  if (status === 'investigating') return <Badge variant="warning">Đang xử lý</Badge>;
-  return <Badge variant="success">Đã xử lý</Badge>;
-}
-
-function flagBadge(flag: 'red' | 'amber' | 'green') {
-  if (flag === 'red') return <Badge variant="danger">Cao</Badge>;
-  if (flag === 'amber') return <Badge variant="warning">Trung bình</Badge>;
+function cancelFlag(rate: number) {
+  if (rate >= 10) return <Badge variant="danger">Cao</Badge>;
+  if (rate >= 5) return <Badge variant="warning">Trung bình</Badge>;
   return <Badge variant="success">Thấp</Badge>;
+}
+
+function KpiCard({ cfg }: { cfg: CardCfg }) {
+  const delta = deltaInfo(cfg);
+  return (
+    <Link
+      href={cfg.href}
+      className="group flex flex-col rounded-2xl bg-white p-5 shadow-card ring-1 ring-ink-200/60 transition-shadow hover:shadow-lg"
+    >
+      <div className="flex items-center gap-2">
+        <span className={`h-2 w-2 rounded-full ${TONE_DOT[cfg.tone]}`} />
+        <p className="overline muted no-dash text-[10px]">{cfg.label}</p>
+      </div>
+      <div className="mt-2 flex items-baseline gap-2">
+        <p
+          className={`font-display text-[1.9rem] font-semibold leading-none tracking-tight ${TONE_VALUE[cfg.tone]}`}
+        >
+          {formatMetric(cfg.kind, cfg.metric.value)}
+        </p>
+        {delta && (
+          <span
+            className={
+              'text-xs font-semibold ' +
+              (delta.good ? 'text-emerald-700' : 'text-rose-600')
+            }
+            title="So với kỳ liền trước cùng độ dài"
+          >
+            {delta.up ? '↑' : '↓'} {delta.text}
+          </span>
+        )}
+      </div>
+      <p className="mt-1.5 flex-1 text-xs leading-snug text-ink-500">
+        {cfg.hint}
+      </p>
+      <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-navy-700 group-hover:gap-1.5">
+        {cfg.cta}
+        <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+      </span>
+    </Link>
+  );
 }
 
 export default async function AdminReportsPage(props: {
   searchParams: Promise<{ range?: string }>;
 }) {
   const sp = await props.searchParams;
-  const range: RangeKey = isRange(sp.range) ? sp.range : 'quarter';
-  const data = getMock(range);
+  const range: RiskRange = isRiskRange(sp.range) ? sp.range : 'month';
+
+  const [kpiRes, disputeListRes] = await Promise.all([
+    getRiskKpisAction(range),
+    listDisputesAction(),
+  ]);
+
+  const k: RiskKpis | null = kpiRes.ok ? kpiRes.data : null;
+
+  const recentDisputes: Dispute[] = (
+    disputeListRes.ok ? disputeListRes.data : []
+  )
+    .filter((d) => d.status === 'open' || d.status === 'investigating')
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 6);
+
+  const cards: CardCfg[] = k
+    ? [
+        {
+          key: 'disputes',
+          label: 'Dispute đang mở',
+          hint: 'Khiếu nại mở/đang xử lý phát sinh trong kỳ',
+          href: '/admin/disputes',
+          cta: 'Xem khiếu nại',
+          tone: 'danger',
+          kind: 'count',
+          metric: k.disputesOpen,
+        },
+        {
+          key: 'hostCancel',
+          label: 'Chủ huỷ sau confirmed',
+          hint: 'Tỉ lệ chủ/sale/admin huỷ trên booking đã cọc',
+          href: '/admin/bookings',
+          cta: 'Xem booking',
+          tone: 'warning',
+          kind: 'rate',
+          metric: k.hostCancelRate,
+        },
+        {
+          key: 'noShow',
+          label: 'Khách no-show',
+          hint: 'Tỉ lệ khách đã cọc nhưng không đến nhận phòng',
+          href: '/admin/bookings?status=no_show',
+          cta: 'Xem booking',
+          tone: 'warning',
+          kind: 'rate',
+          metric: k.noShowRate,
+        },
+        {
+          key: 'flagged',
+          label: 'Review bị gắn cờ',
+          hint: 'Đánh giá bị report spam / giả / vi phạm trong kỳ',
+          href: '/admin/reviews',
+          cta: 'Kiểm duyệt',
+          tone: 'warning',
+          kind: 'count',
+          metric: k.flaggedReviews,
+        },
+        {
+          key: 'deletion',
+          label: 'Yêu cầu xoá account',
+          hint: 'Số yêu cầu xoá tài khoản nhận trong kỳ (NĐ 13)',
+          href: '/admin/users',
+          cta: 'Xem người dùng',
+          tone: 'info',
+          kind: 'count',
+          metric: k.deletionRequests,
+        },
+        {
+          key: 'kyc',
+          label: 'KYC chờ duyệt',
+          hint: 'Hồ sơ chủ nhà chờ admin xác minh',
+          href: '/admin/kyc',
+          cta: 'Duyệt hồ sơ',
+          tone: 'info',
+          kind: 'count',
+          metric: k.kycPending,
+        },
+        {
+          key: 'overdue',
+          label: 'Subscription quá hạn',
+          hint: 'Chủ nhà đang nợ phí gói cước (snapshot hiện tại)',
+          href: '/admin/payments',
+          cta: 'Xem gói cước',
+          tone: 'danger',
+          kind: 'count',
+          metric: k.subscriptionOverdue,
+          hideDelta: true,
+        },
+        {
+          key: 'revenue',
+          label: 'Doanh thu đã thu',
+          hint: 'Phí gói cước chủ nhà đã thanh toán trong kỳ',
+          href: '/admin/payments',
+          cta: 'Đối soát',
+          tone: 'success',
+          kind: 'money',
+          metric: k.revenuePaid,
+          goodWhenUp: true,
+        },
+      ]
+    : [];
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       <PageHeader
         eyebrow="Vận hành hệ thống"
         title="Báo cáo & Phân tích"
-        description="5 chỉ số rủi ro vận hành cốt lõi theo BUSINESS_RISKS §7. Dữ liệu mock — BE sẽ wire khi expose `/admin/reports/risk-kpis`."
-        breadcrumbs={[
-          { label: 'Quản trị' },
-          { label: 'Báo cáo & Phân tích' },
-        ]}
+        description={`Chỉ số rủi ro vận hành trong ${k?.rangeDays ?? RISK_RANGE_LABEL[range]} ngày, so với kỳ liền trước. Dữ liệu thật từ Dispute, Booking, Review, KYC & Subscription.`}
+        breadcrumbs={[{ label: 'Quản trị' }, { label: 'Báo cáo & Phân tích' }]}
         actions={
           <div className="flex flex-wrap gap-1.5">
-            {VALID_RANGES.map((r) => {
+            {RISK_RANGES.map((r) => {
               const active = r === range;
               return (
                 <Link
@@ -274,7 +274,7 @@ export default async function AdminReportsPage(props: {
                       : 'bg-white text-ink-900 ring-1 ring-ink-200 hover:bg-cream-100')
                   }
                 >
-                  {RANGE_LABEL[r]}
+                  {RISK_RANGE_LABEL[r]}
                 </Link>
               );
             })}
@@ -282,43 +282,22 @@ export default async function AdminReportsPage(props: {
         }
       />
 
-      {/* KPI grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {data.kpis.map((kpi) => (
-          <div
-            key={kpi.key}
-            className="rounded-2xl bg-white p-5 shadow-card ring-1 ring-ink-200/60"
-          >
-            <p className="overline muted no-dash text-[10px]">{kpi.label}</p>
-            <div className="mt-2 flex items-baseline gap-2">
-              <p className="font-display text-[1.75rem] font-semibold tracking-tight leading-none text-navy-900">
-                {kpi.value}
-              </p>
-              <span
-                className={
-                  'text-xs font-semibold ' +
-                  (kpi.delta.positive ? 'text-emerald-700' : 'text-rose-600')
-                }
-              >
-                {kpi.delta.positive ? '↓' : '↑'} {kpi.delta.value}
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-ink-500 leading-snug">{kpi.hint}</p>
-            <Sparkbar values={kpi.spark} variant={kpi.variant} />
-          </div>
-        ))}
+      {!kpiRes.ok && (
+        <div className="mb-5 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-900 ring-1 ring-rose-200">
+          Không tải được chỉ số rủi ro: {kpiRes.error}
+        </div>
+      )}
 
-        {/* Filler stat to round out 6-cell grid (lg:grid-cols-3) */}
-        <StatCard
-          label="Booking hoàn tất kỳ này"
-          value={range === 'year' ? '4.812' : range === 'quarter' ? '1.184' : range === 'month' ? '342' : '78'}
-          hint="So với kỳ trước"
-          trend={{ value: '8.4%', positive: true }}
-        />
+      {/* KPI grid */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {cards.map((cfg) => (
+          <KpiCard key={cfg.key} cfg={cfg} />
+        ))}
       </div>
 
       {/* Tables */}
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        {/* Top host cancel */}
         <section className="rounded-2xl bg-white p-5 shadow-card ring-1 ring-ink-200/60">
           <div className="flex items-end justify-between gap-3">
             <div>
@@ -326,88 +305,117 @@ export default async function AdminReportsPage(props: {
                 Top chủ huỷ sau confirmed
               </h2>
               <p className="mt-1 text-sm text-ink-500">
-                Chủ nhà có tỉ lệ huỷ cao nhất kỳ này.
+                Chủ nhà có tỉ lệ tự huỷ cao nhất trong kỳ.
               </p>
             </div>
             <Badge variant="warning">Cảnh báo</Badge>
           </div>
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[600px] text-sm">
-              <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wider text-ink-500">
-                  <th className="px-3 py-2 font-medium">Chủ nhà</th>
-                  <th className="px-3 py-2 font-medium">Booking</th>
-                  <th className="px-3 py-2 font-medium">Tỉ lệ huỷ</th>
-                  <th className="px-3 py-2 font-medium">Mức</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.topHostCancel.map((row) => (
-                  <tr
-                    key={row.hostName}
-                    className="border-t border-ink-100 align-middle"
-                  >
-                    <td className="px-3 py-3">
-                      <p className="font-semibold text-ink-900">
-                        {row.hostName}
-                      </p>
-                      <p className="text-[11px] text-ink-500">
-                        {row.propertyCount} cơ sở
-                      </p>
-                    </td>
-                    <td className="px-3 py-3 text-ink-700">
-                      {row.bookingCount}
-                    </td>
-                    <td className="px-3 py-3 font-semibold text-ink-900">
-                      {row.cancelRate.toFixed(1)}%
-                    </td>
-                    <td className="px-3 py-3">{flagBadge(row.flag)}</td>
+            {!k || k.topHostCancel.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-ink-200 p-6 text-center text-sm text-ink-400">
+                Không có chủ nhà nào huỷ booking trong kỳ. 🎉
+              </p>
+            ) : (
+              <table className="w-full min-w-[600px] text-sm">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wider text-ink-500">
+                    <th className="px-3 py-2 font-medium">Chủ nhà</th>
+                    <th className="px-3 py-2 font-medium">Booking</th>
+                    <th className="px-3 py-2 font-medium">Huỷ</th>
+                    <th className="px-3 py-2 font-medium">Tỉ lệ</th>
+                    <th className="px-3 py-2 font-medium">Mức</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {k.topHostCancel.map((row) => (
+                    <tr
+                      key={row.ownerId || row.name}
+                      className="border-t border-ink-100 align-middle"
+                    >
+                      <td className="px-3 py-3">
+                        {row.ownerId ? (
+                          <Link
+                            href={`/admin/users/${row.ownerId}`}
+                            className="font-semibold text-ink-900 hover:text-navy-900 hover:underline"
+                          >
+                            {row.name || '—'}
+                          </Link>
+                        ) : (
+                          <p className="font-semibold text-ink-900">
+                            {row.name || '—'}
+                          </p>
+                        )}
+                        <p className="text-[11px] text-ink-500">
+                          {row.propertyCount} cơ sở
+                        </p>
+                      </td>
+                      <td className="px-3 py-3 text-ink-700">
+                        {row.bookingCount}
+                      </td>
+                      <td className="px-3 py-3 text-ink-700">
+                        {row.cancelCount}
+                      </td>
+                      <td className="px-3 py-3 font-semibold text-ink-900">
+                        {row.cancelRate.toFixed(1)}%
+                      </td>
+                      <td className="px-3 py-3">{cancelFlag(row.cancelRate)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </section>
 
+        {/* Recent disputes */}
         <section className="rounded-2xl bg-white p-5 shadow-card ring-1 ring-ink-200/60">
           <div className="flex items-end justify-between gap-3">
             <div>
               <h2 className="font-display text-xl font-semibold tracking-tight text-navy-900">
-                Dispute gần nhất
+                Dispute đang chờ
               </h2>
               <p className="mt-1 text-sm text-ink-500">
-                Các khiếu nại đang mở hoặc đang xử lý.
+                Khiếu nại mới mở hoặc đang xử lý.
               </p>
             </div>
             <Link
               href="/admin/disputes"
-              className="text-sm font-semibold text-navy-900 hover:underline"
+              className="shrink-0 text-sm font-semibold text-navy-900 hover:underline"
             >
               Xem tất cả →
             </Link>
           </div>
           <div className="mt-4 space-y-2">
-            {data.recentDisputes.map((d) => (
-              <div
-                key={d.code}
-                className="rounded-xl border border-ink-100 p-3 hover:bg-cream-50"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-mono text-xs font-semibold text-ink-900">
-                    {d.code}
+            {recentDisputes.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-ink-200 p-6 text-center text-sm text-ink-400">
+                Không có khiếu nại nào đang chờ. 🎉
+              </p>
+            ) : (
+              recentDisputes.map((d) => (
+                <Link
+                  key={d.id}
+                  href={`/admin/disputes/${d.id}`}
+                  className="block rounded-xl border border-ink-100 p-3 transition-colors hover:bg-cream-50"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-mono text-xs font-semibold text-ink-900">
+                      {DISPUTE_TYPE_ICON[d.type]}{' '}
+                      {d.bookingCode || d.id.slice(0, 8)}
+                    </p>
+                    {disputeBadge(d.status)}
+                  </div>
+                  <p className="mt-1 line-clamp-1 text-sm text-ink-900">
+                    {d.subject}
                   </p>
-                  {statusBadge(d.status)}
-                </div>
-                <p className="mt-1 text-sm text-ink-900">{d.issue}</p>
-                <p className="mt-0.5 text-[11px] text-ink-500">
-                  {d.propertyName} · mở {d.openedAt}
-                </p>
-              </div>
-            ))}
+                  <p className="mt-0.5 line-clamp-1 text-[11px] text-ink-500">
+                    {d.propertyName} · mở {formatDate(d.createdAt)}
+                  </p>
+                </Link>
+              ))
+            )}
           </div>
         </section>
       </div>
-
     </div>
   );
 }

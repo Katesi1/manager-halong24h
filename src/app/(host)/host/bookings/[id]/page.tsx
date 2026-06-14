@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/host/page-header';
 import { Badge } from '@/components/ui/badge';
 import type { Booking, BookingStatus } from '@/core/entities/booking';
 import { formatVND } from '@/core/value-objects/vnd';
+import { formatBookingTotal, holdSecondsLeft } from '@/lib/booking-display';
 import { formatDate, formatDateTime } from '@/lib/format';
 
 const STATUS_LABEL: Record<BookingStatus, string> = {
@@ -16,6 +17,7 @@ const STATUS_LABEL: Record<BookingStatus, string> = {
   paid: 'Đã nhận tiền',
   cancelled: 'Đã huỷ',
   completed: 'Hoàn tất',
+  no_show: 'Khách không đến',
 };
 
 const STATUS_VARIANT: Record<
@@ -27,6 +29,7 @@ const STATUS_VARIANT: Record<
   paid: 'info',
   cancelled: 'danger',
   completed: 'success',
+  no_show: 'dark',
 };
 
 export default async function BookingDetailPage(props: {
@@ -38,12 +41,17 @@ export default async function BookingDetailPage(props: {
   if (!result.ok || result.data === null) notFound();
   const booking: Booking = result.data;
 
-  const remaining = Math.max(0, booking.totalPrice - booking.deposit);
-  const fullyPaid = remaining === 0 && booking.totalPrice > 0;
+  const hasTotal = booking.totalPrice != null;
+  const remaining = hasTotal
+    ? Math.max(0, booking.totalPrice! - (booking.deposit ?? 0))
+    : null;
+  const fullyPaid = hasTotal && remaining === 0 && booking.totalPrice! > 0;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader
+        backHref="/host/bookings"
+        backLabel="Quay lại danh sách đặt phòng"
         title={`Đặt phòng ${booking.id.slice(0, 12)}`}
         description={`Tạo lúc ${formatDateTime(booking.createdAt)}`}
         breadcrumbs={[
@@ -63,8 +71,8 @@ export default async function BookingDetailPage(props: {
         </div>
       )}
 
-      {booking.status === 'hold' && booking.holdExpireAt && (
-        <HoldCountdown holdExpireAt={booking.holdExpireAt} />
+      {booking.status === 'hold' && (
+        <HoldCountdown secondsLeft={holdSecondsLeft(booking)} />
       )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -130,7 +138,7 @@ export default async function BookingDetailPage(props: {
               {fullyPaid && <Badge variant="success">Đã nhận đủ</Badge>}
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <Stat label="Tổng" value={formatVND(booking.totalPrice)} />
+              <Stat label="Tổng" value={formatBookingTotal(booking.totalPrice)} />
               <Stat
                 label="Khách đã chuyển"
                 value={formatVND(booking.deposit)}
@@ -138,8 +146,8 @@ export default async function BookingDetailPage(props: {
               />
               <Stat
                 label="Còn lại"
-                value={formatVND(remaining)}
-                color={remaining > 0 ? 'amber' : 'emerald'}
+                value={remaining == null ? 'Chưa chốt giá' : formatVND(remaining)}
+                color={remaining != null && remaining > 0 ? 'amber' : 'emerald'}
               />
             </div>
             <div className="mt-4 rounded-lg bg-cream-100 p-4 text-sm text-ink-700">
@@ -173,8 +181,8 @@ export default async function BookingDetailPage(props: {
                 Tính năng chat đang chuẩn bị
               </p>
               <p className="mt-1 text-xs text-ink-500">
-                Khi BE bổ sung endpoint conversations, khung chat + upload bill
-                sẽ hiển thị ở đây.
+                Khung chat và gửi ảnh bill trao đổi với khách sẽ sớm hiển thị ở
+                đây.
               </p>
               <Link
                 href={`/host/messages?booking=${booking.id}`}
@@ -196,8 +204,8 @@ export default async function BookingDetailPage(props: {
                 <BookingActions
                   bookingId={booking.id}
                   status={booking.status}
-                  totalPrice={booking.totalPrice}
-                  alreadyPaid={booking.deposit}
+                  totalPrice={booking.totalPrice ?? 0}
+                  alreadyPaid={booking.deposit ?? 0}
                 />
               </div>
             </div>
@@ -231,15 +239,15 @@ export default async function BookingDetailPage(props: {
   );
 }
 
-function HoldCountdown({ holdExpireAt }: { holdExpireAt: string }) {
-  const remainingMs = new Date(holdExpireAt).getTime() - Date.now();
-  const minutes = Math.max(0, Math.floor(remainingMs / 60_000));
+function HoldCountdown({ secondsLeft }: { secondsLeft: number }) {
+  const minutes = Math.floor(secondsLeft / 60);
   return (
     <div className="mb-6 flex items-center justify-between rounded-lg bg-gold-50 px-4 py-3 text-sm text-gold-900 ring-1 ring-gold-200">
       <span>
-        ⏳ Đặt phòng đang giữ chỗ — hết hạn lúc{' '}
-        <strong>{formatDateTime(holdExpireAt)}</strong>{' '}
-        {minutes > 0 ? `(còn ~${minutes} phút)` : '(đã hết hạn)'}
+        ⏳ Đặt phòng đang giữ chỗ —{' '}
+        {secondsLeft > 0
+          ? `còn ~${minutes} phút trước khi tự nhả phòng`
+          : 'đã hết hạn giữ chỗ'}
       </span>
     </div>
   );

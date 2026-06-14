@@ -31,8 +31,8 @@ interface SpecBooking {
   status: number | BookingStatus;
   holdExpireAt?: string | null;
   holdRemainingSeconds?: number;
-  depositAmount: number;
-  totalAmount: number;
+  depositAmount: number | null;
+  totalAmount: number | null;
   paidAmount?: number | null;
   paidAt?: string | null;
   guestCount: number;
@@ -47,6 +47,7 @@ const STATUS_MAP: Record<number, BookingStatus> = {
   1: 'confirmed',
   2: 'cancelled',
   3: 'completed',
+  4: 'no_show',
 };
 
 function mapStatus(s: SpecBooking['status']): BookingStatus {
@@ -78,8 +79,9 @@ function mapBooking(s: SpecBooking): Booking {
     checkOutAt: s.checkoutDate,
     nights: s.nights ?? nightsBetween(s.checkinDate, s.checkoutDate),
     status: isPaid && status === 'confirmed' ? 'paid' : status,
-    totalPrice: vnd(s.totalAmount),
-    deposit: vnd(s.depositAmount),
+    // BE trả null cho đơn HOLD (chưa chốt giá) → giữ null, UI hiện "Chưa chốt giá".
+    totalPrice: s.totalAmount == null ? null : vnd(s.totalAmount),
+    deposit: s.depositAmount == null ? null : vnd(s.depositAmount),
     holdExpireAt: s.holdExpireAt ?? null,
     holdRemainingSeconds: s.holdRemainingSeconds,
     notes: s.notes,

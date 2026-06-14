@@ -2,83 +2,13 @@ import Link from 'next/link';
 import { PageHeader } from '@/components/host/page-header';
 import { FilterChips } from '@/components/ui/filter-chips';
 import { LeadCard, type LeadCardData } from '@/components/host/lead-card';
+import { Pagination } from '@/components/ui/pagination';
 import { Lightbulb } from 'lucide-react';
 import { listLeadsAction } from '@/app/actions/leads';
 import type { Lead, LeadStatus } from '@/core/entities/lead';
+import { buildPageHref, pageCount, paginate, parsePage } from '@/lib/pagination';
 
-const DEMO: LeadCardData[] = [
-  {
-    id: 'demo-l-1',
-    guest_name: 'Lê Văn Đức',
-    guest_phone: '+84 901 234 567',
-    guest_email: 'leduc@example.com',
-    check_in: '2026-05-01',
-    check_out: '2026-05-04',
-    num_guests: 4,
-    message:
-      'Đi gia đình 4 người, có 2 trẻ con. Cần phòng tầng cao, view biển nếu được. Có thể check-in sớm 12h trưa được không ạ?',
-    status: 'new',
-    created_at: new Date(Date.now() - 5 * 60_000).toISOString(),
-    property_name: 'À La Carte Hạ Long Bay',
-    room_name: '2PN Family Suite',
-  },
-  {
-    id: 'demo-l-2',
-    guest_name: 'Vũ Quỳnh Anh',
-    guest_phone: '+84 987 654 321',
-    guest_email: null,
-    check_in: '2026-05-10',
-    check_out: '2026-05-12',
-    num_guests: 2,
-    message: 'Có phòng view biển trực diện ngày này không em?',
-    status: 'new',
-    created_at: new Date(Date.now() - 12 * 60_000).toISOString(),
-    property_name: 'Sun Grand City Feria',
-    room_name: 'Studio Premium View Vịnh',
-  },
-  {
-    id: 'demo-l-3',
-    guest_name: 'Nguyễn Anh Tú',
-    guest_phone: '+84 901 555 234',
-    guest_email: 'tu@example.com',
-    check_in: '2026-04-28',
-    check_out: '2026-04-30',
-    num_guests: 2,
-    message: 'Có thể đón sân bay không?',
-    status: 'new',
-    created_at: new Date(Date.now() - 38 * 60_000).toISOString(),
-    property_name: 'À La Carte Hạ Long Bay',
-    room_name: 'Studio Premium View Vịnh',
-  },
-  {
-    id: 'demo-l-4',
-    guest_name: 'Đoàn Mạnh Tuấn',
-    guest_phone: '+84 912 345 678',
-    guest_email: 'tuan@example.com',
-    check_in: '2026-04-30',
-    check_out: '2026-05-03',
-    num_guests: 6,
-    message: 'Lễ 30/4, đặt cho công ty 6 người. Cần hoá đơn VAT.',
-    status: 'contacted',
-    created_at: new Date(Date.now() - 4 * 3600_000).toISOString(),
-    property_name: 'À La Carte Hạ Long Bay',
-    room_name: 'Penthouse 3PN Sky Suite',
-  },
-  {
-    id: 'demo-l-5',
-    guest_name: 'Phan Đức Long',
-    guest_phone: '+84 888 999 000',
-    guest_email: null,
-    check_in: null,
-    check_out: null,
-    num_guests: null,
-    message: 'Cho hỏi giá tháng 6 ạ?',
-    status: 'rejected',
-    created_at: new Date(Date.now() - 2 * 86_400_000).toISOString(),
-    property_name: 'Sun Grand City Feria',
-    room_name: null,
-  },
-];
+const PAGE_SIZE = 10;
 
 function toCardData(lead: Lead): LeadCardData {
   return {
@@ -98,31 +28,25 @@ function toCardData(lead: Lead): LeadCardData {
 }
 
 type LeadsState =
-  | { leads: LeadCardData[]; mode: 'live' }
-  | { leads: LeadCardData[]; mode: 'demo-error'; error: string }
-  | { leads: LeadCardData[]; mode: 'empty' };
+  | { leads: LeadCardData[]; mode: 'ok' }
+  | { leads: LeadCardData[]; mode: 'error'; error: string };
 
 async function getLeads(): Promise<LeadsState> {
   const res = await listLeadsAction();
   if (!res.ok) {
-    // BE fail (403/500/network) — fallback DEMO + hiển thị error rõ ràng.
-    return { leads: DEMO, mode: 'demo-error', error: res.error };
+    // BE lỗi (403/500/network) — hiển thị lỗi rõ ràng, không dùng dữ liệu giả.
+    return { leads: [], mode: 'error', error: res.error };
   }
-  if (res.data.length === 0) {
-    // User chưa có lead nào thực sự — empty state đúng, không show DEMO.
-    return { leads: [], mode: 'empty' };
-  }
-  return { leads: res.data.map(toCardData), mode: 'live' };
+  return { leads: res.data.map(toCardData), mode: 'ok' };
 }
 
 export default async function LeadsListPage(props: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; page?: string }>;
 }) {
   const sp = await props.searchParams;
   const state = await getLeads();
   const allLeads = state.leads;
-  const isDemo = state.mode === 'demo-error';
-  const errorMsg = state.mode === 'demo-error' ? state.error : null;
+  const errorMsg = state.mode === 'error' ? state.error : null;
 
   const counts: Record<LeadStatus, number> = {
     new: allLeads.filter((l) => l.status === 'new').length,
@@ -134,6 +58,17 @@ export default async function LeadsListPage(props: {
 
   const filtered = sp.status ? allLeads.filter((l) => l.status === sp.status) : allLeads;
   const newCount = counts.new;
+
+  const currentPage = parsePage(sp.page);
+  const totalPages = pageCount(filtered.length, PAGE_SIZE);
+  const pageItems = paginate(filtered, currentPage, PAGE_SIZE);
+
+  function pageHref(page: number) {
+    return buildPageHref('/host/leads', {
+      status: sp.status,
+      page: page > 1 ? String(page) : undefined,
+    });
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
@@ -147,10 +82,10 @@ export default async function LeadsListPage(props: {
         description="Khách gửi qua form liên hệ. Phản hồi nhanh < 30ph để giữ Trust Score và lên Top tìm kiếm."
       />
 
-      {isDemo && (
+      {errorMsg && (
         <div className="mb-4 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-900 ring-1 ring-rose-200">
           <Lightbulb className="mr-2 inline h-4 w-4" />
-          Không tải được lead từ BE ({errorMsg}). Hiển thị dữ liệu demo tạm thời.
+          Không tải được yêu cầu từ BE: {errorMsg}
         </div>
       )}
 
@@ -179,11 +114,20 @@ export default async function LeadsListPage(props: {
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {filtered.map((lead) => (
-            <LeadCard key={lead.id} lead={lead} />
-          ))}
-        </div>
+        <>
+          <div className="space-y-3">
+            {pageItems.map((lead) => (
+              <LeadCard key={lead.id} lead={lead} />
+            ))}
+          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filtered.length}
+            pageSize={PAGE_SIZE}
+            buildHref={pageHref}
+          />
+        </>
       )}
 
       {/* Tip */}

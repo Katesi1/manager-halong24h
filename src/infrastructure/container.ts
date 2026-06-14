@@ -176,15 +176,16 @@ export function adminUserRepository(): AdminUserRepository {
 let subscriptionSingleton: SubscriptionRepository | null = null;
 export function subscriptionRepository(): SubscriptionRepository {
   // Spec §10 — `/admin/subscriptions/*` + `/subscriptions/me` live.
-  // Default = mock vì BE identify theo userId, port hiện dùng subscriptionId
-  // (giả định 1-1). Khi verify end-to-end OK, đổi default sang 'api'.
-  if (modeFor('NEXT_PUBLIC_DATA_MODE_SUBSCRIPTIONS', 'mock') === 'api') {
-    return new ApiSubscriptionRepository();
+  // Default = api. Response là user-level (§A4), mapper trong
+  // ApiSubscriptionRepository khớp shape thật + treat Subscription.id === userId.
+  // Override sang mock bằng env `NEXT_PUBLIC_DATA_MODE_SUBSCRIPTIONS=mock`.
+  if (modeFor('NEXT_PUBLIC_DATA_MODE_SUBSCRIPTIONS', 'api') === 'mock') {
+    if (!subscriptionSingleton) {
+      subscriptionSingleton = new MockSubscriptionRepository();
+    }
+    return subscriptionSingleton;
   }
-  if (!subscriptionSingleton) {
-    subscriptionSingleton = new MockSubscriptionRepository();
-  }
-  return subscriptionSingleton;
+  return new ApiSubscriptionRepository();
 }
 
 let reviewSingleton: ReviewRepository | null = null;

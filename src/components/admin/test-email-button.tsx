@@ -10,9 +10,14 @@ interface Props {
   template: string;
   /** Pre-fill từ current admin email (lấy ở server) */
   defaultTo?: string;
+  /**
+   * Trạng thái SMTP từ BE (spec §16). `false` → chặn gửi (sẽ thất bại).
+   * `undefined` → không xác định (BE lỗi/chưa expose) → vẫn cho gửi.
+   */
+  smtpEnabled?: boolean;
 }
 
-export function TestEmailButton({ template, defaultTo }: Props) {
+export function TestEmailButton({ template, defaultTo, smtpEnabled }: Props) {
   const [open, setOpen] = useState(false);
   const [to, setTo] = useState(defaultTo ?? '');
   const [pending, startTransition] = useTransition();
@@ -43,10 +48,21 @@ export function TestEmailButton({ template, defaultTo }: Props) {
     });
   }
 
+  const smtpOff = smtpEnabled === false;
+
   if (!open) {
     return (
-      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setOpen(true)}
+        disabled={smtpOff}
+        title={smtpOff ? 'SMTP chưa được cấu hình ở máy chủ' : undefined}
+      >
         📧 Gửi test cho tôi
+        {smtpOff && (
+          <span className="ml-1 text-[10px] opacity-60">(SMTP tắt)</span>
+        )}
       </Button>
     );
   }
@@ -74,8 +90,8 @@ export function TestEmailButton({ template, defaultTo }: Props) {
         disabled={pending}
       />
       <p className="mt-1 text-[11px] text-ink-500">
-        BE chưa wire endpoint. Hiện tại chỉ log ra console + giả lập gửi để
-        verify template không bị lỗi rendering.
+        Gửi một email mẫu tới địa chỉ trên để kiểm tra nội dung và bố cục hiển
+        thị có đúng không.
       </p>
 
       <div className="mt-3 flex gap-2">

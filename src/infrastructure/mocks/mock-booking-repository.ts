@@ -141,9 +141,11 @@ export class MockBookingRepository implements BookingRepository {
   async markPaid(id: string, amount?: number): Promise<Booking> {
     const b = store.get(id);
     if (!b) throw new NotFoundError('Không tìm thấy booking');
-    const receivedThisTime = amount ?? b.totalPrice - b.deposit;
-    const newDeposit = vnd(Math.min(b.totalPrice, b.deposit + receivedThisTime));
-    const fullyPaid = newDeposit >= b.totalPrice;
+    const total = b.totalPrice ?? 0;
+    const paid = b.deposit ?? 0;
+    const receivedThisTime = amount ?? total - paid;
+    const newDeposit = vnd(Math.min(total, paid + receivedThisTime));
+    const fullyPaid = newDeposit >= total;
     const updated: Booking = {
       ...b,
       // Partial: vẫn confirmed, chỉ cộng dồn deposit.

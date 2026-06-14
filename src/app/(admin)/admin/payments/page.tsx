@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { CreditCard, Search, Wallet } from 'lucide-react';
+import { Search, Wallet } from 'lucide-react';
 
 import {
   countOverdueSubscriptionsAction,
@@ -14,11 +14,11 @@ import { PageHeader, StatCard } from '@/components/host/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Pagination } from '@/components/ui/pagination';
 import {
-  PLAN_LABEL,
   type Subscription,
   type SubscriptionFilters,
   type SubscriptionStatus,
 } from '@/core/entities/subscription';
+import { planLabel } from '@/core/entities/billing-plan';
 import { displayName, formatVND } from '@/lib/format';
 
 function avatarColor(seed: string): string {
@@ -157,15 +157,15 @@ export default async function AdminPaymentsPage(props: {
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       <PageHeader
         eyebrow="Tài chính"
-        title="Subscription chủ nhà"
-        description="Doanh thu = phí gói cước chủ nhà trả theo số phòng/tháng. Khách chuyển khoản trực tiếp cho chủ nhà qua STK đã xác minh KYC."
+        title="Gói cước chủ nhà"
+        description="Trạng thái gói cước của từng chủ nhà (phí theo số phòng/kỳ). Đây là nguồn doanh thu duy nhất — khách thuê chuyển khoản trực tiếp cho chủ nhà, không qua hệ thống. Khi chủ nhà chuyển khoản phí, dùng nút bên dưới để đối soát rồi 'Ghi nhận thu' để gia hạn gói."
         actions={
           <div className="flex items-center gap-2">
             <Link
               href="/admin/payments/sessions"
               className="rounded-lg bg-amber-100 px-3.5 py-2 text-sm font-medium text-amber-900 ring-1 ring-amber-200 hover:bg-amber-200"
             >
-              💸 Đối soát thủ công
+              💸 Đối soát chuyển khoản
             </Link>
             <PaymentsExport />
           </div>
@@ -253,9 +253,6 @@ export default async function AdminPaymentsPage(props: {
               <thead>
                 <tr className="border-b border-ink-200 bg-cream-50">
                   <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-ink-500">
-                    Kỳ
-                  </th>
-                  <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-ink-500">
                     Chủ nhà
                   </th>
                   <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-ink-500">
@@ -265,10 +262,10 @@ export default async function AdminPaymentsPage(props: {
                     Phòng
                   </th>
                   <th className="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-ink-500">
-                    Số tiền
+                    Phí / kỳ
                   </th>
                   <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-ink-500">
-                    Hết hạn
+                    Charge tiếp theo
                   </th>
                   <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-ink-500">
                     Trạng thái
@@ -281,12 +278,9 @@ export default async function AdminPaymentsPage(props: {
               <tbody className="divide-y divide-ink-100">
                 {paginated.map((s) => (
                   <tr key={s.id} className="transition-colors hover:bg-cream-50">
-                    <td className="px-5 py-4 text-xs font-mono text-ink-500">
-                      {s.startAt.slice(0, 7)}
-                    </td>
                     <td className="px-5 py-4">
                       {(() => {
-                        const name = displayName(s.ownerName);
+                        const name = displayName(s.ownerName, s.ownerEmail);
                         const initial = name.charAt(0).toUpperCase() || '?';
                         const color = avatarColor(s.ownerId || name);
                         return (
@@ -303,8 +297,8 @@ export default async function AdminPaymentsPage(props: {
                               >
                                 {name}
                               </Link>
-                              <p className="text-[11px] font-mono text-ink-400 truncate">
-                                {s.ownerId.slice(0, 12)}…
+                              <p className="text-[11px] text-ink-400 truncate">
+                                {s.ownerEmail || `${s.ownerId.slice(0, 12)}…`}
                               </p>
                             </div>
                           </div>
@@ -313,19 +307,28 @@ export default async function AdminPaymentsPage(props: {
                     </td>
                     <td className="px-5 py-4">
                       <Badge variant={PLAN_VARIANT[s.plan] ?? 'default'}>
-                        {PLAN_LABEL[s.plan]}
+                        {s.planId ? planLabel(s.planId) : '—'}
                       </Badge>
+                      <p className="mt-1 text-[11px] text-ink-400">
+                        {s.cycle === 'yearly' ? 'Theo năm' : 'Theo tháng'}
+                      </p>
                     </td>
                     <td className="px-5 py-4 text-right font-medium text-ink-700">
                       {s.roomCount}
                     </td>
                     <td className="px-5 py-4 text-right">
-                      <span className="font-mono text-sm font-bold tabular-nums text-emerald-700">
-                        {formatVND(s.amount)}
-                      </span>
+                      {s.amount > 0 ? (
+                        <span className="font-mono text-sm font-bold tabular-nums text-emerald-700">
+                          {formatVND(s.amount)}
+                        </span>
+                      ) : (
+                        <span className="text-xs font-medium text-ink-400">
+                          Miễn phí
+                        </span>
+                      )}
                     </td>
                     <td className="px-5 py-4 text-xs text-ink-500">
-                      <FormattedDate iso={s.expireAt} />
+                      {s.expireAt ? <FormattedDate iso={s.expireAt} /> : '—'}
                     </td>
                     <td className="px-5 py-4">
                       <Badge variant={STATUS_VARIANT[s.status]}>

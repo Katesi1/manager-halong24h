@@ -4,17 +4,17 @@ import {
   Banknote,
   CheckCircle2,
   Clock,
-  Copy,
   Inbox,
   Search,
-  TrendingUp,
   Wallet,
 } from 'lucide-react';
 
 import { listPaymentSessionsAction } from '@/app/actions/payment-sessions';
+import { CopyableCode } from '@/components/admin/copyable-code';
 import { MarkSessionPaidButton } from '@/components/admin/mark-session-paid-button';
 import { PageHeader, StatCard } from '@/components/host/page-header';
 import { Badge } from '@/components/ui/badge';
+import { Pagination } from '@/components/ui/pagination';
 import { FormattedDate } from '@/components/common/formatted-date';
 import {
   PAYMENT_SESSION_STATUS_LABEL,
@@ -26,6 +26,8 @@ import {
 import { displayName, formatVND } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Duyệt gói cước đã mua' };
+
+const PAGE_SIZE = 10;
 
 const STATUS_VARIANT: Record<
   PaymentSessionStatus,
@@ -80,7 +82,7 @@ function avatarColor(seed: string): string {
 }
 
 export default async function PaymentSessionsPage(props: {
-  searchParams: Promise<{ status?: string; q?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; page?: string }>;
 }) {
   const sp = await props.searchParams;
   // Default: pending. Khi user click "Tất cả" → URL có `?status=all` → undefined → BE trả tất cả.
@@ -115,9 +117,27 @@ export default async function PaymentSessionsPage(props: {
       ? sessions.filter((s) => isPaymentSessionActionable(s, now))
       : sessions;
 
+  // Phân trang client-side trên tập đã lọc (BE fetch tối đa limit=100).
+  const currentPage = Math.max(1, parseInt(sp.page ?? '1', 10) || 1);
+  const totalPages = Math.ceil(visibleSessions.length / PAGE_SIZE);
+  const pageSessions = visibleSessions.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
+
+  function pageHref(page: number) {
+    return buildHref('/admin/payments/sessions', {
+      status: sp.status,
+      q: sp.q,
+      page: page > 1 ? String(page) : undefined,
+    });
+  }
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       <PageHeader
+        backHref="/admin/payments"
+        backLabel="Quay lại Subscription"
         eyebrow="Tài chính"
         title="Duyệt gói cước chủ nhà mua"
         description="Khi chủ nhà chuyển khoản phí gói cước, mở app banking ACB tìm giao dịch khớp nội dung CK rồi xác nhận đã nhận tiền để kích hoạt subscription."
@@ -180,7 +200,8 @@ export default async function PaymentSessionsPage(props: {
               <code className="rounded bg-white/60 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-amber-900 ring-1 ring-amber-200">
                 HALONG24H &lt;sessionId&gt;
               </code>{' '}
-              · Click "Đã nhận tiền" sau khi đối soát app banking.
+              · Tìm giao dịch khớp trong app banking rồi bấm "Đã nhận tiền" để
+              kích hoạt gói — không cần nhập mã giao dịch.
             </p>
           </div>
         </div>
@@ -243,6 +264,7 @@ export default async function PaymentSessionsPage(props: {
           </p>
         </div>
       ) : (
+        <>
         <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-ink-200/60 shadow-card">
           <table className="w-full min-w-[900px] text-sm">
             <thead>
@@ -271,7 +293,7 @@ export default async function PaymentSessionsPage(props: {
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-100">
-              {visibleSessions.map((s) => {
+              {pageSessions.map((s) => {
                 const name = displayName(s.userName, s.userEmail);
                 const initial = name.charAt(0).toUpperCase() || '?';
                 const color = avatarColor(s.userId || s.userEmail || s.id);
@@ -299,20 +321,13 @@ export default async function PaymentSessionsPage(props: {
                       </div>
                     </td>
                     <td className="px-5 py-4">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="inline-flex w-fit items-center gap-1 rounded-md bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-700 ring-1 ring-violet-200">
-                          {s.planId}
-                        </span>
-                        <span className="text-[11px] text-ink-500">
-                          {s.rooms} phòng · {s.cycle === 'monthly' ? 'tháng' : 'năm'}
-                        </span>
-                      </div>
+                      <p className="font-medium text-ink-900">{s.planLabel}</p>
+                      <p className="text-[11px] text-ink-500">
+                        {s.cycle === 'yearly' ? 'Theo năm' : 'Theo tháng'}
+                      </p>
                     </td>
                     <td className="px-5 py-4">
-                      <div className="inline-flex items-center gap-1.5 rounded-md bg-cream-100 px-2 py-1 font-mono text-[11px] text-ink-700 ring-1 ring-ink-200/60">
-                        <Copy className="h-3 w-3 text-ink-400" />
-                        {s.ckContent}
-                      </div>
+                      <CopyableCode value={s.ckContent} />
                     </td>
                     <td className="px-5 py-4 text-right">
                       <span className="font-mono text-base font-bold tabular-nums text-emerald-700">
@@ -330,16 +345,6 @@ export default async function PaymentSessionsPage(props: {
                           ? PAYMENT_SESSION_STATUS_LABEL.expired
                           : PAYMENT_SESSION_STATUS_LABEL[s.status]}
                       </Badge>
-                      {expired && s.status === 'pending' && (
-                        <p className="mt-1 text-[10px] text-ink-400">
-                          Quá hạn chuyển khoản 24h
-                        </p>
-                      )}
-                      {s.paidAt && (
-                        <p className="mt-1 text-[10px] text-emerald-600">
-                          <FormattedDate iso={s.paidAt} />
-                        </p>
-                      )}
                     </td>
                     <td className="px-5 py-4 text-right">
                       {isPaymentSessionActionable(s, now) ? (
@@ -355,13 +360,10 @@ export default async function PaymentSessionsPage(props: {
                         >
                           Đã hết hạn
                         </span>
-                      ) : s.reference ? (
-                        <span
-                          className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 font-mono text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200"
-                          title="Mã giao dịch banking"
-                        >
-                          <TrendingUp className="h-3 w-3" />
-                          {s.reference}
+                      ) : s.status === 'paid' ? (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Đã nhận tiền
                         </span>
                       ) : (
                         <span className="text-xs text-ink-400">—</span>
@@ -373,6 +375,15 @@ export default async function PaymentSessionsPage(props: {
             </tbody>
           </table>
         </div>
+
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={visibleSessions.length}
+          pageSize={PAGE_SIZE}
+          buildHref={pageHref}
+        />
+        </>
       )}
     </div>
   );

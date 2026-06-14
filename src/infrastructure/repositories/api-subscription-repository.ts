@@ -1,89 +1,130 @@
 import 'server-only';
 
-import type {
-  FreezeInput,
-  MarkPaidInput,
-  Subscription,
-  SubscriptionCycle,
-  SubscriptionFilters,
-  SubscriptionPlan,
-  SubscriptionStatus,
+import {
+  calcSubscriptionAmount,
+  planForRoomCount,
+  type FreezeInput,
+  type MarkPaidInput,
+  type Subscription,
+  type SubscriptionCycle,
+  type SubscriptionFilters,
+  type SubscriptionPlan,
+  type SubscriptionStatus,
 } from '@/core/entities/subscription';
 import type { SubscriptionRepository } from '@/application/ports/subscription-repository';
 
 import { apiClient } from '../http/api-client';
 
 /**
- * Spec §10 — BE response shape (best effort, fields BE expose).
+ * Spec §10 — BE response shape.
  *
- * Spec v1.3 §22 A5 confirm Option A — 1 user = 1 active subscription, identify
- * qua userId. Port hiện vẫn dùng tên `subscriptionId` (legacy) — repo này treat
- * giá trị đó NHƯ LÀ ownerId. UI gọi action PHẢI truyền userId/ownerId.
+ * `GET /admin/subscriptions` trả **user-level** field (spec §22 A4 CONFIRMED),
+ * KHÔNG phải Subscription row: `id` = userId, `name`/`email`/`phone`,
+ * `subscriptionStatus`, `subscriptionPlanId` (`rooms_5`), `subscriptionCycle`,
+ * `subscriptionPriceOverride`, `nextChargeAt`, `trialEndsAt`, frozen fields.
+ *
+ * BE 2026-06-13 bổ sung `rooms` (số phòng tính phí, không suy từ planId nữa →
+ * `enterprise` hết sai) + `amount` (VND đã gồm VAT, cùng công thức
+ * `POST /payments/quote`; `null` khi user chưa có plan). FE đọc thẳng 2 field
+ * này, KHÔNG tự tính tiền nữa — chỉ fallback công thức khi BE trả thiếu.
+ *
+ * `/admin/users/:id/subscription`, `.../mark-paid`, `/freeze`, `/unfreeze`,
+ * `/subscriptions/me` có thể trả cùng shape hoặc shape cũ (legacy key) → mapper
+ * này đọc cả hai họ field với fallback để không vỡ ở bất kỳ endpoint nào.
+ *
+ * Spec §22 A5 confirm Option A — 1 user = 1 active subscription, identify qua
+ * userId. Repo treat `Subscription.id` === userId; UI action truyền userId.
  */
 interface SpecSubscription {
   id: string;
-  ownerId: string;
+  // ── user-level shape (GET /admin/subscriptions — §A4) ───────────────────
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  isActive?: boolean;
+  subscriptionStatus?: SubscriptionStatus;
+  subscriptionPlanId?: string;
+  subscriptionCycle?: SubscriptionCycle;
+  subscriptionProvider?: Subscription['provider'];
+  subscriptionPriceOverride?: number | null;
+  subscriptionFrozenAt?: string | null;
+  subscriptionFrozenReason?: string | null;
+  // ── legacy / snapshot shape (fallback) ──────────────────────────────────
+  ownerId?: string;
   ownerName?: string;
+  ownerEmail?: string | null;
   planId?: string;
   plan?: SubscriptionPlan;
   cycle?: SubscriptionCycle;
   roomCount?: number;
   rooms?: number;
-  amount?: number;
+  amount?: number | null;
   totalAmount?: number;
-  status: SubscriptionStatus;
-  startsAt?: string;
-  startAt?: string;
-  endsAt?: string;
-  nextChargeAt?: string;
-  expireAt?: string;
-  trialEndsAt?: string | null;
+  status?: SubscriptionStatus;
   priceOverride?: number | null;
   provider?: Subscription['provider'];
   frozenAt?: string | null;
   frozenReason?: string | null;
+  // ── chung ───────────────────────────────────────────────────────────────
+  nextChargeAt?: string | null;
+  trialEndsAt?: string | null;
   paidAt?: string | null;
-  invoicedAt?: string;
-  note?: string | null;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-function mapPlan(s: SpecSubscription): SubscriptionPlan {
-  if (s.plan) return s.plan;
-  const id = s.planId ?? '';
-  if (id.startsWith('rooms_1')) return 'free';
-  if (id.startsWith('rooms_5')) return 'basic';
-  if (id.startsWith('rooms_10')) return 'standard';
-  return 'pro';
+/** `rooms_5` → 5. `enterprise` / không khớp → 0. */
+function roomsFromPlanId(planId: string): number {
+  const m = /^rooms_(\d+)/.exec(planId);
+  return m ? parseInt(m[1]!, 10) : 0;
 }
 
 function mapSubscription(s: SpecSubscription): Subscription {
-  // Spec v1.3 §22 A4 confirm — BE trả user-level fields, không có startsAt/endsAt.
-  // Dùng nextChargeAt làm expire; fallback updatedAt chỉ cho UI display khỏi crash.
-  const expire = s.nextChargeAt ?? s.updatedAt;
+  const planId = s.subscriptionPlanId ?? s.planId ?? '';
+  const roomCount = s.roomCount ?? s.rooms ?? roomsFromPlanId(planId);
+  const plan = s.plan ?? planForRoomCount(roomCount);
+  const cycle = s.subscriptionCycle ?? s.cycle ?? 'monthly';
+  const priceOverride = s.subscriptionPriceOverride ?? s.priceOverride ?? null;
+  // Số tiền/kỳ: ưu tiên BE trả thẳng; nếu không, dùng priceOverride; cuối cùng
+  // suy ra từ công thức plan × số phòng (priceOverride=0 = miễn phí, phải tôn trọng).
+  const amount =
+    s.amount ??
+    s.totalAmount ??
+    (priceOverride != null
+      ? priceOverride
+      : calcSubscriptionAmount(plan, roomCount, cycle));
+  const status = s.subscriptionStatus ?? s.status ?? 'none';
+  const nextChargeAt = s.nextChargeAt ?? null;
+  const trialEndsAt = s.trialEndsAt ?? null;
+  const createdAt = s.createdAt ?? '';
+  const expireAt = nextChargeAt ?? trialEndsAt ?? s.updatedAt ?? createdAt;
+  const frozenReason = s.subscriptionFrozenReason ?? s.frozenReason ?? null;
+  // §A4: list response không có `ownerId` riêng — `id` chính là userId.
+  const ownerId = s.ownerId ?? s.id;
   return {
     id: s.id,
-    ownerId: s.ownerId,
-    ownerName: s.ownerName ?? '',
-    plan: mapPlan(s),
-    cycle: s.cycle ?? 'monthly',
-    roomCount: s.roomCount ?? s.rooms ?? 0,
-    amount: s.amount ?? s.totalAmount ?? 0,
-    status: s.status,
-    startAt: s.createdAt,
-    expireAt: expire,
-    nextChargeAt: s.nextChargeAt ?? null,
-    trialEndsAt: s.trialEndsAt ?? null,
-    priceOverride: s.priceOverride ?? null,
-    provider: s.provider ?? null,
-    frozenAt: s.frozenAt ?? null,
-    frozenReason: s.frozenReason ?? null,
+    ownerId,
+    ownerName: s.ownerName ?? s.name ?? '',
+    ownerEmail: s.ownerEmail ?? s.email ?? null,
+    planId,
+    plan,
+    cycle,
+    roomCount,
+    amount,
+    status,
+    startAt: createdAt,
+    expireAt,
+    nextChargeAt,
+    trialEndsAt,
+    priceOverride,
+    provider: s.subscriptionProvider ?? s.provider ?? null,
+    frozenAt: s.subscriptionFrozenAt ?? s.frozenAt ?? null,
+    frozenReason,
     paidAt: s.paidAt ?? null,
-    invoicedAt: s.createdAt,
-    note: s.frozenReason ?? null,
-    createdAt: s.createdAt,
-    updatedAt: s.updatedAt,
+    invoicedAt: createdAt,
+    note: frozenReason,
+    createdAt,
+    updatedAt: s.updatedAt ?? createdAt,
   };
 }
 
@@ -144,19 +185,24 @@ export class ApiSubscriptionRepository implements SubscriptionRepository {
   }
 
   async countOverdue(): Promise<number> {
-    const data = await apiClient.get<number | { count: number }>(
+    // BE 2026-06-13: `{ count }` (sau khi apiClient unwrap envelope `data`).
+    const data = await apiClient.get<number | { count?: number }>(
       '/admin/subscriptions/count-overdue',
       { cache: 'no-store' },
     );
-    return typeof data === 'number' ? data : data.count;
+    return typeof data === 'number' ? data : (data.count ?? 0);
   }
 
   async sumPaidBetween(from: string, to: string): Promise<number> {
-    const data = await apiClient.get<number | { total: number }>(
-      '/admin/subscriptions/sum-paid',
-      { query: { from, to }, cache: 'no-store' },
-    );
-    return typeof data === 'number' ? data : data.total;
+    // BE 2026-06-13: `{ totalPaid, count, from, to }` — KHÔNG phải `total`.
+    const data = await apiClient.get<
+      number | { totalPaid?: number; total?: number }
+    >('/admin/subscriptions/sum-paid', {
+      query: { from, to },
+      cache: 'no-store',
+    });
+    if (typeof data === 'number') return data;
+    return data.totalPaid ?? data.total ?? 0;
   }
 
   async markPaid(input: MarkPaidInput): Promise<Subscription> {

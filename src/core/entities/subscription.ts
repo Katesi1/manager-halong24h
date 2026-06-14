@@ -51,6 +51,14 @@ export interface Subscription {
   id: string;
   ownerId: string;
   ownerName: string;
+  /** Email chủ nhà — hiển thị cạnh tên cho admin dễ nhận diện (BE trả ở list). */
+  ownerEmail?: string | null;
+  /**
+   * Id gói cước thật từ danh mục (`rooms_5`, `enterprise`, ...) do admin quản lý
+   * ở `/admin/pricing`. Đây là nguồn chuẩn để tra tên + giá gói. `plan` (bucket
+   * free/basic/...) chỉ là phân loại nội bộ phía admin.
+   */
+  planId: string;
   plan: SubscriptionPlan;
   cycle: SubscriptionCycle;
   /** Số phòng tính phí trong kỳ */

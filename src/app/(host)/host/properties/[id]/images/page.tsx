@@ -16,6 +16,8 @@ export default async function PropertyImagesPage(props: {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
       <PageHeader
+        backHref={`/host/properties/${property.id}`}
+        backLabel="Quay lại cơ sở"
         title="Quản lý ảnh"
         description={`Upload, đặt bìa, sắp xếp ảnh cho "${property.name}"`}
         breadcrumbs={[

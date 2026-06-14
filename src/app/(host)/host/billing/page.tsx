@@ -2,56 +2,37 @@ import type { Metadata } from 'next';
 
 import { getCurrentProfile } from '@/app/actions/auth';
 import { getMySubscriptionAction } from '@/app/actions/subscriptions';
+import { listBillingPlansAction } from '@/app/actions/billing-plans';
 import { listPropertiesAction } from '@/app/actions/properties';
 import { PageHeader } from '@/components/host/page-header';
 import { TierSelector } from '@/components/host/tier-selector';
+import { planLabel, type BillingPlan } from '@/core/entities/billing-plan';
 import { formatVND } from '@/core/value-objects/vnd';
 import { formatDate } from '@/lib/format';
-import {
-  PLAN_LABEL,
-  PRICE_PER_ROOM,
-  planForRoomCount,
-  type SubscriptionPlan,
-} from '@/core/entities/subscription';
 
 export const metadata: Metadata = { title: 'Gói cước' };
 
-const ROOM_RANGE: Record<SubscriptionPlan, string> = {
-  free: '1–3 phòng',
-  basic: '4–10 phòng',
-  standard: '11–30 phòng',
-  pro: '31+ phòng',
-};
-
-interface Invoice {
-  id: string;
-  period: string;
-  amount: number;
-  status: 'paid' | 'pending' | 'overdue';
-  paidAt: string | null;
-  roomsCount: number;
-}
-
 export default async function HostBillingPage() {
-  const [profile, propertiesResult, subResult] = await Promise.all([
+  const [profile, propertiesResult, subResult, plansResult] = await Promise.all([
     getCurrentProfile(),
     listPropertiesAction({ includeInactive: true }),
     getMySubscriptionAction(),
+    listBillingPlansAction(),
   ]);
 
   if (!profile) return null;
 
   const roomCount = propertiesResult.ok ? propertiesResult.data.length : 0;
   const sub = subResult.ok ? subResult.data : null;
+  const plans: BillingPlan[] = plansResult.ok ? plansResult.data : [];
+  const plansError = !plansResult.ok ? plansResult.error : null;
 
-  const currentPlan: SubscriptionPlan = sub?.plan ?? planForRoomCount(roomCount);
-  const monthlyFee = roomCount * PRICE_PER_ROOM[currentPlan];
-
-  const invoices: Invoice[] = [
-    { id: 'inv-1', period: '04/2026', amount: 350_000, status: 'paid', paidAt: '2026-04-05', roomsCount: roomCount },
-    { id: 'inv-2', period: '03/2026', amount: 350_000, status: 'paid', paidAt: '2026-03-05', roomsCount: roomCount },
-    { id: 'inv-3', period: '02/2026', amount: 250_000, status: 'paid', paidAt: '2026-02-08', roomsCount: Math.max(0, roomCount - 2) },
-  ];
+  const currentPlanId = sub?.planId || null;
+  // Tên gói lấy từ danh mục admin (theo planId). Không có sub → gói Miễn phí.
+  const currentLabel = currentPlanId ? planLabel(currentPlanId) : 'Miễn phí';
+  // Chi phí kỳ này: số tiền thật BE trả. Không có sub / 0 → Miễn phí.
+  const periodCost =
+    sub && sub.amount > 0 ? formatVND(sub.amount) : 'Miễn phí';
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
@@ -69,10 +50,10 @@ export default async function HostBillingPage() {
                 Gói hiện tại
               </p>
               <h2 className="mt-2 font-display text-4xl font-bold text-white">
-                {PLAN_LABEL[currentPlan]}
+                {currentLabel}
               </h2>
               <p className="mt-2 text-sm text-white/70">
-                {roomCount} phòng hoạt động · {ROOM_RANGE[currentPlan]}
+                {roomCount} phòng đang hoạt động
               </p>
               {sub && (
                 <p className="mt-1 text-xs text-white/50">
@@ -87,14 +68,14 @@ export default async function HostBillingPage() {
             </div>
             <div className="text-right">
               <p className="text-[11px] uppercase tracking-wider text-white/50">
-                Chi phí tháng này
+                Chi phí kỳ này
               </p>
               <p className="mt-1 font-display text-4xl font-bold text-white">
-                {monthlyFee === 0 ? 'Miễn phí' : formatVND(monthlyFee)}
+                {periodCost}
               </p>
-              {monthlyFee > 0 && (
+              {sub && (
                 <p className="mt-1 text-xs text-white/60">
-                  {formatVND(PRICE_PER_ROOM[currentPlan])} / phòng / tháng
+                  {sub.cycle === 'yearly' ? 'Thanh toán theo năm' : 'Thanh toán theo tháng'}
                 </p>
               )}
             </div>
@@ -103,11 +84,9 @@ export default async function HostBillingPage() {
         <div className="grid grid-cols-3 divide-x divide-ink-200 bg-white">
           <QuickStat label="Số phòng" value={String(roomCount)} />
           <QuickStat
-            label="Đơn giá"
+            label="Kỳ thanh toán"
             value={
-              PRICE_PER_ROOM[currentPlan] > 0
-                ? formatVND(PRICE_PER_ROOM[currentPlan])
-                : '0 ₫'
+              sub ? (sub.cycle === 'yearly' ? 'Theo năm' : 'Theo tháng') : '—'
             }
           />
           <QuickStat
@@ -117,9 +96,9 @@ export default async function HostBillingPage() {
                 ? 'Quá hạn'
                 : sub?.status === 'frozen'
                   ? 'Tạm khoá'
-                  : monthlyFee === 0
-                    ? 'Miễn phí'
-                    : 'Hoạt động'
+                  : sub && sub.amount > 0
+                    ? 'Hoạt động'
+                    : 'Miễn phí'
             }
             valueClass={
               sub?.status === 'past_due'
@@ -132,15 +111,26 @@ export default async function HostBillingPage() {
         </div>
       </section>
 
-      {/* ── Tier selector ── */}
+      {/* ── Plan catalog ── */}
       <section className="mt-8">
         <h2 className="font-display text-xl font-semibold tracking-tight text-navy-900">
           Chọn gói cước
         </h2>
-        <p className="mt-1 text-xs text-ink-500 mb-5">
-          Click vào gói bạn muốn chuyển. Hệ thống sẽ hướng dẫn các bước tiếp theo.
+        <p className="mt-1 mb-5 text-xs text-ink-500">
+          Click vào gói bạn muốn đăng ký. Hệ thống sẽ hướng dẫn các bước tiếp theo.
         </p>
-        <TierSelector currentPlan={currentPlan} roomCount={roomCount} />
+
+        {plansError ? (
+          <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200">
+            Không tải được danh sách gói: {plansError}
+          </div>
+        ) : plans.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-ink-200 bg-white p-12 text-center text-sm text-ink-500">
+            Chưa có gói cước nào.
+          </div>
+        ) : (
+          <TierSelector plans={plans} currentPlanId={currentPlanId} />
+        )}
       </section>
 
       {/* ── How it works ── */}
@@ -183,49 +173,10 @@ export default async function HostBillingPage() {
         <h2 className="font-display text-xl font-semibold tracking-tight text-navy-900">
           Lịch sử hoá đơn
         </h2>
-        {invoices.length === 0 ? (
-          <div className="mt-4 rounded-2xl border border-dashed border-ink-200 bg-white p-12 text-center text-sm text-ink-500">
-            Chưa có hoá đơn nào
-          </div>
-        ) : (
-          <div className="mt-4 overflow-x-auto rounded-2xl bg-white ring-1 ring-ink-200/60 shadow-card">
-            <table className="w-full min-w-[560px] text-sm">
-              <thead className="border-b border-ink-200 text-left text-[11px] font-semibold uppercase tracking-wider text-ink-500">
-                <tr>
-                  <th className="px-5 py-3">Kỳ thanh toán</th>
-                  <th className="px-5 py-3">Phòng</th>
-                  <th className="px-5 py-3">Số tiền</th>
-                  <th className="px-5 py-3">Trạng thái</th>
-                  <th className="px-5 py-3">Ngày TT</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ink-100">
-                {invoices.map((inv) => (
-                  <tr
-                    key={inv.id}
-                    className="hover:bg-cream-50 transition-colors"
-                  >
-                    <td className="px-5 py-3.5 font-medium text-ink-900">
-                      {inv.period}
-                    </td>
-                    <td className="px-5 py-3.5 text-ink-700">
-                      {inv.roomsCount} phòng
-                    </td>
-                    <td className="px-5 py-3.5 font-semibold text-navy-900">
-                      {formatVND(inv.amount)}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <InvoiceStatus status={inv.status} />
-                    </td>
-                    <td className="px-5 py-3.5 text-xs text-ink-500">
-                      {inv.paidAt ? formatDate(inv.paidAt) : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <div className="mt-4 rounded-2xl border border-dashed border-ink-200 bg-white p-12 text-center text-sm text-ink-500">
+          Chưa có hoá đơn nào. Lịch sử thanh toán gói cước sẽ hiển thị tại đây khi
+          backend cung cấp dữ liệu.
+        </div>
       </section>
     </div>
   );
@@ -249,19 +200,5 @@ function QuickStat({
         {value}
       </p>
     </div>
-  );
-}
-
-function InvoiceStatus({ status }: { status: 'paid' | 'pending' | 'overdue' }) {
-  const config = {
-    paid: { label: 'Đã thanh toán', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-    pending: { label: 'Chờ thanh toán', cls: 'bg-amber-50 text-amber-700 ring-amber-200' },
-    overdue: { label: 'Quá hạn', cls: 'bg-rose-50 text-rose-700 ring-rose-200' },
-  };
-  const c = config[status];
-  return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ring-1 ${c.cls}`}>
-      {c.label}
-    </span>
   );
 }

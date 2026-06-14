@@ -50,6 +50,8 @@ export default async function AdminDisputeDetailPage(props: {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader
+        backHref="/admin/disputes"
+        backLabel="Quay lại danh sách khiếu nại"
         eyebrow={`${DISPUTE_TYPE_ICON[dispute.type]} ${DISPUTE_TYPE_LABEL[dispute.type]}`}
         title={dispute.subject}
         description={`Khiếu nại ${dispute.id} · Đặt phòng ${dispute.bookingCode} · ${formatDateTime(dispute.createdAt)}`}

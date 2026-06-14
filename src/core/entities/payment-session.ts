@@ -18,6 +18,8 @@ export interface PaymentSession {
   userName: string;
   userEmail: string;
   planId: string;
+  /** Tên gói dễ đọc — BE trả `planLabel` ("Gói 5 phòng"); fallback suy từ planId. */
+  planLabel: string;
   cycle: 'monthly' | 'yearly';
   rooms: number;
   totalAmount: number;
@@ -48,6 +50,15 @@ export interface MarkSessionPaidInput {
   sessionId: string;
   /** Tham chiếu giao dịch ngân hàng. */
   reference?: string;
+}
+
+/** Tên gói dễ đọc từ planId — fallback khi BE không trả `planLabel`. */
+export function paymentSessionPlanLabel(planId: string, rooms: number): string {
+  if (planId === 'enterprise') return 'Doanh nghiệp';
+  const m = /^rooms_(\d+)/.exec(planId);
+  const n = m ? parseInt(m[1]!, 10) : rooms;
+  if (n > 0) return `Gói ${n} phòng`;
+  return planId || 'Gói cước';
 }
 
 export const PAYMENT_SESSION_STATUS_LABEL: Record<

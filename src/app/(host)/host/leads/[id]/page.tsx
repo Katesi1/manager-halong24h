@@ -45,30 +45,6 @@ const STATUS_LABEL: Record<LeadStatus, string> = {
   expired: 'Hết hạn',
 };
 
-const DEMO: Record<string, LeadDetail> = {
-  'demo-l-1': {
-    id: 'demo-l-1',
-    guest_name: 'Lê Văn Đức',
-    guest_phone: '+84 901 234 567',
-    guest_email: 'leduc@example.com',
-    check_in: '2026-05-01',
-    check_out: '2026-05-04',
-    num_guests: 4,
-    message:
-      'Đi gia đình 4 người, có 2 trẻ con. Cần phòng tầng cao, view biển nếu được. Có thể check-in sớm 12h trưa được không ạ?',
-    status: 'new',
-    created_at: new Date(Date.now() - 5 * 60_000).toISOString(),
-    responded_at: null,
-    property_id: 'sample-1',
-    property_name: 'À La Carte Hạ Long Bay',
-    property_slug: 'a-la-carte-ha-long-bay',
-    room_name: '2PN Family Suite',
-    room_id: 'sample-r-2',
-    base_price: 3_200_000,
-    weekend_price: 4_100_000,
-  },
-};
-
 function adaptLeadDetail(lead: Lead): LeadDetail {
   return {
     id: lead.id,
@@ -97,8 +73,7 @@ async function getLead(leadId: string): Promise<LeadDetail | null> {
   if (res.ok && res.data) {
     return adaptLeadDetail(res.data);
   }
-  // BE chưa có lead này HOẶC chưa wire — thử DEMO fallback (giữ UI dev mượt).
-  return DEMO[leadId] ?? null;
+  return null;
 }
 
 function buildCalendar(checkIn: string | null, checkOut: string | null) {

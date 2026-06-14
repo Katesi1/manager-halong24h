@@ -1,10 +1,11 @@
 import 'server-only';
 
-import type {
-  MarkSessionPaidInput,
-  PaymentSession,
-  PaymentSessionFilters,
-  PaymentSessionStatus,
+import {
+  paymentSessionPlanLabel,
+  type MarkSessionPaidInput,
+  type PaymentSession,
+  type PaymentSessionFilters,
+  type PaymentSessionStatus,
 } from '@/core/entities/payment-session';
 import type { PaymentSessionRepository } from '@/application/ports/payment-session-repository';
 
@@ -32,6 +33,7 @@ interface RawSession {
   userEmail?: string | null;
   user?: RawUser | null;
   planId?: string;
+  planLabel?: string | null;
   cycle?: 'monthly' | 'yearly';
   rooms?: number;
   totalAmount?: number;
@@ -50,14 +52,17 @@ interface RawSession {
 }
 
 function mapSession(r: RawSession): PaymentSession {
+  const planId = r.planId ?? '';
+  const rooms = r.rooms ?? 0;
   return {
     id: r.id,
     userId: r.userId ?? r.user?.id ?? '',
     userName: r.userName ?? r.user?.name ?? '',
     userEmail: r.userEmail ?? r.user?.email ?? '',
-    planId: r.planId ?? '',
+    planId,
+    planLabel: r.planLabel ?? paymentSessionPlanLabel(planId, rooms),
     cycle: r.cycle ?? 'monthly',
-    rooms: r.rooms ?? 0,
+    rooms,
     totalAmount: r.totalAmount ?? r.amount ?? 0,
     method: r.method ?? 'bank_transfer',
     status: r.status,

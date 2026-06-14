@@ -6,11 +6,8 @@ import { PageHeader } from '@/components/host/page-header';
 import { Badge } from '@/components/ui/badge';
 
 export const metadata: Metadata = { title: 'Gói cước' };
-import {
-  PLAN_LABEL,
-  PRICE_PER_ROOM,
-  type SubscriptionStatus,
-} from '@/core/entities/subscription';
+import { type SubscriptionStatus } from '@/core/entities/subscription';
+import { planLabel } from '@/core/entities/billing-plan';
 import { blockedReason } from '@/lib/subscription-guard';
 import { formatDate, formatVND } from '@/lib/format';
 
@@ -45,9 +42,11 @@ export default async function HostSubscriptionPage() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
       <PageHeader
+        backHref="/host/settings"
+        backLabel="Quay lại Cài đặt"
         eyebrow="Tài khoản & cài đặt"
         title="Gói cước Halong24h"
-        description="Halong24h thu phí cố định mỗi phòng/tháng. Khách trả tiền trực tiếp cho bạn — chúng tôi không lấy hoa hồng trên booking."
+        description="Halong24h thu phí theo gói cước bạn đăng ký. Khách trả tiền trực tiếp cho bạn — chúng tôi không lấy hoa hồng trên booking."
         breadcrumbs={[
           { label: 'Cài đặt', href: '/host/settings' },
           { label: 'Gói cước' },
@@ -61,8 +60,11 @@ export default async function HostSubscriptionPage() {
             Bạn đang ở gói Miễn phí
           </p>
           <p className="mt-1 text-xs text-ink-600 max-w-md mx-auto">
-            Áp dụng tự động cho 1-3 phòng. Khi thêm phòng thứ 4, hệ thống sẽ tự
-            sinh hoá đơn gói Cơ bản (50.000 ₫/phòng/tháng).
+            Xem các gói cước và đăng ký nâng cấp tại{' '}
+            <Link href="/host/billing" className="font-semibold text-navy-700 hover:underline">
+              trang Gói cước
+            </Link>
+            .
           </p>
         </div>
       ) : (
@@ -78,12 +80,11 @@ export default async function HostSubscriptionPage() {
               <div>
                 <p className="overline muted no-dash text-[10px]">Gói hiện tại</p>
                 <h2 className="mt-1 font-display text-2xl font-semibold text-navy-900">
-                  {PLAN_LABEL[sub.plan]}
+                  {sub.planId ? planLabel(sub.planId) : 'Miễn phí'}
                 </h2>
                 <p className="mt-1 text-xs text-ink-600">
-                  Kỳ {sub.cycle === 'yearly' ? 'năm' : 'tháng'} ·{' '}
-                  {sub.roomCount} phòng · {formatVND(PRICE_PER_ROOM[sub.plan])}
-                  /phòng/tháng
+                  Kỳ {sub.cycle === 'yearly' ? 'năm' : 'tháng'} · {sub.roomCount}{' '}
+                  phòng
                 </p>
               </div>
               <Badge variant={STATUS_VARIANT[sub.status]}>
@@ -142,9 +143,11 @@ export default async function HostSubscriptionPage() {
           </section>
 
           <p className="mt-5 text-xs text-ink-500">
-            Bảng giá: Miễn phí (1-3 phòng: 0 ₫) · Cơ bản (4-10:
-            50.000 ₫/phòng) · Tiêu chuẩn (11-30: 40.000 ₫/phòng) · Chuyên
-            nghiệp (31+: 30.000 ₫/phòng). Trả theo năm giảm 20%.
+            Xem toàn bộ gói cước và bảng giá tại{' '}
+            <Link href="/host/billing" className="font-semibold text-navy-700 hover:underline">
+              trang Gói cước
+            </Link>
+            .
           </p>
         </>
       )}
