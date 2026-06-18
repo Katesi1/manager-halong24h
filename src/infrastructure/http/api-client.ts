@@ -23,6 +23,8 @@ interface RequestOptions {
   body?: unknown;
   /** Locale i18n. */
   locale?: string;
+  /** Override timeout (ms) cho request chậm (vd gửi email qua SMTP). */
+  timeoutMs?: number;
   /** Next.js fetch cache options. */
   cache?: RequestCache;
   /** Next.js revalidate. */
@@ -110,7 +112,7 @@ async function request<T>(
   }
 
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), API_TIMEOUT_MS);
+  const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? API_TIMEOUT_MS);
 
   let res: Response;
   try {

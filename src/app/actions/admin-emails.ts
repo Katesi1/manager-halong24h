@@ -3,6 +3,7 @@
 import { z } from 'zod';
 
 import { requireAdmin } from '@/lib/auth-guard';
+import { EMAIL_TEMPLATE_LABELS } from '@/lib/emails/template-labels';
 
 import { toResult } from './_helpers';
 
@@ -51,12 +52,16 @@ export async function getEmailServiceStatusAction() {
     const templates: EmailTemplate[] = Array.isArray(data.templates)
       ? data.templates
           .filter((t) => !!t?.key)
-          .map((t) => ({
-            key: t.key,
-            label: t.label?.trim() || t.key,
-            description: t.description?.trim() || '',
-            sampleSubject: t.sampleSubject?.trim() || null,
-          }))
+          .map((t) => {
+            // Ưu tiên label BE trả về → nhãn tiếng Việt FE → chính key.
+            const fallback = EMAIL_TEMPLATE_LABELS[t.key];
+            return {
+              key: t.key,
+              label: t.label?.trim() || fallback?.label || t.key,
+              description: t.description?.trim() || fallback?.description || '',
+              sampleSubject: t.sampleSubject?.trim() || null,
+            };
+          })
       : [];
 
     return {
@@ -99,10 +104,13 @@ export async function sendTestEmailAction(input: {
 
     if (mode === 'live') {
       const { apiClient } = await import('@/infrastructure/http/api-client');
-      await apiClient.post<{ sent: boolean }>('/admin/emails/test', {
-        template: parsed.template,
-        to: parsed.to,
-      });
+      // Gửi qua SMTP có thể chậm hơn timeout mặc định (15s) → nới lên 45s
+      // để tránh FE báo "máy chủ phản hồi quá chậm" dù email đã gửi xong.
+      await apiClient.post<{ sent: boolean }>(
+        '/admin/emails/test',
+        { template: parsed.template, to: parsed.to },
+        { timeoutMs: 45_000 },
+      );
     } else {
       console.info('[admin-emails] mock send test', {
         requestedBy: profile.id,
