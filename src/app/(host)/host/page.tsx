@@ -22,6 +22,7 @@ import type { Booking } from '@/core/entities/booking';
 import type { DashboardReport } from '@/core/entities/dashboard';
 import { RoleCode } from '@/core/value-objects/role';
 import { formatVND } from '@/core/value-objects/vnd';
+import { formatBookingTotal } from '@/lib/booking-display';
 import { formatDate, todayISO } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Tổng quan' };
@@ -406,7 +407,7 @@ export default async function HostDashboardPage() {
                     {formatDate(b.checkInAt)}
                   </td>
                   <td className="py-3 pr-4 text-right font-semibold text-emerald-700">
-                    {formatVND(b.totalPrice)}
+                    {formatBookingTotal(b.totalPrice)}
                   </td>
                 </tr>
               ))}

@@ -128,8 +128,8 @@ export function PropertyFilters({
                   'rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ' +
                   (active
                     ? 'bg-white/20 text-white'
-                    : s.key === 'pending' && s.count > 0
-                      ? 'bg-gold-500 text-white'
+                    : s.key === 'suspended' && s.count > 0
+                      ? 'bg-rose-500 text-white'
                       : 'bg-cream-200 text-ink-600')
                 }
               >

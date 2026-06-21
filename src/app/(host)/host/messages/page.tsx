@@ -6,12 +6,27 @@ import { PageHeader } from '@/components/host/page-header';
 export const metadata: Metadata = { title: 'Tin nhắn' };
 import { FilterChips } from '@/components/ui/filter-chips';
 import { GradientAvatar } from '@/components/ui/gradient-avatar';
+import { Pagination } from '@/components/ui/pagination';
 import { relativeTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { buildPageHref, pageCount, paginate, parsePage } from '@/lib/pagination';
 import { listConversationsAction } from '@/app/actions/conversations';
 import { getCurrentProfile } from '@/app/actions/auth';
 import type { Conversation as SpecConversation } from '@/core/entities/chat';
-import { DEMO_CONVERSATIONS, type Conversation } from './demo-data';
+
+const PAGE_SIZE = 15;
+
+interface Conversation {
+  id: string;
+  property_name: string;
+  property_short: string;
+  customer_name: string;
+  last_message_preview: string;
+  last_message_from_me: boolean;
+  last_message_at: string;
+  unread_owner: number;
+  online?: boolean;
+}
 
 function adaptConversation(
   c: SpecConversation,
@@ -33,9 +48,8 @@ function adaptConversation(
 }
 
 type ConvState =
-  | { items: Conversation[]; mode: 'live' }
-  | { items: Conversation[]; mode: 'empty' }
-  | { items: Conversation[]; mode: 'demo-error'; error: string };
+  | { items: Conversation[]; mode: 'ok' }
+  | { items: Conversation[]; mode: 'error'; error: string };
 
 async function getConversations(): Promise<ConvState> {
   const [res, profile] = await Promise.all([
@@ -43,28 +57,36 @@ async function getConversations(): Promise<ConvState> {
     getCurrentProfile(),
   ]);
   if (!res.ok) {
-    return { items: DEMO_CONVERSATIONS, mode: 'demo-error', error: res.error };
-  }
-  if (res.data.length === 0) {
-    return { items: [], mode: 'empty' };
+    // BE lỗi — hiển thị lỗi rõ ràng, không dùng dữ liệu giả.
+    return { items: [], mode: 'error', error: res.error };
   }
   return {
     items: res.data.map((c) => adaptConversation(c, profile?.id ?? null)),
-    mode: 'live',
+    mode: 'ok',
   };
 }
 
 export default async function HostMessagesPage(props: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; page?: string }>;
 }) {
   const sp = await props.searchParams;
   const state = await getConversations();
   const all = state.items;
-  const isDemo = state.mode === 'demo-error';
-  const errorMsg = state.mode === 'demo-error' ? state.error : null;
+  const errorMsg = state.mode === 'error' ? state.error : null;
   const unreadCount = all.filter((c) => c.unread_owner > 0).length;
   const filtered =
     sp.filter === 'unread' ? all.filter((c) => c.unread_owner > 0) : all;
+
+  const currentPage = parsePage(sp.page);
+  const totalPages = pageCount(filtered.length, PAGE_SIZE);
+  const pageItems = paginate(filtered, currentPage, PAGE_SIZE);
+
+  function pageHref(page: number) {
+    return buildPageHref('/host/messages', {
+      filter: sp.filter,
+      page: page > 1 ? String(page) : undefined,
+    });
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
@@ -82,10 +104,10 @@ export default async function HostMessagesPage(props: {
         }
       />
 
-      {isDemo && (
+      {errorMsg && (
         <div className="mb-4 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-900 ring-1 ring-rose-200">
           <Lightbulb className="mr-2 inline h-4 w-4" />
-          Không tải được hội thoại từ BE ({errorMsg}). Hiển thị dữ liệu demo.
+          Không tải được hội thoại từ BE: {errorMsg}
         </div>
       )}
 
@@ -108,9 +130,10 @@ export default async function HostMessagesPage(props: {
           <p className="mt-1 text-sm text-ink-500">Khách nhắn tin sẽ hiện ở đây.</p>
         </div>
       ) : (
+        <>
         <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-ink-200">
           <ul className="divide-y divide-ink-200">
-            {filtered.map((c) => (
+            {pageItems.map((c) => (
               <li key={c.id}>
                 <Link
                   href={`/host/messages/${c.id}`}
@@ -172,6 +195,14 @@ export default async function HostMessagesPage(props: {
             ))}
           </ul>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filtered.length}
+          pageSize={PAGE_SIZE}
+          buildHref={pageHref}
+        />
+        </>
       )}
     </div>
   );

@@ -4,14 +4,21 @@ import { InviteStaffForm } from '@/components/host/invite-staff-form';
 import { PageHeader } from '@/components/host/page-header';
 import { StaffRowActions } from '@/components/host/staff-row-actions';
 import { Badge } from '@/components/ui/badge';
+import { Pagination } from '@/components/ui/pagination';
 import {
   STAFF_INVITE_STATUS_LABEL,
   type StaffInvite,
   type StaffMember,
 } from '@/core/entities/staff';
 import { formatDate } from '@/lib/format';
+import { buildPageHref, pageCount, paginate, parsePage } from '@/lib/pagination';
 
-export default async function HostStaffPage() {
+const PAGE_SIZE = 10;
+
+export default async function HostStaffPage(props: {
+  searchParams: Promise<{ staffPage?: string; invitePage?: string }>;
+}) {
+  const sp = await props.searchParams;
   const [staffResult, invitesResult] = await Promise.all([
     listStaffAction({ isActive: true }),
     listStaffInvitesAction({ status: 'pending' }),
@@ -23,6 +30,28 @@ export default async function HostStaffPage() {
   const apiError =
     (!staffResult.ok ? staffResult.error : null) ||
     (!invitesResult.ok ? invitesResult.error : null);
+
+  const staffPage = parsePage(sp.staffPage);
+  const staffTotalPages = pageCount(staff.length, PAGE_SIZE);
+  const staffItems = paginate(staff, staffPage, PAGE_SIZE);
+
+  const invitePage = parsePage(sp.invitePage);
+  const inviteTotalPages = pageCount(invites.length, PAGE_SIZE);
+  const inviteItems = paginate(invites, invitePage, PAGE_SIZE);
+
+  function staffPageHref(page: number) {
+    return buildPageHref('/host/staff', {
+      staffPage: page > 1 ? String(page) : undefined,
+      invitePage: sp.invitePage,
+    });
+  }
+
+  function invitePageHref(page: number) {
+    return buildPageHref('/host/staff', {
+      staffPage: sp.staffPage,
+      invitePage: page > 1 ? String(page) : undefined,
+    });
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
@@ -70,7 +99,7 @@ export default async function HostStaffPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink-200">
-                  {staff.map((s) => (
+                  {staffItems.map((s) => (
                     <tr key={s.id} className="hover:bg-cream-100">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -99,6 +128,16 @@ export default async function HostStaffPage() {
             )}
           </section>
 
+          {staff.length > 0 && (
+            <Pagination
+              currentPage={staffPage}
+              totalPages={staffTotalPages}
+              totalItems={staff.length}
+              pageSize={PAGE_SIZE}
+              buildHref={staffPageHref}
+            />
+          )}
+
           {/* Pending invites */}
           {invites.length > 0 && (
             <section className="overflow-x-auto rounded-2xl bg-white ring-1 ring-ink-200/60 shadow-card">
@@ -118,7 +157,7 @@ export default async function HostStaffPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink-200">
-                  {invites.map((inv) => (
+                  {inviteItems.map((inv) => (
                     <tr key={inv.id} className="hover:bg-cream-100">
                       <td className="px-4 py-3 font-medium text-ink-900">
                         {inv.email}
@@ -146,6 +185,16 @@ export default async function HostStaffPage() {
                 </tbody>
               </table>
             </section>
+          )}
+
+          {invites.length > 0 && (
+            <Pagination
+              currentPage={invitePage}
+              totalPages={inviteTotalPages}
+              totalItems={invites.length}
+              pageSize={PAGE_SIZE}
+              buildHref={invitePageHref}
+            />
           )}
         </div>
 

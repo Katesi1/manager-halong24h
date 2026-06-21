@@ -34,7 +34,7 @@ export default async function AdminPricingPage() {
       <PageHeader
         eyebrow="Cấu hình"
         title="Quản lý gói cước"
-        description="CRUD trực tiếp qua /admin/billing-plans. Bảng public preview dưới đây là dữ liệu user thật sự thấy (cache 5 phút)."
+        description="Quản lý danh mục gói cước hiển thị cho chủ nhà. Bảng xem trước bên dưới là đúng những gì khách hàng nhìn thấy khi đăng ký."
       />
 
       {adminResult.ok ? (
@@ -48,11 +48,11 @@ export default async function AdminPricingPage() {
 
       <div className="mt-10 border-t border-ink-200 pt-8">
         <h2 className="font-display text-xl font-semibold tracking-tight text-navy-900">
-          Public preview (user thấy)
+          Xem trước danh mục công khai
         </h2>
         <p className="mt-1 text-xs text-ink-500">
-          Dữ liệu từ <code className="rounded bg-cream-100 px-1.5">/billing/plans</code>{' '}
-          — chỉ gói <strong>active</strong>, cache 5 phút.
+          Chỉ hiển thị các gói <strong>đang bật</strong>. Cột nào chưa được cấu
+          hình sẽ hiển thị <strong>—</strong>.
         </p>
 
         {!publicResult.ok ? (
@@ -107,13 +107,25 @@ function PlansTable({ plans }: { plans: BillingPlan[] }) {
                   </div>
                 </td>
                 <td className="px-5 py-3.5 text-ink-700">
-                  {plan.rooms === -1 ? '∞' : `${plan.rooms} phòng`}
+                  {plan.rooms == null
+                    ? '—'
+                    : plan.rooms === -1
+                      ? '∞'
+                      : `${plan.rooms} phòng`}
                 </td>
                 <td className="px-5 py-3.5 font-semibold text-navy-900">
-                  {isContact ? 'Liên hệ' : formatVND(plan.monthlyPrice)}
+                  {isContact
+                    ? 'Liên hệ'
+                    : plan.monthlyPrice
+                      ? formatVND(plan.monthlyPrice)
+                      : '—'}
                 </td>
                 <td className="px-5 py-3.5 text-ink-700">
-                  {isContact ? 'Liên hệ' : formatVND(plan.yearlyPrice)}
+                  {isContact
+                    ? 'Liên hệ'
+                    : plan.yearlyPrice
+                      ? formatVND(plan.yearlyPrice)
+                      : '—'}
                 </td>
                 <td className="px-5 py-3.5">
                   {savings > 0 ? (
@@ -143,7 +155,7 @@ function PlansGrid({ plans }: { plans: BillingPlan[] }) {
         Xem nhanh từng gói
       </h2>
       <p className="mt-1 text-xs text-ink-500">
-        Card preview giống như chủ nhà sẽ thấy trên trang billing.
+        Dạng thẻ của từng gói trong danh mục công khai.
       </p>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -207,7 +219,11 @@ function PlanCard({ plan }: { plan: BillingPlan }) {
       <p className="mt-3 text-xs text-ink-600">
         Phòng:{' '}
         <strong className="text-ink-900">
-          {plan.rooms === -1 ? 'Không giới hạn' : `${plan.rooms} phòng`}
+          {plan.rooms == null
+            ? '—'
+            : plan.rooms === -1
+              ? 'Không giới hạn'
+              : `${plan.rooms} phòng`}
         </strong>
       </p>
 
@@ -241,26 +257,15 @@ function Notes() {
       <p className="font-semibold text-ink-800">Ghi chú:</p>
       <ul className="mt-2 list-disc list-inside space-y-1 text-xs">
         <li>
-          Giá hiển thị <strong>chưa bao gồm VAT 10%</strong> (Enterprise tính
+          Giá hiển thị <strong>chưa bao gồm VAT 10%</strong> (gói Enterprise tính
           riêng theo hợp đồng).
         </li>
         <li>
-          Chu kỳ năm được giảm so với 12 tháng — Business giảm sâu nhất 37%.
+          Thanh toán theo năm được giảm giá so với trả từng tháng.
         </li>
         <li>
-          Catalog quản lý ở BE qua{' '}
-          <code className="rounded bg-white px-1.5 py-0.5 ring-1 ring-ink-200">
-            GET /billing/plans
-          </code>{' '}
-          — kết quả cache 5 phút.
-        </li>
-        <li>
-          ID gói (<code>rooms_1</code>, <code>rooms_5</code>, ...) là khoá kỹ
-          thuật ánh xạ tới{' '}
-          <code className="rounded bg-white px-1.5 py-0.5 ring-1 ring-ink-200">
-            User.subscriptionPlanId
-          </code>
-          .
+          Thay đổi gói áp dụng ngay cho chủ nhà đăng ký mới; chủ nhà đang dùng
+          chỉ đổi giá từ kỳ gia hạn kế tiếp.
         </li>
       </ul>
     </div>

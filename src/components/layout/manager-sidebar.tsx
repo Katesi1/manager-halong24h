@@ -22,6 +22,7 @@ import {
   LayoutGrid,
   LogOut,
   type LucideIcon,
+  Mail,
   Menu,
   MessageSquare,
   Settings,
@@ -100,7 +101,7 @@ const ADMIN_GROUPS: NavGroup[] = [
     items: [
       { href: '/admin/pricing', label: 'Quản lý gói cước', icon: CreditCard },
       { href: '/admin/permissions', label: 'Phân quyền', icon: KeyRound },
-      { href: '/admin/settings', label: 'Cài đặt hệ thống', icon: Settings },
+      { href: '/admin/emails', label: 'Mẫu email', icon: Mail },
     ],
   },
 ];

@@ -16,6 +16,7 @@ import type { Booking } from '@/core/entities/booking';
 import type { Property } from '@/core/entities/property';
 import { RoleCode } from '@/core/value-objects/role';
 import { formatVND } from '@/core/value-objects/vnd';
+import { formatBookingTotal } from '@/lib/booking-display';
 import { formatDate } from '@/lib/format';
 
 const FALLBACK_STATS = {
@@ -212,7 +213,7 @@ export default async function AdminOverviewPage() {
                   </p>
                 </div>
                 <span className="text-sm font-semibold text-emerald-700 shrink-0">
-                  {formatVND(b.totalPrice)}
+                  {formatBookingTotal(b.totalPrice)}
                 </span>
               </li>
             ))}

@@ -21,21 +21,15 @@ export function MarkSessionPaidButton({
   amount,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [reference, setReference] = useState('');
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  function confirmPaid() {
     startTransition(async () => {
-      const res = await markPaymentSessionPaidAction({
-        sessionId,
-        reference: reference.trim() || undefined,
-      });
+      const res = await markPaymentSessionPaidAction({ sessionId });
       if (res.ok) {
-        toast.success('Đã xác nhận thanh toán');
+        toast.success('Đã xác nhận nhận tiền — gói cước được kích hoạt');
         setOpen(false);
-        setReference('');
         router.refresh();
       } else {
         toast.error(res.error);
@@ -45,11 +39,7 @@ export function MarkSessionPaidButton({
 
   return (
     <>
-      <Button
-        size="sm"
-        variant="primary"
-        onClick={() => setOpen(true)}
-      >
+      <Button size="sm" variant="primary" onClick={() => setOpen(true)}>
         Đã nhận tiền
       </Button>
       <Dialog
@@ -61,8 +51,8 @@ export function MarkSessionPaidButton({
             Xác nhận đã nhận tiền
           </h3>
           <p className="mt-1 text-sm text-ink-600">
-            Đối chiếu với app banking ACB. Sau khi xác nhận, BE sẽ activate
-            subscription cho user ngay.
+            Chỉ xác nhận sau khi đã thấy giao dịch khớp trong app banking ACB.
+            Sau khi xác nhận, gói cước của chủ nhà sẽ được kích hoạt ngay.
           </p>
 
           <dl className="mt-4 space-y-2 rounded-lg bg-cream-100 p-3 text-sm">
@@ -80,49 +70,26 @@ export function MarkSessionPaidButton({
             </div>
           </dl>
 
-          <form onSubmit={handleSubmit} className="mt-4 space-y-3">
-            <div>
-              <label
-                htmlFor="reference"
-                className="block text-xs font-medium text-ink-700"
-              >
-                Mã giao dịch banking (optional)
-              </label>
-              <input
-                id="reference"
-                type="text"
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-                placeholder="VD: FT26060512345678"
-                disabled={pending}
-                maxLength={64}
-                className="mt-1 h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-500/20 disabled:bg-cream-100 font-mono"
-              />
-              <p className="mt-1 text-[10px] text-ink-500">
-                Copy từ app banking để có audit trail.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setOpen(false)}
-                disabled={pending}
-              >
-                Huỷ
-              </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                size="sm"
-                disabled={pending}
-              >
-                {pending ? 'Đang xử lý...' : 'Xác nhận thanh toán'}
-              </Button>
-            </div>
-          </form>
+          <div className="mt-5 flex items-center justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setOpen(false)}
+              disabled={pending}
+            >
+              Huỷ
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={confirmPaid}
+              disabled={pending}
+            >
+              {pending ? 'Đang xử lý...' : 'Đã nhận tiền'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </>

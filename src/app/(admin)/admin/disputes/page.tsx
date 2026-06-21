@@ -7,6 +7,7 @@ export const metadata: Metadata = { title: 'Khiếu nại' };
 import { PageHeader } from '@/components/host/page-header';
 import { Badge } from '@/components/ui/badge';
 import { FilterChips } from '@/components/ui/filter-chips';
+import { Pagination } from '@/components/ui/pagination';
 import {
   DISPUTE_STATUS_LABEL,
   DISPUTE_TYPE_ICON,
@@ -15,6 +16,9 @@ import {
   type DisputeStatus,
 } from '@/core/entities/dispute';
 import { formatDate, formatVND, relativeTime } from '@/lib/format';
+import { buildPageHref, pageCount, paginate, parsePage } from '@/lib/pagination';
+
+const PAGE_SIZE = 10;
 
 const STATUS_VARIANT: Record<
   DisputeStatus,
@@ -31,7 +35,7 @@ function isStatus(s?: string): s is DisputeStatus {
 }
 
 export default async function AdminDisputesPage(props: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; page?: string }>;
 }) {
   const sp = await props.searchParams;
   const status = isStatus(sp.status) ? sp.status : undefined;
@@ -55,6 +59,17 @@ export default async function AdminDisputesPage(props: {
   const totalInDispute = all
     .filter((d) => d.status === 'open' || d.status === 'investigating')
     .reduce((s, d) => s + (d.amount ?? 0), 0);
+
+  const currentPage = parsePage(sp.page);
+  const totalPages = pageCount(disputes.length, PAGE_SIZE);
+  const pageItems = paginate(disputes, currentPage, PAGE_SIZE);
+
+  function pageHref(page: number) {
+    return buildPageHref('/admin/disputes', {
+      status,
+      page: page > 1 ? String(page) : undefined,
+    });
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
@@ -114,7 +129,7 @@ export default async function AdminDisputesPage(props: {
         </div>
       ) : (
         <div className="space-y-3">
-          {disputes.map((d) => {
+          {pageItems.map((d) => {
             const urgent =
               d.priority === 'high' &&
               (d.status === 'open' || d.status === 'investigating');
@@ -205,6 +220,16 @@ export default async function AdminDisputesPage(props: {
             );
           })}
         </div>
+      )}
+
+      {!apiError && disputes.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={disputes.length}
+          pageSize={PAGE_SIZE}
+          buildHref={pageHref}
+        />
       )}
     </div>
   );

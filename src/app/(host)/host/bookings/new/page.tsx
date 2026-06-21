@@ -91,6 +91,8 @@ export default async function NewBookingPage(props: {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
       <PageHeader
+        backHref="/host/bookings"
+        backLabel="Quay lại danh sách đặt phòng"
         title="Tạo đặt phòng mới"
         description="Khách đến trực tiếp, đặt qua điện thoại, hoặc nhập từ kênh khác. Đặt phòng ở trạng thái giữ chỗ 30 phút — sau đó xác nhận để chốt."
         breadcrumbs={[

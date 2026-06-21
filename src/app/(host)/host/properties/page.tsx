@@ -8,20 +8,37 @@ export const metadata: Metadata = { title: 'Cơ sở của tôi' };
 import { PageHeader } from '@/components/host/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Pagination } from '@/components/ui/pagination';
 import type { Property } from '@/core/entities/property';
 import {
   cancellationPolicyLabel,
   propertyTypeLabel,
 } from '@/core/value-objects/property-type';
+import { buildPageHref, pageCount, paginate, parsePage } from '@/lib/pagination';
+
+const PAGE_SIZE = 12;
 
 function coverImage(p: Property): string | null {
   return p.images.find((i) => i.isCover)?.imageUrl ?? p.images[0]?.imageUrl ?? null;
 }
 
-export default async function PropertiesListPage() {
+export default async function PropertiesListPage(props: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const sp = await props.searchParams;
   const result = await listPropertiesAction({ includeInactive: true });
   const properties: Property[] = result.ok ? result.data : [];
   const apiError = !result.ok ? result.error : null;
+
+  const currentPage = parsePage(sp.page);
+  const totalPages = pageCount(properties.length, PAGE_SIZE);
+  const pageItems = paginate(properties, currentPage, PAGE_SIZE);
+
+  function pageHref(page: number) {
+    return buildPageHref('/host/properties', {
+      page: page > 1 ? String(page) : undefined,
+    });
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
@@ -56,8 +73,9 @@ export default async function PropertiesListPage() {
           </Link>
         </div>
       ) : (
+        <>
         <div className="grid gap-4 md:grid-cols-2">
-          {properties.map((p) => {
+          {pageItems.map((p) => {
             const cover = coverImage(p);
             return (
               <Link
@@ -107,6 +125,14 @@ export default async function PropertiesListPage() {
             );
           })}
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={properties.length}
+          pageSize={PAGE_SIZE}
+          buildHref={pageHref}
+        />
+        </>
       )}
     </div>
   );

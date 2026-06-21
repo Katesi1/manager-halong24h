@@ -3,56 +3,93 @@
 import { z } from 'zod';
 
 import { requireAdmin } from '@/lib/auth-guard';
-import {
-  EMAIL_TEMPLATE_META,
-  type EmailTemplateKey,
-} from '@/lib/emails/types';
+import { EMAIL_TEMPLATE_LABELS } from '@/lib/emails/template-labels';
 
 import { toResult } from './_helpers';
 
-const VALID_KEYS: EmailTemplateKey[] = [
-  'booking_confirmation',
-  'payment_received',
-  'kyc_approved',
-  'kyc_rejected',
-  'property_approved',
-  'property_rejected',
-  'subscription_overdue',
-  'booking_request_guest',
-  'booking_request_host',
-  'booking_hold_timeout_guest',
-  'booking_hold_timeout_host',
-  'booking_deposit_timeout_guest',
-  'booking_deposit_timeout_host',
-  'booking_completed_guest_review',
-  'booking_completed_host_review',
-];
+/**
+ * 1 template email do BE quản lý (spec §16). BE là source of truth cho danh
+ * sách key — FE KHÔNG hardcode. `label`/`description`/`sampleSubject` là optional
+ * (BE có thể chưa extend) → FE fallback về `key` để vẫn hiển thị được.
+ */
+export interface EmailTemplate {
+  key: string;
+  label: string;
+  description: string;
+  sampleSubject: string | null;
+}
 
-const Schema = z.object({
-  template: z.string().refine((v) => VALID_KEYS.includes(v as EmailTemplateKey), {
-    message: 'Template không hợp lệ',
-  }),
-  to: z.string().email('Email không hợp lệ'),
-});
+export interface EmailServiceStatus {
+  /** SMTP đã cấu hình & bật ở BE chưa — quyết định có gửi thật được không. */
+  smtpEnabled: boolean;
+  /** Danh sách template BE hỗ trợ (spec §16). Render trực tiếp, không map. */
+  templates: EmailTemplate[];
+}
+
+interface RawTemplate {
+  key: string;
+  label?: string | null;
+  description?: string | null;
+  sampleSubject?: string | null;
+}
+
+/**
+ * Lấy trạng thái dịch vụ email + danh sách template từ BE —
+ * spec §16 `GET /admin/emails/templates` → `{ smtpEnabled, templates: [{ key, ... }] }`.
+ *
+ * Dùng để render UI hoàn toàn động (không hardcode key phía FE) + hiển thị
+ * trạng thái SMTP. Khi BE lỗi/chưa expose → trả lỗi, UI coi như "không xác định".
+ */
+export async function getEmailServiceStatusAction() {
+  return toResult<EmailServiceStatus>(async () => {
+    await requireAdmin();
+    const { apiClient } = await import('@/infrastructure/http/api-client');
+    const data = await apiClient.get<{
+      smtpEnabled?: boolean;
+      templates?: RawTemplate[];
+    }>('/admin/emails/templates');
+
+    const templates: EmailTemplate[] = Array.isArray(data.templates)
+      ? data.templates
+          .filter((t) => !!t?.key)
+          .map((t) => {
+            // Ưu tiên label BE trả về → nhãn tiếng Việt FE → chính key.
+            const fallback = EMAIL_TEMPLATE_LABELS[t.key];
+            return {
+              key: t.key,
+              label: t.label?.trim() || fallback?.label || t.key,
+              description: t.description?.trim() || fallback?.description || '',
+              sampleSubject: t.sampleSubject?.trim() || null,
+            };
+          })
+      : [];
+
+    return {
+      smtpEnabled: data.smtpEnabled === true,
+      templates,
+    };
+  });
+}
 
 export interface SendTestResult {
-  template: EmailTemplateKey;
+  template: string;
   to: string;
-  subject: string;
   mode: 'mock' | 'live';
   sentAt: string;
 }
 
+const Schema = z.object({
+  // BE validate key ∈ EMAIL_TEMPLATE_KEYS và trả "Unknown template" nếu sai.
+  // FE chỉ cần đảm bảo không rỗng — không lặp lại danh sách (BE source of truth).
+  template: z.string().min(1, 'Thiếu template'),
+  to: z.string().email('Email không hợp lệ'),
+});
+
 /**
- * Gửi email test cho admin để verify template trông đúng trên Gmail/Outlook/etc.
+ * Gửi email test cho admin để verify template trông đúng trên Gmail/Outlook.
+ * Spec §16 — `POST /admin/emails/test { template, to }` → `{ sent: boolean }`.
  *
- * Hiện tại BE chưa expose endpoint /admin/emails/test → chạy MOCK mode:
- *  - validate input
- *  - log ra console với template + recipient
- *  - trả về thành công như đã gửi
- *
- * Khi BE ready: thay block log bằng POST /admin/emails/test { template, to }.
- * UI không cần đổi (cùng Server Action).
+ * Mặc định = live. Mock chỉ khi `NEXT_PUBLIC_EMAIL_LIVE=false`.
  */
 export async function sendTestEmailAction(input: {
   template: string;
@@ -61,34 +98,30 @@ export async function sendTestEmailAction(input: {
   return toResult<SendTestResult>(async () => {
     const profile = await requireAdmin();
     const parsed = Schema.parse(input);
-    const key = parsed.template as EmailTemplateKey;
-    const meta = EMAIL_TEMPLATE_META[key];
 
-    // Default = live (spec đã có endpoint). Mock chỉ khi env bật rõ ràng.
     const mode: 'mock' | 'live' =
       process.env.NEXT_PUBLIC_EMAIL_LIVE === 'false' ? 'mock' : 'live';
 
     if (mode === 'live') {
-      // Spec §16 — POST /admin/emails/test { template, to } → { sent: boolean }
       const { apiClient } = await import('@/infrastructure/http/api-client');
-      await apiClient.post<{ sent: boolean }>('/admin/emails/test', {
-        template: key,
-        to: parsed.to,
-      });
+      // Gửi qua SMTP có thể chậm hơn timeout mặc định (15s) → nới lên 45s
+      // để tránh FE báo "máy chủ phản hồi quá chậm" dù email đã gửi xong.
+      await apiClient.post<{ sent: boolean }>(
+        '/admin/emails/test',
+        { template: parsed.template, to: parsed.to },
+        { timeoutMs: 45_000 },
+      );
     } else {
       console.info('[admin-emails] mock send test', {
         requestedBy: profile.id,
-        template: key,
-        to:
-          process.env.NODE_ENV === 'development' ? parsed.to : '[REDACTED]',
-        subject: meta.subject,
+        template: parsed.template,
+        to: process.env.NODE_ENV === 'development' ? parsed.to : '[REDACTED]',
       });
     }
 
     return {
-      template: key,
+      template: parsed.template,
       to: parsed.to,
-      subject: meta.subject,
       mode,
       sentAt: new Date().toISOString(),
     };

@@ -23,7 +23,7 @@ export default async function AdminPermissionsPage(props: {
           <PageHeader
             eyebrow="Cấu hình"
             title="Phân quyền"
-            description="Cấu hình quyền CRUD theo từng module cho nhân viên SALE."
+            description="Cấu hình quyền thao tác theo từng module cho nhân viên SALE."
             breadcrumbs={[
               { label: 'Phân quyền', href: '/admin/permissions' },
               { label: 'Lỗi' },
@@ -48,7 +48,7 @@ export default async function AdminPermissionsPage(props: {
         <PageHeader
           eyebrow="Cấu hình"
           title="Phân quyền nhân viên"
-          description="Spec §12. Bật/tắt từng quyền CRUD theo module. Lưu áp dụng ngay."
+          description="Bật/tắt từng quyền thao tác theo module. Lưu áp dụng ngay."
           breadcrumbs={[
             { label: 'Phân quyền', href: '/admin/permissions' },
             { label: user?.name ?? 'Chi tiết' },
@@ -72,7 +72,7 @@ export default async function AdminPermissionsPage(props: {
       <PageHeader
         eyebrow="Cấu hình"
         title="Phân quyền hệ thống"
-        description="Chọn 1 nhân viên SALE để cấu hình quyền CRUD theo từng module (Cơ sở, Booking, Lịch, Review)."
+        description="Chọn 1 nhân viên SALE để cấu hình quyền thao tác theo từng module (Cơ sở, Booking, Lịch, Review)."
       />
 
       {!usersRes.ok && (
@@ -90,8 +90,7 @@ export default async function AdminPermissionsPage(props: {
             Chưa có nhân viên SALE nào
           </p>
           <p className="mt-1 text-xs text-ink-500">
-            Nhân viên SALE được mời qua /staff/invites bởi OWNER hoặc tạo bởi
-            ADMIN.
+            Nhân viên SALE được chủ nhà mời qua email, hoặc do ADMIN tạo.
           </p>
         </div>
       ) : (

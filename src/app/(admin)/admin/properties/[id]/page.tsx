@@ -39,6 +39,8 @@ export default async function AdminPropertyDetail(props: {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader
+        backHref="/admin/properties"
+        backLabel="Quay lại danh sách cơ sở"
         title={property.name}
         description={
           property.description?.slice(0, 100) +

@@ -9,13 +9,16 @@ import type { VND } from '../value-objects/vnd';
  *  - paid       (chủ nhà đã nhận tiền + gửi email phiếu check-in)
  *  - cancelled  (huỷ)
  *  - completed  (đã check-out, hoàn thành)
+ *  - no_show    (spec v1.14, status=4: khách không đến + không thanh toán —
+ *               cron BE tự đánh khi CONFIRMED quá checkout 24h mà paidAt=null)
  */
 export type BookingStatus =
   | 'hold'
   | 'confirmed'
   | 'paid'
   | 'cancelled'
-  | 'completed';
+  | 'completed'
+  | 'no_show';
 
 export interface Booking {
   id: string;
@@ -30,8 +33,10 @@ export interface Booking {
   checkOutAt: string;
   nights: number;
   status: BookingStatus;
-  totalPrice: VND;
-  deposit: VND;
+  /** `null` khi đơn còn HOLD — BE chưa join bảng giá (chỉ chốt khi markPaid). */
+  totalPrice: VND | null;
+  /** `null` khi khách chưa khai số tiền cọc lúc tạo hold. */
+  deposit: VND | null;
   /** Khi status = hold: thời điểm hết hạn giữ chỗ */
   holdExpireAt?: string | null;
   /** Tính từ thời điểm fetch */
