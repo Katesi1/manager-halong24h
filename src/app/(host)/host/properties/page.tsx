@@ -54,7 +54,7 @@ export default async function PropertiesListPage(props: {
 
       {apiError && (
         <div className="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200">
-          <span className="font-semibold">Không kết nối được API: </span>
+          <span className="font-semibold">Tạm thời không tải được dữ liệu: </span>
           {apiError}
         </div>
       )}

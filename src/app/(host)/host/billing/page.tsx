@@ -66,7 +66,7 @@ export default async function HostBillingPage() {
               <p className="mt-2 text-sm text-white/70">
                 {roomCount} phòng đang hoạt động
               </p>
-              {sub && (
+              {sub && sub.expireAt && (
                 <p className="mt-1 text-xs text-white/50">
                   Hết hạn: {formatDate(sub.expireAt)}
                   {sub.status === 'past_due' && (

@@ -51,9 +51,15 @@ export function formatVNDShort(amount: number | null | undefined): string {
   return `${amount}`;
 }
 
-/** Format date: "2026-04-30" -> "30/04/2026" */
-export function formatDate(date: string | Date): string {
+/**
+ * Format date: "2026-04-30" -> "30/04/2026".
+ * Ngày rỗng/không hợp lệ → "—" (Intl.format ném RangeError với Invalid Date,
+ * nên phải guard để không sập trang khi BE trả ngày null/"").
+ */
+export function formatDate(date: string | Date | null | undefined): string {
+  if (date === null || date === undefined || date === '') return '—';
   const d = typeof date === 'string' ? new Date(date) : date;
+  if (Number.isNaN(d.getTime())) return '—';
   return new Intl.DateTimeFormat('vi-VN', {
     day: '2-digit',
     month: '2-digit',
@@ -61,9 +67,11 @@ export function formatDate(date: string | Date): string {
   }).format(d);
 }
 
-/** Format datetime: "2026-04-30T14:00:00Z" -> "14:00 30/04/2026" */
-export function formatDateTime(date: string | Date): string {
+/** Format datetime: "2026-04-30T14:00:00Z" -> "14:00 30/04/2026". Invalid → "—". */
+export function formatDateTime(date: string | Date | null | undefined): string {
+  if (date === null || date === undefined || date === '') return '—';
   const d = typeof date === 'string' ? new Date(date) : date;
+  if (Number.isNaN(d.getTime())) return '—';
   return new Intl.DateTimeFormat('vi-VN', {
     hour: '2-digit',
     minute: '2-digit',

@@ -38,14 +38,21 @@ export interface KycSubmission {
   updatedAt: string;
 }
 
+/**
+ * `kycStatus` BE trả ở `/kyc/status` có thể là vocab submission (lifecycle đầy
+ * đủ) HOẶC vocab User profile (`none|pending|approved|rejected`) — gộp cả hai.
+ */
+export type KycStatusValue = KycSubmissionStatus | 'none' | 'pending';
+
 export interface KycStatusResponse {
-  kycStatus: KycSubmissionStatus | 'none';
+  kycStatus: KycStatusValue;
   submission: KycSubmission | null;
   kycBypass: boolean;
 }
 
-export const KYC_STATUS_LABEL: Record<KycSubmissionStatus | 'none', string> = {
+export const KYC_STATUS_LABEL: Record<KycStatusValue, string> = {
   none: 'Chưa nộp',
+  pending: 'Đang chờ duyệt',
   draft: 'Nháp (chưa nộp)',
   kyc_submitted: 'Đã nộp — chờ duyệt',
   payment_pending: 'Chờ thanh toán phí',

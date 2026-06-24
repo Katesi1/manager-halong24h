@@ -30,6 +30,12 @@ export default function HostError({
             Mã: {error.digest}
           </p>
         )}
+        {process.env.NODE_ENV !== 'production' && (
+          <pre className="mt-4 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-ink-900/90 p-3 text-left text-[11px] leading-relaxed text-rose-200">
+            {error.message}
+            {error.stack ? `\n\n${error.stack}` : ''}
+          </pre>
+        )}
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
           <button
             type="button"

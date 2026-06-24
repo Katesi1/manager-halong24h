@@ -79,6 +79,7 @@ export default async function NewBookingPage(props: {
   }
 
   const result = await listPropertiesAction({ includeInactive: false });
+  const loadFailed = !result.ok;
   const properties = result.ok
     ? result.data.map((p) => ({
         id: p.id,
@@ -101,14 +102,28 @@ export default async function NewBookingPage(props: {
         ]}
       />
 
-      {properties.length === 0 ? (
+      {loadFailed ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50/50 p-12 text-center">
+          <p className="text-2xl">⚠️</p>
+          <p className="mt-3 font-medium text-rose-900">
+            Không tải được danh sách cơ sở.
+          </p>
+          <p className="mt-1 text-sm text-rose-700">
+            Vui lòng tải lại trang. Nếu vẫn chưa được, hãy thử lại sau ít phút.
+          </p>
+          <Link href="/host/bookings/new" className="mt-5 inline-block">
+            <Button variant="outline">Tải lại</Button>
+          </Link>
+        </div>
+      ) : properties.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-ink-200 bg-white p-12 text-center">
           <p className="text-2xl">🏡</p>
-          <p className="mt-3 text-ink-700 font-medium">
-            Bạn chưa có cơ sở nào hoặc API không kết nối được.
+          <p className="mt-3 font-medium text-ink-700">
+            Bạn chưa có cơ sở nào để nhận đặt phòng.
           </p>
           <p className="mt-1 text-sm text-ink-500">
-            Tạo cơ sở trước khi tạo đặt phòng.
+            Hãy tạo cơ sở (homestay, khách sạn, căn hộ…) trước, sau đó quay lại
+            tạo đặt phòng cho khách.
           </p>
           <Link href="/host/properties/new" className="mt-5 inline-block">
             <Button>+ Thêm cơ sở</Button>

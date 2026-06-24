@@ -1,7 +1,6 @@
 import {
   KYC_STATUS_LABEL,
   type KycStatusResponse,
-  type KycSubmissionStatus,
 } from '@/core/entities/kyc';
 import { cn } from '@/lib/utils';
 
@@ -9,11 +8,18 @@ interface KycStatusCardProps {
   status: KycStatusResponse;
 }
 
+// Key bằng `string` để dung nạp cả vocab submission (draft/kyc_submitted/…) lẫn
+// vocab User profile (`none|pending|approved|rejected`) BE có thể trả ở /kyc/status.
 const STATUS_TONE: Record<
-  KycSubmissionStatus | 'none',
+  string,
   { bg: string; text: string; icon: string }
 > = {
   none: { bg: 'bg-amber-50 ring-amber-200', text: 'text-amber-900', icon: '⚠️' },
+  pending: {
+    bg: 'bg-blue-50 ring-blue-200',
+    text: 'text-blue-900',
+    icon: '⏳',
+  },
   draft: { bg: 'bg-amber-50 ring-amber-200', text: 'text-amber-900', icon: '✏️' },
   kyc_submitted: {
     bg: 'bg-blue-50 ring-blue-200',
@@ -44,9 +50,17 @@ const STATUS_TONE: Record<
   },
 };
 
+const FALLBACK_TONE = STATUS_TONE.none;
+
 export function KycStatusCard({ status }: KycStatusCardProps) {
   const s = status.kycStatus;
-  const tone = STATUS_TONE[s];
+  // BE có thể trả trạng thái ngoài 9 giá trị FE map (vd tài khoản admin pass KYC)
+  // → fallback để không sập trang; log dev để bổ sung map khi gặp giá trị mới.
+  const tone = STATUS_TONE[s] ?? FALLBACK_TONE;
+  const label = KYC_STATUS_LABEL[s] ?? 'Đang cập nhật';
+  if (!STATUS_TONE[s] && process.env.NODE_ENV !== 'production') {
+    console.warn('[KycStatusCard] kycStatus chưa được map:', s);
+  }
   const isApproved = s === 'approved' || status.kycBypass;
   const needsAction = s === 'none' || s === 'draft' || s === 'rejected';
 
@@ -63,7 +77,7 @@ export function KycStatusCard({ status }: KycStatusCardProps) {
             Trạng thái KYC
           </p>
           <p className={cn('mt-0.5 text-base font-bold', tone.text)}>
-            {KYC_STATUS_LABEL[s]}
+            {label}
             {status.kycBypass && (
               <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
                 MIỄN XÁC MINH
