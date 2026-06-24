@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
 import {
+  addSubscriptionCallLogAction,
   freezeSubscriptionAction,
   markSubscriptionPaidAction,
   unfreezeSubscriptionAction,
@@ -42,13 +43,21 @@ export function SubscriptionRowActions({
   const [confirmPaid, setConfirmPaid] = useState(false);
 
   function onSubmitCallNote() {
-    if (callNote.trim().length < 3) return;
-    // BE chưa có endpoint lưu ghi chú cuộc gọi → đây là nhắc việc tạm trên
-    // trình duyệt, KHÔNG đồng bộ server. Toast nói đúng sự thật, không giả
-    // vờ đã lưu. Khi BE ra endpoint sẽ wire vào use case thật.
-    toast.success('Đã đánh dấu đã gọi (ghi chú tạm, chưa lưu server)');
-    setCallOpen(false);
-    setCallNote('');
+    const note = callNote.trim();
+    if (note.length < 3) return;
+    setError(null);
+    // `subscriptionId` === OWNER userId (spec §A5 Option A) → đúng `:id` của
+    // endpoint `/admin/subscriptions/:id/call-log`. Lưu thật vào server.
+    startTransition(async () => {
+      const r = await addSubscriptionCallLogAction(subscriptionId, note);
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      toast.success('Đã lưu ghi chú cuộc gọi');
+      setCallOpen(false);
+      setCallNote('');
+    });
   }
 
   function onMarkPaid() {
@@ -56,8 +65,12 @@ export function SubscriptionRowActions({
     setConfirmPaid(false);
     startTransition(async () => {
       const r = await markSubscriptionPaidAction(subscriptionId, amount);
-      if (!r.ok) setError(r.error);
-      else router.refresh();
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      toast.success('Đã nhận tiền — gói được kích hoạt/gia hạn');
+      router.refresh();
     });
   }
 
@@ -93,14 +106,16 @@ export function SubscriptionRowActions({
         <p className="text-[10px] text-rose-700 max-w-[200px]">{error}</p>
       )}
 
-      {(status === 'past_due' || status === 'trial') && (
+      {/* Chỉ chủ nhà đang NỢ phí gói thật (past_due + phí > 0) mới xác nhận thu.
+          Trial/Chưa có gói: chưa phát sinh tiền → không hiện. */}
+      {status === 'past_due' && amount > 0 && (
         <Button
           variant="primary"
           size="sm"
           onClick={() => setConfirmPaid(true)}
           disabled={pending}
         >
-          {pending ? '…' : '💰 Ghi nhận thu'}
+          {pending ? '…' : '✓ Đã nhận tiền'}
         </Button>
       )}
 
@@ -173,9 +188,9 @@ export function SubscriptionRowActions({
 
       <ConfirmDialog
         open={confirmPaid}
-        title="Xác nhận đã thu phí gói cước"
-        description={`Ghi nhận đã thu ${formatVND(amount)} cho kỳ này. Subscription sẽ được gia hạn ngay. Chỉ xác nhận sau khi đã đối soát chuyển khoản.`}
-        confirmLabel="Đã thu tiền"
+        title="Xác nhận đã nhận tiền gia hạn"
+        description={`Đã nhận ${formatVND(amount)} phí gói cước cho kỳ này. Gói sẽ được kích hoạt/gia hạn ngay. Chỉ xác nhận sau khi đã đối soát chuyển khoản.`}
+        confirmLabel="Đã nhận tiền"
         variant="primary"
         pending={pending}
         onConfirm={onMarkPaid}
@@ -208,10 +223,10 @@ export function SubscriptionRowActions({
             </Button>
             <Button
               variant="primary"
-              disabled={callNote.trim().length < 3}
+              disabled={callNote.trim().length < 3 || pending}
               onClick={onSubmitCallNote}
             >
-              Lưu note
+              {pending ? '…' : 'Lưu note'}
             </Button>
           </div>
         </DialogContent>

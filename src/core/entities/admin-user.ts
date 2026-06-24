@@ -25,6 +25,8 @@ export interface AdminUser {
   disputeCount: number;
   /** KYC status (chỉ OWNER) */
   kycStatus: 'none' | 'pending' | 'approved' | 'rejected';
+  /** ADMIN cấp quyền bỏ qua KYC (chỉ OWNER) — tạo phòng không cần KYC approved */
+  kycBypass: boolean;
   /** Subscription status (chỉ OWNER) */
   subscriptionPlan: 'free' | 'basic' | 'standard' | 'pro' | null;
   createdAt: string;
@@ -55,4 +57,15 @@ export interface RevokeSessionInput {
 export interface UpdateSubscriptionInput {
   userId: string;
   plan: NonNullable<AdminUser['subscriptionPlan']>;
+}
+
+export interface UpdateRoleInput {
+  userId: string;
+  role: RoleCode;
+}
+
+/** Spec §2A.7 — ADMIN cấp/thu hồi quyền bỏ qua KYC cho OWNER. */
+export interface SetKycBypassInput {
+  userId: string;
+  bypass: boolean;
 }

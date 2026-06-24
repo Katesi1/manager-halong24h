@@ -6,9 +6,7 @@
  *  - Đối chiếu khi BE/owner phản hồi "tôi không làm việc đó".
  *  - Compliance — sau này sẽ kiểm toán định kỳ.
  *
- * BE chưa có endpoint /admin/audit-log. Dùng MockAuditLogRepository
- * để demo + capture từ Server Action. Khi BE ready: tạo ApiAuditLogRepository
- * + switch trong container. UI không cần đổi.
+ * Spec §14 — BE tự ghi, FE chỉ đọc qua ApiAuditLogRepository.
  */
 
 /**

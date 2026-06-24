@@ -15,7 +15,10 @@ export interface DisputeRepository {
   open(input: OpenDisputeData): Promise<Dispute>;
   /** Set status=investigating, log admin nhận case */
   startInvestigation(id: string): Promise<Dispute>;
-  /** Resolve + verdict + penalty */
+  /**
+   * Resolve + verdict + penalty. `input.penaltyAction` (enum phẳng, optional)
+   * được gửi xuống BE qua body field `penalty`. KHÔNG tự ban user.
+   */
   resolve(input: ResolveDisputeInput): Promise<Dispute>;
   /** Reject với lý do */
   reject(input: RejectDisputeInput): Promise<Dispute>;

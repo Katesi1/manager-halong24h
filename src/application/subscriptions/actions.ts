@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { ValidationError } from '@/core/errors';
 import type {
   Subscription,
+  SubscriptionCallLog,
   SubscriptionFilters,
+  SubscriptionInvoice,
 } from '@/core/entities/subscription';
 import type { SubscriptionRepository } from '../ports/subscription-repository';
 
@@ -28,6 +30,12 @@ export async function getCurrentSubscriptionUseCase(
 ): Promise<Subscription | null> {
   if (!ownerId) return null;
   return repo.getCurrentForOwner(ownerId);
+}
+
+export async function listMyInvoicesUseCase(
+  repo: SubscriptionRepository,
+): Promise<SubscriptionInvoice[]> {
+  return repo.listMyInvoices();
 }
 
 export async function countOverdueSubscriptionsUseCase(
@@ -88,4 +96,35 @@ export async function unfreezeSubscriptionUseCase(
 ): Promise<Subscription> {
   if (!subscriptionId) throw new ValidationError('Thiếu mã subscription');
   return repo.unfreeze(subscriptionId);
+}
+
+const CallLogSchema = z.object({
+  userId: z.string().min(1, 'Thiếu mã người dùng'),
+  note: z
+    .string()
+    .trim()
+    .min(3, 'Ghi chú tối thiểu 3 ký tự')
+    .max(2000, 'Ghi chú tối đa 2000 ký tự'),
+});
+
+export async function addSubscriptionCallLogUseCase(
+  repo: SubscriptionRepository,
+  raw: unknown,
+): Promise<SubscriptionCallLog> {
+  const parsed = CallLogSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new ValidationError(
+      'Ghi chú cuộc gọi không hợp lệ',
+      parsed.error.flatten().fieldErrors,
+    );
+  }
+  return repo.addCallLog(parsed.data.userId, parsed.data.note);
+}
+
+export async function listSubscriptionCallLogsUseCase(
+  repo: SubscriptionRepository,
+  userId: string,
+): Promise<SubscriptionCallLog[]> {
+  if (!userId) throw new ValidationError('Thiếu mã người dùng');
+  return repo.listCallLogs(userId);
 }

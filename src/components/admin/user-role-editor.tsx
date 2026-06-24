@@ -57,8 +57,7 @@ export function UserRoleEditor({
   }
 
   function handleConfirm() {
-    // Mock: ghi audit log qua server action + cập nhật UI local.
-    // BE chưa expose PATCH /admin/users/:id/role — refresh sẽ revert về role cũ.
+    // Gọi PATCH /users/:id/role (BE đã live) — thay đổi được lưu, refresh giữ nguyên.
     startTransition(async () => {
       const result = await changeUserRoleAction(userId, savedRole, draftRole);
       if (!result.ok) {
@@ -67,9 +66,7 @@ export function UserRoleEditor({
       }
       setSavedRole(draftRole);
       setConfirmOpen(false);
-      toast.success(
-        `Đã đổi vai trò sang "${ROLE_LABEL[draftRole]}". Đã ghi nhật ký thay đổi.`,
-      );
+      toast.success(`Đã đổi vai trò sang "${ROLE_LABEL[draftRole]}".`);
       router.refresh();
     });
   }

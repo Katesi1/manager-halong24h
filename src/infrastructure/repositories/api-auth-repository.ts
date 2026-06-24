@@ -11,6 +11,7 @@ import type {
   ChangePasswordInput,
   LoginCredentials,
   RegisterInput,
+  UpdateProfileInput,
 } from '@/application/ports/auth-repository';
 
 import { apiClient } from '../http/api-client';
@@ -63,6 +64,10 @@ export class ApiAuthRepository implements AuthRepository {
 
   async getProfile(): Promise<UserProfile> {
     return apiClient.get<UserProfile>('/auth/profile');
+  }
+
+  async updateProfile(input: UpdateProfileInput): Promise<UserProfile> {
+    return apiClient.patch<UserProfile>('/auth/profile', input);
   }
 
   async logout(): Promise<void> {

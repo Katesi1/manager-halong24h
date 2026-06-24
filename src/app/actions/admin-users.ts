@@ -8,7 +8,9 @@ import {
   listAdminUsersUseCase,
   resetPasswordUseCase,
   revokeSessionUseCase,
+  setKycBypassUseCase,
   unbanUserUseCase,
+  updateRoleUseCase,
   updateSubscriptionUseCase,
 } from '@/application/admin-users/actions';
 import type { AdminUserFilters } from '@/core/entities/admin-user';
@@ -110,8 +112,7 @@ export async function updateUserSubscriptionAction(
 }
 
 /**
- * Mock-only: ghi audit log + revalidate. BE chưa expose PATCH /admin/users/:id/role.
- * Khi BE ready, gọi use-case thực thay vì chỉ ghi audit.
+ * Đổi vai trò người dùng qua `PATCH /users/:id/role` (BE đã live).
  */
 export async function changeUserRoleAction(
   userId: string,
@@ -129,8 +130,26 @@ export async function changeUserRoleAction(
     if (fromRole === toRole) {
       throw new Error('Vai trò mới trùng vai trò hiện tại');
     }
-    const user = await getAdminUserUseCase(adminUserRepository(), userId);
-    return true;
+    return updateRoleUseCase(adminUserRepository(), {
+      userId,
+      role: toRole,
+    });
+  });
+  if (result.ok) {
+    revalidatePath('/admin/users');
+    revalidatePath(`/admin/users/${userId}`);
+  }
+  return result;
+}
+
+/**
+ * Cấp/thu hồi quyền bỏ qua KYC cho OWNER qua `PATCH /users/:id/kyc-bypass`.
+ * `bypass=true` → OWNER tạo/sửa phòng không cần KYC approved (spec §2A.7).
+ */
+export async function setUserKycBypassAction(userId: string, bypass: boolean) {
+  const result = await toResult(async () => {
+    await requireAdmin();
+    return setKycBypassUseCase(adminUserRepository(), { userId, bypass });
   });
   if (result.ok) {
     revalidatePath('/admin/users');

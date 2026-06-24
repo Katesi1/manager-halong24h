@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useActionState, useEffect, useRef } from 'react';
 
+import { updateProfileAction, type ActionResult } from '@/app/actions/auth';
 import { Input, Label } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { Button } from '@/components/ui/button';
@@ -14,28 +15,30 @@ interface ProfileFormProps {
   };
 }
 
+const initialState: ActionResult = {};
+
 /**
- * Mock profile form — BE chưa có endpoint `PATCH /auth/profile` cho cập nhật
- * thông tin cá nhân. Khi có sẽ thêm `updateProfileAction` và call ở submit.
+ * Hồ sơ cá nhân — `PATCH /auth/profile` (spec §25.2). Whitelist họ tên / email /
+ * SĐT. Lỗi trùng email/SĐT (409) hiển thị qua toast.
  */
 export function ProfileForm({ defaults }: ProfileFormProps) {
   const { show } = useToast();
-  const [pending, setPending] = useState(false);
+  const [state, formAction, pending] = useActionState(
+    updateProfileAction,
+    initialState,
+  );
+  const formRef = useRef<HTMLFormElement>(null);
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setPending(true);
-    setTimeout(() => {
-      setPending(false);
-      show(
-        'Đã lưu thông tin.',
-        'success',
-      );
-    }, 400);
-  }
+  useEffect(() => {
+    if (state.ok) {
+      show('Đã lưu thông tin.', 'success');
+    } else if (state.error) {
+      show(state.error, 'error');
+    }
+  }, [state, show]);
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
+    <form ref={formRef} action={formAction} className="grid gap-4 sm:grid-cols-2">
       <div className="sm:col-span-2">
         <Label htmlFor="full_name" required>
           Họ và tên
@@ -48,6 +51,9 @@ export function ProfileForm({ defaults }: ProfileFormProps) {
           minLength={2}
           maxLength={120}
         />
+        {state.fieldErrors?.fullName && (
+          <p className="mt-1 text-xs text-red-600">{state.fieldErrors.fullName}</p>
+        )}
       </div>
       <div>
         <Label htmlFor="email" required>
@@ -60,6 +66,9 @@ export function ProfileForm({ defaults }: ProfileFormProps) {
           defaultValue={defaults.email}
           required
         />
+        {state.fieldErrors?.email && (
+          <p className="mt-1 text-xs text-red-600">{state.fieldErrors.email}</p>
+        )}
       </div>
       <div>
         <Label htmlFor="phone">Số điện thoại</Label>
@@ -70,6 +79,9 @@ export function ProfileForm({ defaults }: ProfileFormProps) {
           defaultValue={defaults.phone}
           placeholder="0901234567"
         />
+        {state.fieldErrors?.phone && (
+          <p className="mt-1 text-xs text-red-600">{state.fieldErrors.phone}</p>
+        )}
       </div>
       <div className="sm:col-span-2 flex justify-end">
         <Button type="submit" disabled={pending}>

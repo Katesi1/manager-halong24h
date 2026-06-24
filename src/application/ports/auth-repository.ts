@@ -23,6 +23,13 @@ export interface ChangePasswordInput {
   newPassword: string;
 }
 
+/** Spec §25.2 — whitelist 3 field, tất cả optional (ít nhất 1). */
+export interface UpdateProfileInput {
+  fullName?: string;
+  email?: string;
+  phone?: string;
+}
+
 export interface AuthRepository {
   /** Spec v1.7 — chỉ trả tokens, caller phải gọi getProfile() riêng. */
   login(input: LoginCredentials): Promise<AuthTokens>;
@@ -36,6 +43,8 @@ export interface AuthRepository {
   forgotPassword(identifier: string): Promise<void>;
   resetPassword(token: string, newPassword: string): Promise<void>;
   getProfile(): Promise<UserProfile>;
+  /** Spec §25.2 — `PATCH /auth/profile`, trả full profile đã cập nhật. */
+  updateProfile(input: UpdateProfileInput): Promise<UserProfile>;
   logout(): Promise<void>;
   changePassword(input: ChangePasswordInput): Promise<void>;
 }

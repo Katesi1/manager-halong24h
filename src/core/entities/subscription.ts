@@ -101,6 +101,62 @@ export interface SubscriptionFilters {
   search?: string;
 }
 
+/** Loại hoá đơn gói cước. */
+export type InvoiceKind = 'subscription' | 'renew' | 'upgrade' | 'refund';
+
+/**
+ * Hoá đơn gói cước của chủ nhà (`GET /subscriptions/me/invoices`).
+ *
+ * `amount` giữ nguyên `number` (VND, theo style các field tiền BE trả — xem
+ * `Subscription.amount`). Format hiển thị qua `formatVND` ở UI.
+ */
+export interface SubscriptionInvoice {
+  id: string;
+  invoiceNumber: string;
+  kind: InvoiceKind;
+  planId: string;
+  planLabel: string;
+  cycle: SubscriptionCycle;
+  rooms: number;
+  /** Kỳ hoá đơn dạng "YYYY-MM". */
+  period: string;
+  /** Số tiền hoá đơn (VND). */
+  amount: number;
+  /** Phương thức thanh toán, vd "bank_transfer". */
+  method: string;
+  /** Trạng thái hoá đơn, vd "paid". */
+  status: string;
+  /** Nhà cung cấp thanh toán, vd "manual_bank". */
+  provider: string;
+  referenceCode: string | null;
+  paidAt: string | null;
+  refundedAt: string | null;
+  refundedAmount: number | null;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+/** Admin được hydrate trong call-log (`admin: { id, name, email }`). */
+export interface CallLogAdmin {
+  id: string;
+  name: string;
+  email: string;
+}
+
+/**
+ * Ghi chú cuộc gọi đòi nợ gói cước (`/admin/subscriptions/:id/call-log`).
+ * `:id` là userId của OWNER.
+ */
+export interface SubscriptionCallLog {
+  id: string;
+  userId: string;
+  adminId: string;
+  note: string;
+  createdAt: string;
+  /** Hydrate ở GET list (newest-first). */
+  admin?: CallLogAdmin | null;
+}
+
 export interface MarkPaidInput {
   subscriptionId: string;
   /** Số tiền thực thu — phải bằng amount */

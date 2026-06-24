@@ -6,7 +6,9 @@ import type {
   AdminUserStatus,
   BanUserInput,
   RevokeSessionInput,
+  SetKycBypassInput,
   UnbanUserInput,
+  UpdateRoleInput,
   UpdateSubscriptionInput,
 } from '@/core/entities/admin-user';
 import type { AdminUserRepository } from '@/application/ports/admin-user-repository';
@@ -16,7 +18,8 @@ import { apiClient } from '../http/api-client';
 
 /**
  * Spec §3 + v1.3 §22 A2 — `GET /users?withStats=true` bundle `propertyCount`,
- * `bookingCount`. `disputeCount` + `lastActiveAt` BE chưa expose → default 0/null.
+ * `bookingCount`, `stats.disputeCount` + `lastActiveAt` (null nếu user chỉ dùng
+ * web — `lastActiveAt` chỉ track từ mobile FCM).
  */
 interface SpecUserWithStats {
   id: string;
@@ -31,6 +34,7 @@ interface SpecUserWithStats {
   bannedAt?: string | null;
   bannedReason?: string | null;
   kycStatus?: 'none' | 'pending' | 'approved' | 'rejected';
+  kycBypass?: boolean;
   subscriptionStatus?: string | null;
   subscriptionPlanId?: string | null;
   subscriptionCycle?: 'monthly' | 'yearly' | null;
@@ -38,6 +42,8 @@ interface SpecUserWithStats {
   updatedAt?: string;
   propertyCount?: number;
   bookingCount?: number;
+  stats?: { disputeCount?: number } | null;
+  lastActiveAt?: string | null;
 }
 
 function mapStatus(s: SpecUserWithStats): AdminUserStatus {
@@ -66,11 +72,13 @@ function mapUser(s: SpecUserWithStats): AdminUser {
     ownerId: s.ownerId,
     bookingCount: s.bookingCount ?? 0,
     propertyCount: s.propertyCount ?? 0,
-    disputeCount: 0, // Spec v1.3: chưa expose, BE sẽ thêm v2
+    disputeCount: s.stats?.disputeCount ?? 0,
     kycStatus: s.kycStatus ?? 'none',
+    kycBypass: s.kycBypass ?? false,
     subscriptionPlan: mapPlan(s),
     createdAt: s.createdAt,
-    lastActiveAt: null, // Spec v1.3: chưa expose, BE sẽ thêm v2
+    // `null` cho user chỉ dùng web (chỉ track từ mobile FCM) — giữ nullable.
+    lastActiveAt: s.lastActiveAt ?? null,
   };
 }
 
@@ -130,6 +138,30 @@ export class ApiAdminUserRepository implements AdminUserRepository {
       `/users/${input.userId}/unban`,
     );
     return mapUser(data);
+  }
+
+  async updateRole(input: UpdateRoleInput): Promise<AdminUser> {
+    // BE: `PATCH /users/:id/role` (KHÔNG prefix /admin) body `{ role: number }`.
+    // Trả user đã cập nhật — re-fetch kèm withStats để giữ đủ thống kê.
+    await apiClient.patch(`/users/${input.userId}/role`, {
+      role: input.role,
+    });
+    const refreshed = await this.getById(input.userId);
+    if (!refreshed)
+      throw new Error('Không tìm thấy user sau khi đổi vai trò');
+    return refreshed;
+  }
+
+  async setKycBypass(input: SetKycBypassInput): Promise<AdminUser> {
+    // Spec §2A.7 — `PATCH /users/:id/kyc-bypass` body `{ bypass }`. Re-fetch
+    // kèm withStats để giữ đủ thống kê + trạng thái kycBypass mới.
+    await apiClient.patch(`/users/${input.userId}/kyc-bypass`, {
+      bypass: input.bypass,
+    });
+    const refreshed = await this.getById(input.userId);
+    if (!refreshed)
+      throw new Error('Không tìm thấy user sau khi cập nhật quyền KYC');
+    return refreshed;
   }
 
   async revokeSession(input: RevokeSessionInput): Promise<void> {

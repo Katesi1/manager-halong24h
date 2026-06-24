@@ -64,7 +64,7 @@ const ENTITLED: OwnerEntitlement = {
 
 /**
  * Suy ra trạng thái entitlement của OWNER từ profile (`GET /auth/profile`) —
- * nguồn tin cậy nhất, không phụ thuộc subscription repo (đang default mock).
+ * nguồn tin cậy nhất, không phụ thuộc subscription repo.
  *
  * Lưu ý: chỉ áp dụng cho OWNER. SALE inherit entitlement của OWNER ở BE — FE
  * không tự suy ra cho SALE (profile SALE không mang sub của OWNER), để BE 403

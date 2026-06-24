@@ -8,6 +8,7 @@ import type { CalendarRepository } from '@/application/ports/calendar-repository
 import type { ChatRepository } from '@/application/ports/chat-repository';
 import type { DashboardRepository } from '@/application/ports/dashboard-repository';
 import type { DisputeRepository } from '@/application/ports/dispute-repository';
+import type { GuestRepository } from '@/application/ports/guest-repository';
 import type { NotificationRepository } from '@/application/ports/notification-repository';
 import type { PaymentSessionRepository } from '@/application/ports/payment-session-repository';
 import type { PropertyRepository } from '@/application/ports/property-repository';
@@ -29,6 +30,7 @@ import { ApiCalendarRepository } from './repositories/api-calendar-repository';
 import { ApiChatRepository } from './repositories/api-chat-repository';
 import { ApiDisputeRepository } from './repositories/api-dispute-repository';
 import { ApiDashboardRepository } from './repositories/api-dashboard-repository';
+import { ApiGuestRepository } from './repositories/api-guest-repository';
 import { ApiKycAdminRepository } from './repositories/api-kyc-admin-repository';
 import { ApiKycRepository } from './repositories/api-kyc-repository';
 import { ApiLeadRepository } from './repositories/api-lead-repository';
@@ -39,49 +41,19 @@ import { ApiPropertyRepository } from './repositories/api-property-repository';
 import { ApiReviewRepository } from './repositories/api-review-repository';
 import { ApiStaffRepository } from './repositories/api-staff-repository';
 import { ApiSubscriptionRepository } from './repositories/api-subscription-repository';
-import { MockAdminUserRepository } from './mocks/mock-admin-user-repository';
-import { MockAuditLogRepository } from './mocks/mock-audit-log-repository';
-import { MockBookingRepository } from './mocks/mock-booking-repository';
-import { MockCalendarRepository } from './mocks/mock-calendar-repository';
-import { MockDisputeRepository } from './mocks/mock-dispute-repository';
-import { MockKycAdminRepository } from './mocks/mock-kyc-admin-repository';
-import { MockKycRepository } from './mocks/mock-kyc-repository';
-import { MockLeadRepository } from './mocks/mock-lead-repository';
-import { MockPropertyRepository } from './mocks/mock-property-repository';
-import { MockReviewRepository } from './mocks/mock-review-repository';
-import { MockSubscriptionRepository } from './mocks/mock-subscription-repository';
-import { MockStaffRepository } from './mocks/mock-staff-repository';
 
 /**
- * Container — chọn implementation cho mỗi port dựa trên env.
+ * Container — resolve mỗi port về implementation REST API thật.
  *
- * Quy ước: module nào có endpoint thật trên BE thì mặc định = `api`.
- * Override bằng env: `NEXT_PUBLIC_DATA_MODE_<MODULE>=mock|api`.
- *
- * Trạng thái BE (verified bằng curl):
- *   ✅ /auth/*          → ApiAuthRepository
- *   ✅ /properties/*    → ApiPropertyRepository
- *   ✅ /dashboard/stats → ApiDashboardRepository
- *   ✅ /reports         → ApiDashboardRepository.getReports
- *   ✅ /bookings (GET)  → ApiBookingRepository
- *   ✅ /notifications/* → ApiNotificationRepository
- *   ❌ /payments, /disputes, /calendar — chưa có
+ * Dự án thật: mọi module dùng API trên `http://api.halong24h.com`.
+ * Lớp Mock đã được loại bỏ hoàn toàn (không còn swap api/mock qua env).
  */
-type Mode = 'api' | 'mock';
-
-function modeFor(envKey: string, defaultMode: Mode): Mode {
-  const v = process.env[envKey]?.toLowerCase();
-  return v === 'api' || v === 'mock' ? v : defaultMode;
-}
-
 export function authRepository(): AuthRepository {
   return new ApiAuthRepository();
 }
 
 export function propertyRepository(): PropertyRepository {
-  return modeFor('NEXT_PUBLIC_DATA_MODE_PROPERTIES', 'api') === 'mock'
-    ? new MockPropertyRepository()
-    : new ApiPropertyRepository();
+  return new ApiPropertyRepository();
 }
 
 export function dashboardRepository(): DashboardRepository {
@@ -94,9 +66,7 @@ export function billingPlanRepository(): BillingPlanRepository {
 }
 
 export function bookingRepository(): BookingRepository {
-  return modeFor('NEXT_PUBLIC_DATA_MODE_BOOKINGS', 'api') === 'mock'
-    ? new MockBookingRepository()
-    : new ApiBookingRepository();
+  return new ApiBookingRepository();
 }
 
 export function notificationRepository(): NotificationRepository {
@@ -111,99 +81,69 @@ export function paymentSessionRepository(): PaymentSessionRepository {
 export function disputeRepository(): DisputeRepository {
   // Spec §13 — /disputes + /admin/disputes/* live. Extended fields (evidence/
   // chatExcerpt/verdict/penalty) BE defer v2 → repo trả [] hoặc null.
-  return modeFor('NEXT_PUBLIC_DATA_MODE_DISPUTES', 'api') === 'mock'
-    ? new MockDisputeRepository()
-    : new ApiDisputeRepository();
+  return new ApiDisputeRepository();
 }
 
 export function calendarRepository(): CalendarRepository {
-  // Spec §6 — /calendar/* live. Default = api.
-  return modeFor('NEXT_PUBLIC_DATA_MODE_CALENDAR', 'api') === 'mock'
-    ? new MockCalendarRepository()
-    : new ApiCalendarRepository();
+  // Spec §6 — /calendar/* live.
+  return new ApiCalendarRepository();
 }
 
 export function staffRepository(): StaffRepository {
-  return modeFor('NEXT_PUBLIC_DATA_MODE_STAFF', 'api') === 'mock'
-    ? new MockStaffRepository()
-    : new ApiStaffRepository();
+  return new ApiStaffRepository();
 }
 
 export function kycRepository(): KycRepository {
-  return modeFor('NEXT_PUBLIC_DATA_MODE_KYC', 'api') === 'mock'
-    ? new MockKycRepository()
-    : new ApiKycRepository();
+  return new ApiKycRepository();
 }
 
 export function permissionRepository(): PermissionRepository {
-  // Spec §12 — /permissions/:userId live. Default = api, hiện không có Mock impl.
-  // Env `NEXT_PUBLIC_DATA_MODE_PERMISSIONS=mock` chưa support — luôn dùng api.
+  // Spec §12 — /permissions/:userId live.
   return new ApiPermissionRepository();
 }
 
 export function chatRepository(): ChatRepository {
-  // Spec §17 — /conversations/* live (REST). Default = api, chưa có Mock impl.
+  // Spec §17 — /conversations/* live (REST).
   return new ApiChatRepository();
 }
 
-let leadSingleton: LeadRepository | null = null;
 export function leadRepository(): LeadRepository {
   // Spec §15 — /leads live (POST public + GET auth).
-  if (modeFor('NEXT_PUBLIC_DATA_MODE_LEADS', 'api') === 'mock') {
-    if (!leadSingleton) leadSingleton = new MockLeadRepository();
-    return leadSingleton;
-  }
   return new ApiLeadRepository();
 }
 
+export function guestRepository(): GuestRepository {
+  // GET /guests + /guests/:id live (Auth ADMIN/OWNER/SALE).
+  return new ApiGuestRepository();
+}
+
 export function kycAdminRepository(): KycAdminRepository {
-  // Spec §9.2 — `/admin/kyc/*` live. 4-state (none/pending/approved/rejected).
-  // FE entity 8-state map xuống subset. Verification fields[] BE chưa expose
-  // → trả mảng rỗng, UI section sẽ blank đợi v2.
-  return modeFor('NEXT_PUBLIC_DATA_MODE_KYC_ADMIN', 'api') === 'mock'
-    ? new MockKycAdminRepository()
-    : new ApiKycAdminRepository();
+  // Spec §9.2 — `/admin/kyc/*` live. 4-state (none/pending/approved/rejected),
+  // FE entity 8-state map xuống subset. Chi tiết `GET /admin/kyc/:id` trả đủ
+  // 3 ảnh upload + checklist 7 yếu tố xác minh (`verificationFields[]`) +
+  // danh sách thanh toán → trang `/admin/kyc/:id` dùng `getDetail()`.
+  return new ApiKycAdminRepository();
 }
 
 export function adminUserRepository(): AdminUserRepository {
-  // Spec §3 + v1.3 §22 A2 — `/users?withStats=true` cung cấp propertyCount +
-  // bookingCount. `disputeCount` + `lastActiveAt` BE chưa expose → default.
-  return modeFor('NEXT_PUBLIC_DATA_MODE_ADMIN_USERS', 'api') === 'mock'
-    ? new MockAdminUserRepository()
-    : new ApiAdminUserRepository();
+  // `/users?withStats=true` cung cấp propertyCount + bookingCount +
+  // stats.disputeCount + lastActiveAt (null nếu user chỉ dùng web).
+  return new ApiAdminUserRepository();
 }
 
-let subscriptionSingleton: SubscriptionRepository | null = null;
 export function subscriptionRepository(): SubscriptionRepository {
   // Spec §10 — `/admin/subscriptions/*` + `/subscriptions/me` live.
-  // Default = api. Response là user-level (§A4), mapper trong
-  // ApiSubscriptionRepository khớp shape thật + treat Subscription.id === userId.
-  // Override sang mock bằng env `NEXT_PUBLIC_DATA_MODE_SUBSCRIPTIONS=mock`.
-  if (modeFor('NEXT_PUBLIC_DATA_MODE_SUBSCRIPTIONS', 'api') === 'mock') {
-    if (!subscriptionSingleton) {
-      subscriptionSingleton = new MockSubscriptionRepository();
-    }
-    return subscriptionSingleton;
-  }
+  // Response là user-level (§A4), mapper trong ApiSubscriptionRepository khớp
+  // shape thật + treat Subscription.id === userId.
   return new ApiSubscriptionRepository();
 }
 
-let reviewSingleton: ReviewRepository | null = null;
 export function reviewRepository(): ReviewRepository {
-  // Spec §7 — /admin/reviews + /properties/:id/reviews live. Default = api.
-  if (modeFor('NEXT_PUBLIC_DATA_MODE_REVIEWS', 'api') === 'mock') {
-    if (!reviewSingleton) reviewSingleton = new MockReviewRepository();
-    return reviewSingleton;
-  }
+  // Spec §7 — /admin/reviews + /properties/:id/reviews live.
   return new ApiReviewRepository();
 }
 
-let auditLogSingleton: AuditLogRepository | null = null;
 export function auditLogRepository(): AuditLogRepository {
-  // Spec §14 — BE tự ghi, FE chỉ đọc. Default = api.
-  if (modeFor('NEXT_PUBLIC_DATA_MODE_AUDIT_LOG', 'api') === 'mock') {
-    if (!auditLogSingleton) auditLogSingleton = new MockAuditLogRepository();
-    return auditLogSingleton;
-  }
+  // Spec §14 — BE tự ghi, FE chỉ đọc.
   return new ApiAuditLogRepository();
 }

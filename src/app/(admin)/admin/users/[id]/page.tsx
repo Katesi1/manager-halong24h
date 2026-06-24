@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 import { getAdminUserAction } from '@/app/actions/admin-users';
+import { KycBypassToggle } from '@/components/admin/kyc-bypass-toggle';
 import { UserModerationActions } from '@/components/admin/user-moderation-actions';
 import { UserRoleEditor } from '@/components/admin/user-role-editor';
 import { Badge } from '@/components/ui/badge';
@@ -119,11 +120,13 @@ export default async function AdminUserDetailPage(props: {
               <InfoCell icon={<Phone className="h-4 w-4" />} label="Số điện thoại" value={user.phone ?? '—'} />
               <InfoCell
                 icon={<Calendar className="h-4 w-4" />}
-                label="Hoạt động gần nhất"
+                label="Hoạt động lần cuối"
                 value={
-                  user.lastActiveAt
-                    ? `${relativeTime(user.lastActiveAt)}`
-                    : '—'
+                  user.lastActiveAt ? (
+                    relativeTime(user.lastActiveAt)
+                  ) : (
+                    <span className="text-ink-400">Chưa ghi nhận</span>
+                  )
                 }
               />
               <InfoCell
@@ -190,6 +193,16 @@ export default async function AdminUserDetailPage(props: {
                     ) : (
                       '—'
                     )
+                  }
+                />
+                <InfoCell
+                  icon={<ShieldCheck className="h-4 w-4" />}
+                  label="Quyền bỏ qua KYC"
+                  value={
+                    <KycBypassToggle
+                      userId={user.id}
+                      kycBypass={user.kycBypass}
+                    />
                   }
                 />
               </div>

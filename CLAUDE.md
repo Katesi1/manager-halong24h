@@ -15,8 +15,7 @@
 | Style | Tailwind v4 (`@tailwindcss/postcss`), Radix UI, lucide-react, framer-motion |
 | Validation | **Zod 3** (mọi boundary) |
 | Form | react-hook-form + Zod resolver (khi cần phức tạp), Server Action + `useActionState` (khi đơn giản) |
-| Data source chính | **REST API ngoài** — base URL: `http://api.halong24h.com` (BE chạy không có prefix `/api/v1` mặc dù spec ghi vậy) |
-| Data source phụ | Mock (cho module BE chưa có endpoint) |
+| Data source | **REST API ngoài** — base URL: `http://api.halong24h.com` (BE chạy không có prefix `/api/v1` mặc dù spec ghi vậy). Lớp Mock đã loại bỏ — mọi module dùng API thật |
 | Dev port | **3001** (`npm run dev`) |
 
 ```bash
@@ -47,8 +46,7 @@ src/
 ├── infrastructure/        # 🔴 Infrastructure Layer (chi tiết kỹ thuật)
 │   ├── http/              # api-client, token-storage, api-config, error mapping
 │   ├── repositories/      # ApiXxxRepository — concrete impl của ports
-│   ├── mocks/             # MockXxxRepository — dữ liệu mock cho module chưa có API
-│   └── container.ts       # DI: trả về repo phù hợp (api/mock) theo env
+│   └── container.ts       # DI: resolve mỗi port về ApiXxxRepository (REST API thật)
 │
 ├── app/                   # 🔵 Presentation (Next.js App Router)
 │   ├── (admin)/, (host)/, (auth)/   # Route groups
@@ -75,7 +73,7 @@ core ◄── application ◄── infrastructure
 - `core` **KHÔNG** import từ bất kỳ layer nào khác.
 - `application` chỉ import `core`. Phụ thuộc Infrastructure qua **interface (port)**.
 - `infrastructure` import `core` + `application/ports`, implement port.
-- `app` (route/page) gọi **Server Action**, Server Action gọi **use case**, use case gọi **port** (Container resolve về Api/Mock impl).
+- `app` (route/page) gọi **Server Action**, Server Action gọi **use case**, use case gọi **port** (Container resolve về `ApiXxxRepository`).
 
 **KHÔNG được** import trực tiếp:
 - `infrastructure/*` từ Server Component / Client Component (luôn đi qua Server Action).
@@ -93,18 +91,17 @@ core ◄── application ◄── infrastructure
 
 | Module | Path prefix | Use cases |
 |---|---|---|
-| **Auth** | `/auth/*` | login, register, googleLogin, refresh, forgotPassword, resetPassword, getProfile, logout, changePassword |
+| **Auth** | `/auth/*` | login, register, googleLogin, refresh, forgotPassword, resetPassword, getProfile, updateProfile (`PATCH /auth/profile`), logout, changePassword |
 | **Properties** | `/properties/*` | list, getById, create, update, delete, updatePrices, uploadImages, deleteImage, setCover |
 | **Dashboard** | `/dashboard/stats`, `/reports` | getStats, getReports |
 | **Bookings** | `/bookings` (GET) | list, getById |
 | **Notifications** | `/notifications`, `/notifications/unread-count`, `/notifications/:id/read`, `/notifications/read-all` | list, unreadCount, markRead, markAllRead |
 
-### Module CHƯA có API → dùng MOCK
+### Module CHƯA có endpoint BE đầy đủ
 
-`bookings`, `calendar`, `notifications`, `reviews`, `kyc`, `billing`, `payment`, `permissions (admin)`, `users (admin)`, `disputes`, `messages`, `housekeeping`, `staff`, `leads`, `guests`, `reports (host)`.
+Một số thao tác chưa có endpoint thật (vd: `PATCH /auth/profile`, đổi role `PATCH /admin/users/:id/role`) → Server Action tương ứng hiện trả mock-success (xem Nhóm B trong changelog `mock-layer-removal`). Khi BE ra endpoint, wire thẳng vào action — UI không phải sửa.
 
-→ Tạo `MockXxxRepository` trong `src/infrastructure/mocks/` và đăng ký trong `container.ts`.
-→ Khi BE ra endpoint thật, **chỉ cần** thêm `ApiXxxRepository` và đổi 1 dòng trong container — UI không phải sửa.
+→ Lớp **MockXxxRepository swappable đã bị loại bỏ hoàn toàn**. Container luôn resolve về `ApiXxxRepository`. Không còn env `NEXT_PUBLIC_DATA_MODE_*`.
 
 ### Authentication flow
 
@@ -183,36 +180,25 @@ Trình tự cho 1 use case mới:
 2. application/ports/<x>-repository.ts  — interface
 3. application/<module>/<action>.ts     — use case (input/output type, gọi repo qua port)
 4. infrastructure/repositories/api-<x>-repository.ts  — gọi REST API
-5. infrastructure/mocks/mock-<x>-repository.ts        — mock nếu chưa có API
-6. infrastructure/container.ts — đăng ký
-7. app/actions/<module>.ts     — Server Action gọi use case, parse Zod
-8. app/(admin|host)/.../page.tsx — Server Component fetch, render
-9. components/<module>/...     — UI client
+5. infrastructure/container.ts — đăng ký (return new ApiXxxRepository())
+6. app/actions/<module>.ts     — Server Action gọi use case, parse Zod
+7. app/(admin|host)/.../page.tsx — Server Component fetch, render
+8. components/<module>/...     — UI client
 ```
 
 ---
 
-## 7. Mock Mode
+## 7. Data Source — chỉ API thật
 
-Mỗi module có thể chạy **api** hoặc **mock**, điều khiển bằng env:
-
-```bash
-# .env.local
-NEXT_PUBLIC_DATA_MODE_BOOKINGS=mock      # api | mock
-NEXT_PUBLIC_DATA_MODE_PAYMENTS=mock
-# Mặc định mọi module chưa có API = mock
-# Auth/Properties/Dashboard mặc định = api (vì spec đã có)
-```
-
-Container nhìn env và return repo tương ứng:
+Dự án thật: **không còn lớp Mock**. Container resolve mọi port thẳng về `ApiXxxRepository`, không có env `NEXT_PUBLIC_DATA_MODE_*`:
 
 ```ts
-export function bookingsRepo(): BookingRepository {
-  return process.env.NEXT_PUBLIC_DATA_MODE_BOOKINGS === 'api'
-    ? new ApiBookingRepository(httpClient)
-    : new MockBookingRepository()
+export function bookingRepository(): BookingRepository {
+  return new ApiBookingRepository()
 }
 ```
+
+Mọi gọi đều tới `http://api.halong24h.com`. Thao tác nào BE chưa có endpoint thì Server Action trả mock-success tạm thời (xem changelog `mock-layer-removal` Nhóm B) — wire API thật khi BE sẵn sàng.
 
 ---
 
@@ -221,7 +207,7 @@ export function bookingsRepo(): BookingRepository {
 AI agent phải **tự động cập nhật CLAUDE.md** khi:
 
 1. Tạo entity mới ⇒ cập nhật danh sách trong mục **§2** và **§6**.
-2. Tích hợp endpoint mới (BE ra endpoint mới cho module đang mock) ⇒ chuyển từ §3 "MOCK" sang "TÍCH HỢP THẬT", note thay đổi env.
+2. Tích hợp endpoint mới (BE ra endpoint cho thao tác đang mock-success) ⇒ wire API vào Server Action + cập nhật §3.
 3. Đổi cấu trúc folder ⇒ cập nhật cây thư mục §2.
 4. Thêm pattern/quy ước mới ⇒ ghi vào `docs/CODING-STANDARDS.md`, link từ §4.
 5. Đổi data flow (auth, RLS, RBAC) ⇒ cập nhật §3 hoặc §5.
@@ -232,33 +218,35 @@ AI agent phải **tự động cập nhật CLAUDE.md** khi:
 
 ## 9. Data Source
 
-Project dùng **REST API** qua Clean Architecture:
-- Auth/Properties/Dashboard/Bookings/Notifications → `ApiXxxRepository` (REST API)
-- Module chưa có endpoint → `MockXxxRepository`
+Project dùng **REST API** qua Clean Architecture: mọi port → `ApiXxxRepository` (REST API). Lớp Mock đã loại bỏ hoàn toàn (xem §7).
 
 Supabase đã được loại bỏ hoàn toàn (code, config, migrations, packages). Không còn bất kỳ reference nào trong source code.
 
 ---
 
-## 10. Roadmap thoát Mock
+## 10. Trạng thái module (đều dùng ApiXxxRepository)
 
-| Module | Trạng thái | Ưu tiên |
+Lớp Mock đã loại bỏ — mọi module gọi API thật. Bảng dưới ghi độ phủ endpoint thực tế của BE:
+
+| Module | Endpoint | Ghi chú |
 |---|---|---|
-| Auth | ✅ API | — |
-| Properties | ✅ API | — |
-| Dashboard | ✅ API | — |
-| Bookings | ✅ API `GET /bookings` (read-only — chưa có CRUD) | High |
-| Notifications | ✅ API `GET /notifications` + `unread-count` + `markRead` | Low |
-| Calendar | 🟡 Mock (`MockCalendarRepository`) | High |
-| Subscriptions (gói cước) | ✅ API `GET /admin/subscriptions` + `/admin/users/:id/subscription/*` (default api từ 2026-06-13) | — |
-| Payment sessions (đối soát) | ✅ API `GET /admin/payments` + `POST /admin/payments/:id/mark-paid` | — |
-| Disputes | 🟡 Mock (`MockDisputeRepository`) | Medium |
-| KYC | 🟡 Mock (chưa có repo) | Medium |
-| Messages | 🟡 Mock (chưa có repo) | Medium |
-| Reviews | 🟡 Mock (chưa có repo) | Low |
-| Permissions/Users (admin) | 🟡 Mock (chưa có repo) | Low |
+| Auth | ✅ `/auth/*` (+ `PATCH /auth/profile`) | — |
+| Properties | ✅ `/properties/*` | — |
+| Dashboard | ✅ `/dashboard/stats` + `/reports` + `/reports/risk-kpis` | — |
+| Bookings | ✅ `/bookings` (list/detail + hold/confirm/paid/cancel) | — |
+| Notifications | ✅ `/notifications` + `unread-count` + `markRead` | — |
+| Calendar | ✅ `/calendar/*` (+ `POST /calendar/bulk`) | — |
+| Subscriptions | ✅ `/admin/subscriptions` + `/admin/users/:id/subscription/*` + `/subscriptions/me/invoices` + `/admin/subscriptions/:id/call-log` | — |
+| Payment sessions | ✅ `/admin/payments` + `/admin/payments/:id/mark-paid` | — |
+| Disputes | ✅ `/disputes` + `/admin/disputes/*` (evidence/verdict/chatExcerpts/penalty live §25.8) | — |
+| KYC (admin) | ✅ `/admin/kyc/*` + `GET /admin/kyc/:id` (verificationFields[7] + uploads + payments §25.9) | — |
+| Reviews | ✅ `/admin/reviews` + `/properties/:id/reviews` | — |
+| Permissions / Users (admin) | ✅ `/permissions/:userId` + `/users?withStats=true` (stats.disputeCount + lastActiveAt) + `PATCH /users/:id/role` | — |
+| Guests | ✅ `/guests` + `/guests/:id` | — |
+| Leads | ✅ `/leads` | — |
+| Chat / Messages | ✅ `/conversations/*` (REST) + Socket.IO `/chat` | — |
 
-Khi BE bổ sung endpoint, cập nhật bảng này + §3.
+**Thao tác BE vẫn chưa có endpoint** (Server Action còn mock-success): housekeeping (module "Sắp ra mắt"). Khi BE bổ sung, wire thẳng vào Server Action + cập nhật bảng này.
 
 ---
 
@@ -305,10 +293,15 @@ Khi BE bổ sung endpoint, cập nhật bảng này + §3.
 | 2026-06-13 | sessions-pagination | **Phân trang `/admin/payments/sessions`.** Thêm `<Pagination>` (reuse component, PAGE_SIZE=10) client-side trên tập `visibleSessions` đã lọc — giống pattern `/admin/payments`. URL `?page=`, `pageHref` giữ `status`+`q`; đổi tab/search tự reset về trang 1 (href không kèm page). BE fetch tối đa `limit=100`. Typecheck **0 errors**, lint **0 warnings**. |
 | 2026-06-13 | reports-real-api | **`/admin/reports` chuyển MOCK → API thật (100%).** Trang trước đây fabricate 5 KPI §7 + 2 bảng demo (`getMock`). BE chưa có `/admin/reports/risk-kpis` và 3/5 chỉ số §7 (host-cancel, no-show, deletion-request) không có endpoint nào → thiết kế lại quanh dữ liệu thật đang có. **6 KPI card** (Promise.all): Tổng việc cần xử lý (sum), Dispute đang mở (`countActiveDisputesAction`), Review bị gắn cờ (`countFlaggedReviewsAction`), KYC chờ duyệt (`countPendingKycAdminAction`), Subscription quá hạn (`countOverdueSubscriptionsAction`), Doanh thu đã thu tháng này (`sumPaidSubscriptionsAction` + `monthRange`). Mỗi card là Link tới trang xử lý tương ứng + CTA. Bỏ Sparkbar/delta giả. **2 bảng thật**: "Dispute đang chờ" (`listDisputesAction` lọc open/investigating, sort desc, top 6, link `/admin/disputes/[id]`) thay bảng recent-disputes mock; "Review bị gắn cờ" (`listReviewsAction({flagged:true})` top 6) thay bảng top-host-cancel (không có endpoint booking-analytics). Bỏ range selector (KPI là snapshot hiện tại, chỉ doanh thu theo tháng). Banner amber khi action nào fail (không im lặng hiển thị 0). Typecheck **0 errors**, lint **0 warnings**. |
 | 2026-06-14 | gộp 1 hệ giá gói cước (owner = danh mục admin) | **Gỡ bỏ hệ giá per-room thừa ở phía chủ nhà — chủ nhà giờ thấy đúng danh mục gói admin quản lý.** Trước đây tồn tại 2 hệ: (a) danh mục `BillingPlan` (`/billing/plans`, `rooms_*`, giá tháng/năm) admin sửa ở `/admin/pricing`; (b) hằng số hardcode `PRICE_PER_ROOM` (50k/phòng) — chủ nhà bị tính theo (b), khác hẳn (a). **Sửa**: (1) Entity [subscription.ts](src/core/entities/subscription.ts) thêm `Subscription.planId` (id gói thật, nguồn chuẩn để tra tên/giá; `plan` bucket free/basic/... giờ chỉ còn là phân loại nội bộ admin). (2) [api-subscription-repository.ts](src/infrastructure/repositories/api-subscription-repository.ts) map `planId = subscriptionPlanId ?? planId`. (3) Mock repo thêm `planId` cho 5 seed. (4) **Rewrite** [tier-selector.tsx](src/components/host/tier-selector.tsx): nhận `plans: BillingPlan[]` + `currentPlanId`, render thẳng danh mục (giá tháng/năm thật, "—" khi BE chưa cấu hình, tiết kiệm % khi trả năm), bỏ toggle/per-room math + bỏ modal "thành công" giả → dialog hiện thông tin chuyển khoản thật. (5) [host/billing](src/app/(host)/host/billing/page.tsx): fetch `listBillingPlansAction()`, hero hiện tên gói theo `planId` + **chi phí kỳ = `sub.amount` BE trả** (bỏ `roomCount × PRICE_PER_ROOM`), bỏ `ROOM_RANGE`. (6) [host/settings/subscription](src/app/(host)/host/settings/subscription/page.tsx): nhãn gói theo `planLabel(sub.planId)`, bỏ dòng per-room + bảng giá hardcode → link sang trang Gói cước. (7) [admin/payments](src/app/(admin)/admin/payments/page.tsx): cột gói hiện `planLabel(s.planId)` (đồng bộ tên với danh mục) thay nhãn bucket suy từ roomCount. **Còn lại (admin-internal, cần BE để bỏ hẳn)**: enum `SubscriptionPlan`/`PRICE_PER_ROOM`/`planForRoomCount`/`calcSubscriptionAmount` vẫn giữ cho mapper suy `plan` bucket (màu badge) + mock seed + tính năng "đổi gói" trong user-moderation (cần endpoint BE set planId mới gỡ được). **BE cần làm để chủ nhà thấy đủ giá**: điền `monthlyPrice` + `rooms` cho từng gói trong danh mục (hiện chỉ có giá năm → cột giá tháng/số phòng ra "—"). Typecheck **0 errors**, lint 0 warning mới. |
+| 2026-06-24 | pricing-field-map-fix | **🐛 Fix `/admin/pricing` bảng sửa hiện "—" ở Giá tháng + Phòng, sửa giá tháng không lưu được.** Nguyên nhân thật (đính chính chẩn đoán cũ ở entry `pricing-ux`): endpoint admin `GET /admin/billing-plans` trả tên trường **legacy** (`minCharge`/`maxRooms`/`pricePerRoom`) còn public `GET /billing/plans` đã chuẩn hoá (`monthlyPrice`/`rooms`) — verify bằng curl. `ApiBillingPlanRepository` trước pass-through raw nên chỉ `yearlyPrice` (trùng tên) hiện đúng; `monthlyPrice`/`rooms` undefined → "—". Code ghi cũng gửi sai (`monthlyPrice`/`rooms`) trong khi BE chờ `minCharge`/`maxRooms` (spec §10.1) → Lưu giá tháng bị bỏ qua. **Fix** [api-billing-plan-repository.ts](src/infrastructure/repositories/api-billing-plan-repository.ts): `mapPlan()` đọc tolerant 2 tên (`monthlyPrice ?? minCharge`, `rooms ?? maxRooms`, `maxRooms===null → -1`) cho cả `list`+`listAll`; `toWriteDto()` ghi đúng tên spec (`minCharge`/`maxRooms`/`pricePerRoom` tự tính + `name` từ `planLabel`) cho create+update; `delete` đọc `softDeleted` (spec §10.1) thay field `mode` không tồn tại. Typecheck **0 errors**. |
 | 2026-06-14 | pricing-ux + ẩn rò rỉ endpoint | **Trang `/admin/pricing` (gói cước — dùng API thật, không phải mock).** (1) **Gỡ text làm lộ endpoint/jargon kỹ thuật** khỏi UI: [billing-plan-editor.tsx](src/components/admin/billing-plan-editor.tsx) đổi tiêu đề "Catalog admin (read/write)" → **"Danh mục gói cước"**, bỏ subtitle "CRUD trực tiếp qua `/admin/billing-plans`. Bao gồm gói inactive (soft-deleted)" → mô tả nghiệp vụ; toast/ConfirmDialog/AdminWriteHint bỏ "ref/soft delete/BE" → ngôn ngữ người dùng ("đang có người dùng → ẩn gói"). [pricing/page.tsx](src/app/(admin)/admin/pricing/page.tsx): description + section "Public preview" (`/billing/plans`, "cache 5 phút") + Notes (`GET /billing/plans`, `User.subscriptionPlanId`) → diễn đạt nghiệp vụ, bỏ mã endpoint. (2) **Trường null/trống → "—"**: cột Phòng (rooms `== null` → "—", `-1` → "∞"), Giá tháng/năm (0 → "—"), Tính năng (rỗng → "—") ở cả bảng editor lẫn bảng preview + card. (3) **Rà soát trang tương tự — gỡ rò rỉ hiển thị**: [permissions/page.tsx](src/app/(admin)/admin/permissions/page.tsx) bỏ "Spec §12", "CRUD" → "thao tác (thêm/xem/sửa/xoá)", "/staff/invites" → "mời qua email"; [permission-editor.tsx](src/components/admin/permission-editor.tsx) bỏ "Spec §12"; [settings/emails/page.tsx](src/app/(admin)/admin/settings/emails/page.tsx) "(BE chưa có endpoint)" → "(sắp ra mắt)"; [test-email-button.tsx](src/components/admin/test-email-button.tsx) bỏ "BE chưa wire endpoint…log ra console" → mô tả nghiệp vụ; [host/bookings/[id]](src/app/(host)/host/bookings/[id]/page.tsx) bỏ "Khi BE bổ sung endpoint conversations". **Xác nhận `/admin/pricing` dùng API thật** (`ApiBillingPlanRepository` → `GET /billing/plans` + `/admin/billing-plans`), KHÔNG mock — cột Phòng trống do BE chưa trả `rooms` cho các gói đó (nay hiển thị "—"). Typecheck **0 errors**, lint 0 warning mới. |
 | 2026-06-14 | mock-cleanup + paginate-all | **(1) Bỏ dữ liệu demo cứng còn sót + chuẩn hoá empty/error state.** Helper mới [lib/pagination.ts](src/lib/pagination.ts) (`parsePage`/`pageCount`/`paginate`/`buildPageHref`) dùng chung cho Server Component. [host/guests](src/app/(host)/host/guests/page.tsx): xoá mảng `DEMO` 6 khách + `getGuests()` → empty-state "chờ BE" (module chưa có endpoint). [host/billing](src/app/(host)/host/billing/page.tsx): xoá mảng `invoices` bịa + component `InvoiceStatus`; lịch sử hoá đơn → empty-state (hero gói cước vẫn dùng dữ liệu thật). [host/leads](src/app/(host)/host/leads/page.tsx) + [host/leads/[id]](src/app/(host)/host/leads/[id]/page.tsx): **bỏ hẳn fallback DEMO** — lỗi BE giờ hiện banner lỗi rõ ràng / `notFound()`, không hiện dữ liệu giả. [host/messages](src/app/(host)/host/messages/page.tsx): bỏ fallback `DEMO_CONVERSATIONS`, **xoá file `demo-data.ts`**, đưa type `Conversation` vào page. (2) **Phân trang mọi bảng/list còn thiếu** (reuse `<Pagination>` + URL `?page=`): admin/bookings (PAGE_SIZE 20, giữ `?status=`), admin/properties (12, giữ status/q/type/sort), admin/disputes (10), host/bookings (15), host/properties (12), host/leads (10), host/messages (15), host/staff (10 cho cả 2 bảng — param riêng `?staffPage=`/`?invitePage=`). Các bảng đã có phân trang từ trước (admin users/payments/reviews/kyc/audit-log/payments-sessions) giữ nguyên. Typecheck **0 errors**, lint **0 warning mới** (chỉ còn warning pre-existing ở disputes/kyc-admin/subscriptions actions + emails). |
 | 2026-06-14 | emails BE-driven (Q7 resolved) | **BE chốt Q7: BE là source of truth cho 15 key email, FE đổi theo, KHÔNG layer mapping.** 15 key chính thức: `welcome_owner, welcome_sale, password_reset, booking_confirmed, booking_cancelled, booking_paid, kyc_approved, kyc_rejected, staff_invite, subscription_due, subscription_overdue, subscription_paid, dispute_opened, review_received, property_approved` (định nghĩa BE `email.service.ts`). `POST /admin/emails/test` reject key lạ. → **(1) Xoá toàn bộ stack render email song song của FE** (drift-prone, sai/thiếu key): 6 file `src/lib/emails/*` (`booking-confirmation`, `payment-received`, `booking-transitions`, `simple-templates`, `samples`, `types`) + route `src/app/api/admin/emails/preview/[template]/route.tsx`. (2) **Trang [/admin/emails](src/app/(admin)/admin/emails/page.tsx) render hoàn toàn động từ BE** — danh sách + key + label/description/sampleSubject lấy từ `GET /admin/emails/templates`, không hardcode. BE đổi template → FE tự đồng bộ, không redeploy. **Bỏ iframe preview**; preview chuẩn = nút "Gửi test cho tôi" gửi email BE thật vào inbox admin. (3) [admin-emails.ts](src/app/actions/admin-emails.ts) viết lại: `getEmailServiceStatusAction` trả `{ smtpEnabled, templates: EmailTemplate[] }` (fallback `label=key` khi BE chưa extend); `sendTestEmailAction` bỏ `VALID_KEYS`/`EMAIL_TEMPLATE_META`, chỉ `z.string().min(1)` (BE validate key). **BE sẽ extend** response thêm `label`/`description`/`sampleSubject` — FE đã xử lý optional nên không vỡ khi chưa có. (4) **Nhãn tiếng Việt hiển thị** ([template-labels.ts](src/lib/emails/template-labels.ts)) — từ điển `EMAIL_TEMPLATE_LABELS` cho 15 key BE (lớp i18n hiển thị, KHÔNG phải mapping key). Thứ tự ưu tiên render: `label` BE → nhãn FE → key. Giúp admin đọc "Chào mừng chủ nhà" thay vì `welcome_owner` ngay cả khi BE chưa extend. Typecheck **0 errors**, lint **0 warnings**. |
 | 2026-06-14 | xoá System Settings + emails-status-wire | **BE chốt KHÔNG làm API settings** (1 admin operator, default checkin/out/currency/language hardcode `constants.ts` là đủ; terms/cancelPolicy là static content landing; maintenance gấp dùng PM2/nginx 503). → **(1) Xoá hẳn trang `/admin/settings`** (Option 1): xoá [system-settings.tsx], `/admin/settings/page.tsx`, `/admin/settings/emails/page.tsx` (toàn bộ là mock `setTimeout` không persist — tránh user tưởng đã lưu). **Chuyển trang Mẫu email lên [`/admin/emails`](src/app/(admin)/admin/emails/page.tsx)** (route mới, breadcrumb/back trỏ `/admin` Tổng quan). Sidebar [manager-sidebar.tsx](src/components/layout/manager-sidebar.tsx) đổi mục "Cài đặt hệ thống" → **"Mẫu email"** (icon `Mail`) trỏ `/admin/emails`. (2) **Wire `GET /admin/emails/templates` (spec §16)** — action mới `getEmailServiceStatusAction()` trong [admin-emails.ts](src/app/actions/admin-emails.ts) trả `{ smtpEnabled, templateKeys }`. Trang emails: badge "● SMTP đang hoạt động/chưa cấu hình", truyền `smtpEnabled` xuống [test-email-button.tsx](src/components/admin/test-email-button.tsx) → disable nút + hint "(SMTP tắt)" khi `false`; cảnh báo amber khi template FE chưa có trong danh sách key BE. Lỗi/chưa expose → `undefined` = không xác định, KHÔNG chặn gửi (tránh false-block). **Decision BE đã chốt (nếu sau này làm)**: 1 object `GET/PUT /admin/settings` + `GET /settings/public` (Public), maintenance BE enforce global guard (không chỉ FE banner), terms = Markdown, không versioning (dựa AuditLog `settings.update`), currency chỉ VND, time regex `^([01]\d\|2[0-3]):[0-5]\d$`, chỉ ADMIN ghi. **Flag BE còn mở (Q7)**: 15 key spec §16 (`welcome_owner`, `booking_confirmed`...) khác bộ key FE (`booking_confirmation`, `booking_request_guest`...) — cần BE xác nhận mapping để `POST /admin/emails/test` không lệch key. Typecheck **0 errors**, lint **0 warnings**. |
+| 2026-06-23 | gộp 2 trang tài chính → 1 | **Gộp `/admin/payments` (trạng thái subscription) + `/admin/payments/sessions` (duyệt thanh toán) thành 1 trang** vì tách 2 gây khó hiểu. Mô hình mới rõ: chủ nhà CK mua gói → tạo PaymentSession → admin **Duyệt** (xác nhận nhận tiền) → gói kích hoạt. [/admin/payments](src/app/(admin)/admin/payments/page.tsx) (171 dòng — chỉ điều phối) có **segmented control 2 view** qua `?view=approve|subs`: (a) **"Chờ duyệt (N)"** = hàng đợi đối soát (banner ACB + bảng session + `MarkSessionPaidButton`), default khi có session chờ; (b) **"Tất cả gói cước (N)"** = trạng thái subscription từng chủ nhà (tabs status + search + `SubscriptionRowActions`). Mỗi view có status sub-filter (`?status=`) + search (`?q=`) + phân trang (`?page=`, size 10). 2 view tách ra component [payments-approve-view.tsx](src/components/admin/payments-approve-view.tsx) + [payments-subs-view.tsx](src/components/admin/payments-subs-view.tsx), 2 bảng [subscriptions-table.tsx](src/components/admin/subscriptions-table.tsx) + [payment-sessions-table.tsx](src/components/admin/payment-sessions-table.tsx), helper chung [payments-shared.ts](src/components/admin/payments-shared.ts) (giữ mọi file <400 dòng). `/admin/payments/sessions` → `redirect('/admin/payments?view=approve')` (giữ bookmark cũ). Sidebar gộp 2 mục ("Subscription chủ nhà" + "Duyệt gói cước đã mua") → 1 mục **"Gói cước chủ nhà"** (bỏ import `Banknote` thừa). Status lọc client-side để count trên segmented control luôn là tổng. Typecheck **0 errors**, lint 0 warning mới. |
+| 2026-06-23 | kyc-bypass-toggle | **Nút "Cho qua KYC" (kycBypass) ở trang chi tiết user** (spec §2A.7 — `PATCH /users/:id/kyc-bypass` body `{bypass:boolean}`, ADMIN-only, đã live). Full stack: `AdminUser.kycBypass:boolean` + `SetKycBypassInput` (entity), port `setKycBypass`, `ApiAdminUserRepository.setKycBypass` (patch rồi re-fetch withStats; map `s.kycBypass ?? false`), `setKycBypassUseCase` (Zod `{userId:uuid, bypass:boolean}`), `setUserKycBypassAction` (requireAdmin + revalidate). UI: [kyc-bypass-toggle.tsx](src/components/admin/kyc-bypass-toggle.tsx) (badge trạng thái + nút cấp/thu hồi qua `ConfirmDialog` + toast + router.refresh) gắn vào section "Xác minh KYC & Gói cước" (OWNER-only) trong [admin/users/[id]/page.tsx](src/app/(admin)/admin/users/[id]/page.tsx). Typecheck **0 errors**, lint 0 warning mới. |
+| 2026-06-23 | be-v2-§25-wire | **Wire 8 endpoint mới + mở rộng (BE spec §25, đã live prod) + nối 2 tile dashboard.** **#1** `PATCH /auth/profile` — `AuthRepository.updateProfile` + `updateProfileAction` (Zod fullName/email/phone, guard `getCurrentProfile`→/login tránh circular import) + `profile-form.tsx` chuyển sang `useActionState` (bỏ setTimeout giả). **#2** đổi role: `AdminUserRepository.updateRole` → `PATCH /users/:id/role` (KHÔNG prefix `/admin`), `changeUserRoleAction` gọi `updateRoleUseCase` thật (RoleSchema `userId` siết `.uuid()`), bỏ comment "mock-only". **#3** Guests module mới (full stack): `core/entities/guest.ts`, port, 2 use case, `ApiGuestRepository` (`GET /guests` + `/guests/:id`), `guestRepository()` container, `actions/guests.ts` (guard `requireManagerRole` + uuid), trang list `/host/guests` (search `q` + filter label + phân trang server-side) + detail `/host/guests/[id]` (recentBookings), `guest-label-badge.tsx`. **#4** `GET /subscriptions/me/invoices` → entity `SubscriptionInvoice` + `listMyInvoices` + `listMyInvoicesAction` + bảng hoá đơn trong `/host/billing` (thay empty-state; SALE 400 → notice). **#5** `POST/GET /admin/subscriptions/:id/call-log` → `SubscriptionCallLog` + `addCallLog`/`listCallLogs` + 2 action (requireAdmin + uuid, note 3–2000) + `subscription-row-actions.tsx` lưu thật (bỏ toast giả). **#6** `POST /calendar/bulk` (đổi path, body `{mode, items:[{propertyId,date}]}`, max 100) → `CalendarRepository.bulkLock` + `bulkLockDatesAction` 1 request (thêm guard `requireManagerRole`, expand `dates[]`→`items[]`). **#7** `GET /users?withStats` → map `stats.disputeCount` + `lastActiveAt` (bỏ default cứng 0/null; `lastActiveAt` null = chỉ dùng web → "Chưa ghi nhận"). **#8** `GET /admin/disputes/:id` mở rộng: map `evidence`(alias attachments)/`verdict`(alias resolution text)/`chatExcerpts[]`(≤20, cũ→mới)/`penalty`(enum phẳng → `penaltyAction`); `resolveDisputeAction` thêm `penaltyAction` (Zod enum), repo `resolve` chỉ gửi `{resolution, refundAmount, penalty}` đúng spec (object penalty FE-internal KHÔNG gửi); detail page render transcript + penalty badge; form thêm selector "Mức xử phạt", ô hoàn tiền hiện khi `penaltyAction==='refund'`. **#9** `GET /admin/kyc/:id` mới → `KycAdminDetail` (uploads 3 ảnh + payments + `verificationFields[7]` + passed/total), port `getDetail`, `getKycAdminDetailAction`, trang `/admin/kyc/[id]` render checklist 7 mục + ảnh CCCD/selfie + payments (`kyc-detail-sections.tsx`). **Group B** dashboard `/admin`: "Khiếu nại đang mở" → `countActiveDisputesAction`, "Doanh thu subscription" → `sumPaidSubscriptionsAction(monthRange)` (bỏ hardcode 0 + 15.9M giả). **Review** (code-reviewer agent): 0 CRITICAL, 3 HIGH đã fix (guard `updateProfileAction` + `bulkLockDatesAction`; uuid-validate `userId` ở call-log + role). Typecheck **0 errors**, lint 0 warning mới. **Còn chờ BE/quyết định**: dispute form vẫn còn UI verdict/penaltyType FE-internal cũ (không gửi BE, chỉ `refundAmount` dùng) — nên dọn ở đợt sau; KYC score giả định thang 0–1; `lastActiveAt` chỉ từ mobile FCM. |
+| 2026-06-23 | mock-layer-removal | **Loại bỏ hoàn toàn lớp Mock (dự án thật chỉ dùng API).** **Nhóm A — đã xoá:** (1) Xoá 12 file `src/infrastructure/mocks/*` + thư mục `mocks/`. (2) [container.ts](src/infrastructure/container.ts) viết lại: gỡ helper `modeFor`, type `Mode`, mọi nhánh rẽ `?mock:api` + singleton (lead/subscription/review/audit-log chỉ tồn tại để cache state mock) → mỗi hàm `return new ApiXxxRepository()`. Gỡ 12 import Mock. (3) Xoá 6 biến `NEXT_PUBLIC_DATA_MODE_*` khỏi `.env` + `.env.local` (mặc định vốn đã `api`, ghi `=api` thừa). (4) Sửa comment lỗi thời nhắc Mock repo trong [audit-log.ts](src/core/entities/audit-log.ts), [review.ts](src/core/entities/review.ts), [calendar-repository.ts](src/application/ports/calendar-repository.ts), [entitlement.ts](src/lib/entitlement.ts), [properties/new/page.tsx](src/app/(host)/host/properties/new/page.tsx). (5) Cập nhật CLAUDE.md §1/§2/§3/§6/§7/§9/§10. **Nhóm B — GIỮ LẠI (không phải mock repo, là stub vì BE chưa có endpoint — xoá sẽ vỡ UI):** [profile-form.tsx](src/components/account/profile-form.tsx) (chưa có `PATCH /auth/profile`), [admin-users.ts](src/app/actions/admin-users.ts) `updateUserRoleAction` (chưa có `PATCH /admin/users/:id/role`), [lead.ts](src/app/actions/lead.ts) legacy mock-success, 2 tile "(mock — chờ BE)" ở [admin/page.tsx](src/app/(admin)/admin/page.tsx), email test mode (`NEXT_PUBLIC_EMAIL_LIVE=false`). Khi BE ra endpoint → wire thẳng vào action. **Trạng thái mới**: 0 file mock, container chỉ Api. Typecheck **0 errors**, lint chỉ còn warning pre-existing (unused `profile`/`user` + eslint-disable thừa), không phát sinh mới. |
 | 2026-06-13 | be-v1.14-sync | **Đồng bộ BE v1.14 (NO_SHOW + risk-kpis + delete grace).** (1) **Booking NO_SHOW (status=4)**: `BookingStatus` thêm `'no_show'`; `ApiBookingRepository.STATUS_MAP[4]='no_show'`; label "Khách không đến" + badge variant `dark` trong [booking-display.ts](src/lib/booking-display.ts) + 3 Record cục bộ (host list/detail, đã đồng bộ). Thêm tab "Khách không đến" ở `/admin/bookings` (lọc client-side) + `/host/bookings` (lọc server `?status=no_show`) + `isBookingStatus`/`VALID_STATUS`. (2) **`/admin/reports` → `GET /admin/reports/risk-kpis` thật (spec §7A.5)**: full stack mới — entity [risk-kpi.ts](src/core/entities/risk-kpi.ts) (`RiskRange`, `RiskMetric{value,prev}`, `TopHostCancelRow`, `RiskKpis` 10 field), port `DashboardRepository.getRiskKpis(range)`, `ApiDashboardRepository` map tolerant (`metric()` chấp nhận `{value,prev}`/số/thiếu), use case [get-risk-kpis.ts](src/application/dashboard/get-risk-kpis.ts), action `getRiskKpisAction(range)` (requireAdmin). Trang hiển thị **8 KPI card có delta vs kỳ trước** (Dispute mở, Chủ huỷ %, No-show %, Review cờ, Yêu cầu xoá account, KYC chờ, Subscription quá hạn [snapshot — ẩn delta], Doanh thu đã thu [tăng=tốt]) + **range tabs** 7/30/90/365 ngày + bảng **Top chủ huỷ** thật (từ `topHostCancel`) + bảng Dispute đang chờ (`listDisputesAction`). Bỏ KPI ghép tạm từ count rời (đợt trước). (3) **DELETE /users/me grace 30 ngày**: web manager **không có UI self-delete** (chỉ trang legal `/legal/privacy` nhắc tới) → không cần đổi UX; chỉ ghi nhận (mobile xử lý). Typecheck **0 errors**, lint **0 warnings**. **Optional chưa làm**: cột "Huỷ bởi <role>" + lý do trong booking detail (BE đã trả `cancelledByRole/cancelledReason`) — chưa cấp thiết. |
 
 ---

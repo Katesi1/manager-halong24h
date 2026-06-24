@@ -3,11 +3,15 @@ import 'server-only';
 import {
   calcSubscriptionAmount,
   planForRoomCount,
+  type CallLogAdmin,
   type FreezeInput,
+  type InvoiceKind,
   type MarkPaidInput,
   type Subscription,
+  type SubscriptionCallLog,
   type SubscriptionCycle,
   type SubscriptionFilters,
+  type SubscriptionInvoice,
   type SubscriptionPlan,
   type SubscriptionStatus,
 } from '@/core/entities/subscription';
@@ -77,6 +81,79 @@ interface SpecSubscription {
 function roomsFromPlanId(planId: string): number {
   const m = /^rooms_(\d+)/.exec(planId);
   return m ? parseInt(m[1]!, 10) : 0;
+}
+
+/** Spec — item trong `GET /subscriptions/me/invoices` → `data.items[]`. */
+interface SpecInvoice {
+  id: string;
+  invoiceNumber?: string | null;
+  kind?: InvoiceKind;
+  planId?: string | null;
+  planLabel?: string | null;
+  cycle?: SubscriptionCycle;
+  rooms?: number | null;
+  period?: string | null;
+  amount?: number | null;
+  method?: string | null;
+  status?: string | null;
+  provider?: string | null;
+  referenceCode?: string | null;
+  paidAt?: string | null;
+  refundedAt?: string | null;
+  refundedAmount?: number | null;
+  expiresAt?: string | null;
+  createdAt?: string | null;
+}
+
+function mapInvoice(i: SpecInvoice): SubscriptionInvoice {
+  return {
+    id: i.id,
+    invoiceNumber: i.invoiceNumber ?? '',
+    kind: i.kind ?? 'subscription',
+    planId: i.planId ?? '',
+    planLabel: i.planLabel ?? '',
+    cycle: i.cycle ?? 'monthly',
+    rooms: i.rooms ?? 0,
+    period: i.period ?? '',
+    amount: i.amount ?? 0,
+    method: i.method ?? '',
+    status: i.status ?? '',
+    provider: i.provider ?? '',
+    referenceCode: i.referenceCode ?? null,
+    paidAt: i.paidAt ?? null,
+    refundedAt: i.refundedAt ?? null,
+    refundedAmount: i.refundedAmount ?? null,
+    expiresAt: i.expiresAt ?? null,
+    createdAt: i.createdAt ?? '',
+  };
+}
+
+/** Spec — item trong `GET /admin/subscriptions/:id/call-log`. */
+interface SpecCallLog {
+  id: string;
+  userId?: string | null;
+  adminId?: string | null;
+  note?: string | null;
+  createdAt?: string | null;
+  admin?: { id: string; name?: string | null; email?: string | null } | null;
+}
+
+function mapCallLogAdmin(
+  a: SpecCallLog['admin'],
+): CallLogAdmin | null {
+  if (!a) return null;
+  return { id: a.id, name: a.name ?? '', email: a.email ?? '' };
+}
+
+function mapCallLog(c: SpecCallLog, fallbackUserId: string): SubscriptionCallLog {
+  return {
+    id: c.id,
+    userId: c.userId ?? fallbackUserId,
+    adminId: c.adminId ?? '',
+    note: c.note ?? '',
+    createdAt: c.createdAt ?? '',
+    admin: mapCallLogAdmin(c.admin),
+  };
 }
 
 function mapSubscription(s: SpecSubscription): Subscription {
@@ -184,6 +261,16 @@ export class ApiSubscriptionRepository implements SubscriptionRepository {
     }
   }
 
+  async listMyInvoices(): Promise<SubscriptionInvoice[]> {
+    // Spec — Auth OWNER/SALE. SALE 400 `users.saleNotAssigned` nếu chưa gán owner
+    // → bubble lên action (caller hiển thị notice, không crash).
+    const data = await apiClient.get<{ items?: SpecInvoice[]; total?: number }>(
+      '/subscriptions/me/invoices',
+      { cache: 'no-store' },
+    );
+    return (data.items ?? []).map(mapInvoice);
+  }
+
   async countOverdue(): Promise<number> {
     // BE 2026-06-13: `{ count }` (sau khi apiClient unwrap envelope `data`).
     const data = await apiClient.get<number | { count?: number }>(
@@ -227,5 +314,24 @@ export class ApiSubscriptionRepository implements SubscriptionRepository {
       `/admin/users/${subscriptionId}/subscription/unfreeze`,
     );
     return mapSubscription(data);
+  }
+
+  async addCallLog(userId: string, note: string): Promise<SubscriptionCallLog> {
+    // Spec — `:id` là OWNER userId. POST body { note } → { id, userId, adminId, note, createdAt }.
+    const data = await apiClient.post<SpecCallLog>(
+      `/admin/subscriptions/${userId}/call-log`,
+      { note },
+    );
+    return mapCallLog(data, userId);
+  }
+
+  async listCallLogs(userId: string): Promise<SubscriptionCallLog[]> {
+    // Spec — newest-first, mỗi item kèm admin { id, name, email }.
+    const data = await apiClient.get<{ items?: SpecCallLog[] } | SpecCallLog[]>(
+      `/admin/subscriptions/${userId}/call-log`,
+      { cache: 'no-store' },
+    );
+    const arr = Array.isArray(data) ? data : (data.items ?? []);
+    return arr.map((c) => mapCallLog(c, userId));
   }
 }

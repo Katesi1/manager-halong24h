@@ -2,6 +2,7 @@ import 'server-only';
 
 import {
   CalendarStatus,
+  type BulkLockInput,
   type CalendarDay,
   type CalendarEvent,
   type CalendarFilters,
@@ -88,6 +89,14 @@ export class ApiCalendarRepository implements CalendarRepository {
   async unlockDate(input: UnlockDateInput): Promise<void> {
     await apiClient.delete('/calendar/lock', {
       body: { propertyId: input.propertyId, date: input.date },
+    });
+  }
+
+  async bulkLock(input: BulkLockInput): Promise<void> {
+    // Spec §25.6 — `POST /calendar/bulk` { mode, items: [{propertyId, date}] }.
+    await apiClient.post('/calendar/bulk', {
+      mode: input.mode,
+      items: input.items,
     });
   }
 

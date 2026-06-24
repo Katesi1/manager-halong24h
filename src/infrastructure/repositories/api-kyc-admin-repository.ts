@@ -3,13 +3,17 @@ import 'server-only';
 import {
   KYC_FIELD_LABEL,
   type ApproveKycInput,
+  type KycAdminDetail,
   type KycAdminFilters,
   type KycAdminListResult,
   type KycAdminSubmission,
   type KycField,
   type KycPayment,
   type KycQueueFilter,
+  type KycUploadDetail,
+  type KycUploadSet,
   type KycVerification,
+  type KycVerificationField,
   type RejectKycInput,
 } from '@/core/entities/kyc-admin';
 import type { KycSubmissionStatus } from '@/core/entities/kyc';
@@ -22,7 +26,11 @@ import { apiClient } from '../http/api-client';
  *
  * Danh sách: `GET /admin/kyc/queue?filter&q&page&pageSize` →
  *   `{ filter, pendingCount, items[], total, page, pageSize }`.
- * Chi tiết: `GET /kyc/submissions/:id` (ADMIN xem mọi hồ sơ, OWNER chỉ của mình).
+ * Chi tiết (legacy 5-field): `GET /kyc/submissions/:id` (ADMIN mọi hồ sơ, OWNER của mình).
+ * Chi tiết đầy đủ: `GET /admin/kyc/:id` (Auth ADMIN) → trả 3 ảnh upload (kèm
+ *   ocrResult/ocrConfidence/faceMatchScore/livenessScore/provider), checklist 7
+ *   yếu tố xác minh tự động (`verificationFields[]` + passed/total count) và danh
+ *   sách thanh toán `payments[]`. Dùng cho trang chi tiết `/admin/kyc/:id`.
  *
  * Status BE rút gọn còn `pending | approved | rejected` → map sang entity 8-state.
  * `uploads` là object `{ cccdFront, cccdBack, selfie }`, mỗi cái có `imageUrl`,
@@ -97,6 +105,64 @@ interface SpecQueueResponse {
   page: number;
   pageSize: number;
   items: SpecKycSubmission[];
+}
+
+/** 1 ảnh upload đầy đủ ở `GET /admin/kyc/:id`. */
+interface SpecUploadDetail {
+  id?: string;
+  imageUrl?: string | null;
+  imageUrlThumb?: string | null;
+  ocrResult?: unknown;
+  ocrConfidence?: number | null;
+  faceMatchScore?: number | null;
+  livenessScore?: number | null;
+  provider?: string | null;
+  uploadedAt?: string | null;
+}
+
+interface SpecVerificationField {
+  key?: string;
+  label?: string;
+  passed?: boolean;
+  source?: string | null;
+}
+
+interface SpecKycDetailUser {
+  id?: string;
+  name?: string;
+  email?: string;
+  phone?: string | null;
+  avatar?: string | null;
+  role?: number | null;
+  kycBypass?: boolean;
+  kycStatus?: string | null;
+  createdAt?: string | null;
+}
+
+interface SpecKycDetail {
+  id: string;
+  userId?: string;
+  user?: SpecKycDetailUser;
+  status: string;
+  statusLabel?: string | null;
+  rejectReason?: string | null;
+  rejectedItems?: string[];
+  approvedAt?: string | null;
+  approvedById?: string | null;
+  trialEndsAt?: string | null;
+  chargeStartsAt?: string | null;
+  expectedRooms?: number | null;
+  uploads?: {
+    cccdFront?: SpecUploadDetail | null;
+    cccdBack?: SpecUploadDetail | null;
+    selfie?: SpecUploadDetail | null;
+  };
+  payments?: SpecKycPayment[];
+  verificationFields?: SpecVerificationField[];
+  verificationPassedCount?: number;
+  verificationTotalCount?: number;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 /** Map status BE (rút gọn) sang entity 8-state; nhận cả camelCase legacy. */
@@ -234,6 +300,115 @@ function mapSubmission(s: SpecKycSubmission): KycAdminSubmission {
   };
 }
 
+function mapUploadDetail(
+  up: SpecUploadDetail | null | undefined,
+): KycUploadDetail | null {
+  if (!up) return null;
+  return {
+    id: up.id ?? '',
+    imageUrl: up.imageUrl ?? null,
+    imageUrlThumb: up.imageUrlThumb ?? null,
+    ocrResult: up.ocrResult ?? null,
+    ocrConfidence: typeof up.ocrConfidence === 'number' ? up.ocrConfidence : null,
+    faceMatchScore:
+      typeof up.faceMatchScore === 'number' ? up.faceMatchScore : null,
+    livenessScore:
+      typeof up.livenessScore === 'number' ? up.livenessScore : null,
+    provider: up.provider ?? null,
+    uploadedAt: up.uploadedAt ?? null,
+  };
+}
+
+function mapUploadSet(u: SpecKycDetail['uploads']): KycUploadSet {
+  return {
+    cccdFront: mapUploadDetail(u?.cccdFront),
+    cccdBack: mapUploadDetail(u?.cccdBack),
+    selfie: mapUploadDetail(u?.selfie),
+  };
+}
+
+function mapVerificationField(
+  f: SpecVerificationField,
+): KycVerificationField {
+  return {
+    key: f.key ?? '',
+    label: f.label ?? f.key ?? '',
+    passed: f.passed === true,
+    source: f.source ?? null,
+  };
+}
+
+/** Map `kycStatus` của user — chấp nhận cả `'none'` (chưa nộp). */
+function mapUserKycStatus(s: string | null | undefined): KycSubmissionStatus | 'none' {
+  if (!s || s === 'none') return 'none';
+  return mapStatus(s);
+}
+
+function mapDetail(d: SpecKycDetail): KycAdminDetail {
+  const fields = (d.verificationFields ?? []).map(mapVerificationField);
+  const passed = fields.filter((f) => f.passed).length;
+  return {
+    id: d.id,
+    userId: d.user?.id ?? d.userId ?? '',
+    user: {
+      id: d.user?.id ?? d.userId ?? '',
+      name: d.user?.name ?? '',
+      email: d.user?.email ?? '',
+      phone: d.user?.phone ?? null,
+      avatar: d.user?.avatar ?? null,
+      role: typeof d.user?.role === 'number' ? d.user.role : null,
+      kycBypass: d.user?.kycBypass === true,
+      kycStatus: mapUserKycStatus(d.user?.kycStatus),
+      createdAt: d.user?.createdAt ?? null,
+    },
+    status: mapStatus(d.status),
+    statusLabel: d.statusLabel ?? null,
+    rejectReason: d.rejectReason ?? null,
+    rejectedItems: d.rejectedItems ?? [],
+    approvedAt: d.approvedAt ?? null,
+    approvedById: d.approvedById ?? null,
+    trialEndsAt: d.trialEndsAt ?? null,
+    chargeStartsAt: d.chargeStartsAt ?? null,
+    expectedRooms: typeof d.expectedRooms === 'number' ? d.expectedRooms : null,
+    uploads: mapUploadSet(d.uploads),
+    payments: (d.payments ?? []).map(mapPaymentDetail),
+    verificationFields: fields,
+    verificationPassedCount:
+      typeof d.verificationPassedCount === 'number'
+        ? d.verificationPassedCount
+        : passed,
+    verificationTotalCount:
+      typeof d.verificationTotalCount === 'number'
+        ? d.verificationTotalCount
+        : fields.length,
+    createdAt: d.createdAt,
+    updatedAt: d.updatedAt ?? d.createdAt,
+  };
+}
+
+/** Payment trong list `payments[]` luôn có giá trị (khác `mapPayment` nullable). */
+function mapPaymentDetail(p: SpecKycPayment): KycPayment {
+  return {
+    id: p.id ?? undefined,
+    planId: p.planId ?? null,
+    cycle: p.cycle ?? null,
+    rooms: p.rooms ?? null,
+    totalAmount: p.totalAmount ?? null,
+    method: p.method ?? null,
+    status: p.status ?? null,
+    paidAt: p.paidAt ?? null,
+  };
+}
+
+/** Trả `true` nếu lỗi là HTTP 404 (không tìm thấy hồ sơ). */
+function isNotFound(err: unknown): boolean {
+  return (
+    err instanceof Error &&
+    'status' in err &&
+    (err as { status: number }).status === 404
+  );
+}
+
 export class ApiKycAdminRepository implements KycAdminRepository {
   async list(filters?: KycAdminFilters): Promise<KycAdminListResult> {
     const filter: KycQueueFilter = filters?.filter ?? 1;
@@ -265,17 +440,24 @@ export class ApiKycAdminRepository implements KycAdminRepository {
         cache: 'no-store',
       });
     } catch (err) {
-      if (
-        err instanceof Error &&
-        'status' in err &&
-        (err as { status: number }).status === 404
-      ) {
-        return null;
-      }
+      if (isNotFound(err)) return null;
       throw err;
     }
 
     return mapSubmission(data);
+  }
+
+  async getDetail(id: string): Promise<KycAdminDetail | null> {
+    let data: SpecKycDetail;
+    try {
+      data = await apiClient.get<SpecKycDetail>(`/admin/kyc/${id}`, {
+        cache: 'no-store',
+      });
+    } catch (err) {
+      if (isNotFound(err)) return null;
+      throw err;
+    }
+    return mapDetail(data);
   }
 
   async approve(input: ApproveKycInput): Promise<KycAdminSubmission> {

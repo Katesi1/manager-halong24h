@@ -4,8 +4,7 @@
  * Lifecycle:
  *   published (default) → hidden (admin ẩn vì spam/vi phạm) hoặc deleted (khách tự xoá)
  *
- * BE chưa có endpoint /reviews — dùng MockReviewRepository.
- * Khi BE ready: tạo ApiReviewRepository giữ nguyên port.
+ * Spec §7 — /admin/reviews + /properties/:id/reviews live (ApiReviewRepository).
  */
 
 export type ReviewStatus = 'published' | 'hidden' | 'deleted';

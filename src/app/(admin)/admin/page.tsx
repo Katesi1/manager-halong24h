@@ -6,8 +6,10 @@ import { listAdminUsersAction } from '@/app/actions/admin-users';
 export const metadata: Metadata = { title: 'Quản trị' };
 import { listBookingsAction } from '@/app/actions/bookings';
 import { getDashboardStatsAction } from '@/app/actions/dashboard';
+import { countActiveDisputesAction } from '@/app/actions/disputes';
 import { countPendingKycAdminAction } from '@/app/actions/kyc-admin';
 import { listPropertiesAction } from '@/app/actions/properties';
+import { sumPaidSubscriptionsAction } from '@/app/actions/subscriptions';
 import { RevenueBarChart } from '@/components/admin/revenue-bar-chart';
 import { UserRoleDonut } from '@/components/admin/user-role-donut';
 import { PageHeader, StatCard } from '@/components/host/page-header';
@@ -29,21 +31,44 @@ const FALLBACK_STATS = {
   todayRevenue: 0,
 };
 
+function currentMonthRange(): { from: string; to: string } {
+  const now = new Date();
+  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const to = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999),
+  );
+  return { from: from.toISOString(), to: to.toISOString() };
+}
+
 export default async function AdminOverviewPage() {
-  const [statsResult, propertiesResult, bookingsResult, kycCountResult, usersResult] =
-    await Promise.all([
-      getDashboardStatsAction(),
-      listPropertiesAction({ includeInactive: true }),
-      listBookingsAction(),
-      countPendingKycAdminAction(),
-      listAdminUsersAction(),
-    ]);
+  const { from, to } = currentMonthRange();
+  const [
+    statsResult,
+    propertiesResult,
+    bookingsResult,
+    kycCountResult,
+    usersResult,
+    activeDisputesResult,
+    monthlyPaidResult,
+  ] = await Promise.all([
+    getDashboardStatsAction(),
+    listPropertiesAction({ includeInactive: true }),
+    listBookingsAction(),
+    countPendingKycAdminAction(),
+    listAdminUsersAction(),
+    countActiveDisputesAction(),
+    sumPaidSubscriptionsAction(from, to),
+  ]);
 
   const stats = statsResult.ok ? statsResult.data : FALLBACK_STATS;
   const properties: Property[] = propertiesResult.ok ? propertiesResult.data : [];
   const bookings: Booking[] = bookingsResult.ok ? bookingsResult.data : [];
   const kycPendingCount = kycCountResult.ok ? kycCountResult.data : 0;
   const users = usersResult.ok ? usersResult.data : [];
+  const activeDisputes = activeDisputesResult.ok ? activeDisputesResult.data : 0;
+  const monthlySubscriptionRevenue = monthlyPaidResult.ok
+    ? monthlyPaidResult.data
+    : 0;
 
   const pendingProperties = properties.filter(
     (p) => !p.isActive && p.bookingCount === 0,
@@ -81,10 +106,9 @@ export default async function AdminOverviewPage() {
         <AlertCard
           icon="⚠️"
           label="Khiếu nại đang mở"
-          value={0}
-          tone="ok"
+          value={activeDisputes}
+          tone={activeDisputes > 0 ? 'warning' : 'ok'}
           href="/admin/disputes?status=open"
-          hint="(mock — chờ BE)"
         />
         <AlertCard
           icon="🚫"
@@ -99,9 +123,8 @@ export default async function AdminOverviewPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Doanh thu hệ thống (subscription)"
-          value={formatVND(15_900_000)}
-          hint="Tháng này · mock"
-          trend={{ value: '+17% so tháng trước', positive: true }}
+          value={formatVND(monthlySubscriptionRevenue)}
+          hint="Đã thu tháng này"
         />
         <StatCard
           label="Lượt đặt phòng tháng"

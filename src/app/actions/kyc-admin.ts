@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import {
   approveKycUseCase,
   countPendingKycUseCase,
+  getKycDetailUseCase,
   getKycSubmissionUseCase,
   listKycSubmissionsUseCase,
   rejectKycUseCase,
@@ -26,6 +27,13 @@ export async function getKycAdminAction(id: string) {
   return toResult(async () => {
     await requireAdmin();
     return getKycSubmissionUseCase(kycAdminRepository(), id);
+  });
+}
+
+export async function getKycAdminDetailAction(id: string) {
+  return toResult(async () => {
+    await requireAdmin();
+    return getKycDetailUseCase(kycAdminRepository(), id);
   });
 }
 

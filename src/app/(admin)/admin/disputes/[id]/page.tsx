@@ -7,10 +7,10 @@ import { DisputeResolutionForm } from '@/components/admin/dispute-resolution-for
 import { PageHeader } from '@/components/host/page-header';
 import { Badge } from '@/components/ui/badge';
 import {
+  DISPUTE_PENALTY_LABEL,
   DISPUTE_STATUS_LABEL,
   DISPUTE_TYPE_ICON,
   DISPUTE_TYPE_LABEL,
-  PENALTY_LABEL,
   VERDICT_LABEL,
   type DisputeStatus,
 } from '@/core/entities/dispute';
@@ -71,27 +71,19 @@ export default async function AdminDisputeDetailPage(props: {
         }
       />
 
-      {dispute.status === 'resolved' && dispute.verdict && (
+      {dispute.status === 'resolved' && (
         <div className="mb-6 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-100">
-          <p className="font-semibold">
-            ✓ Đã phán quyết: {VERDICT_LABEL[dispute.verdict]}
-            {dispute.penalty && dispute.penalty.type !== 'none' && (
-              <>
-                {' '}
-                · Phạt: {PENALTY_LABEL[dispute.penalty.type]}
-                {dispute.penalty.target && (
-                  <>
-                    {' '}
-                    cho{' '}
-                    {dispute.penalty.target === 'customer'
-                      ? 'khách'
-                      : 'chủ nhà'}
-                  </>
-                )}
-                {dispute.penalty.refundAmount && (
-                  <> · Hoàn {formatVND(dispute.penalty.refundAmount)}</>
-                )}
-              </>
+          <p className="flex flex-wrap items-center gap-2 font-semibold">
+            <span>✓ Đã phán quyết</span>
+            {/* verdict (object rich FE-internal) BE chưa expose — chỉ hiện khi có */}
+            {dispute.verdict && <span>· {VERDICT_LABEL[dispute.verdict]}</span>}
+            {dispute.penaltyAction && dispute.penaltyAction !== 'none' && (
+              <Badge variant="danger">
+                Xử phạt: {DISPUTE_PENALTY_LABEL[dispute.penaltyAction]}
+              </Badge>
+            )}
+            {dispute.penalty && dispute.penalty.refundAmount && (
+              <span>· Hoàn {formatVND(dispute.penalty.refundAmount)}</span>
             )}
           </p>
           {dispute.resolution && (
@@ -147,12 +139,30 @@ export default async function AdminDisputeDetailPage(props: {
                 Đoạn chat trích dẫn ({dispute.chatExcerpts.length})
               </h2>
               <p className="mt-1 text-sm text-ink-700">
-                Các tin nhắn quan trọng được lọc ra từ cuộc trò chuyện khách ↔
-                chủ nhà — làm bằng chứng cho phán quyết.
+                {dispute.chatExcerpts.length} tin nhắn mới nhất của cuộc trò
+                chuyện khách ↔ chủ nhà (cũ → mới) — làm bằng chứng cho phán
+                quyết.
               </p>
               <ul className="mt-5 space-y-3">
                 {dispute.chatExcerpts.map((c) => {
-                  const isCustomer = c.sender.role === 'customer';
+                  if (c.isSystem) {
+                    return (
+                      <li key={c.id} className="flex justify-center">
+                        <div className="max-w-[90%] rounded-full bg-ink-100 px-3 py-1.5 text-center text-[11px] text-ink-600">
+                          {c.content}
+                          <span className="ml-1.5 text-ink-400">
+                            {formatDateTime(c.createdAt)}
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  }
+                  // Khách hay chủ nhà? suy từ senderId so với 2 bên.
+                  const isCustomer = c.senderId === dispute.customer.id;
+                  const senderName = isCustomer
+                    ? dispute.customer.name
+                    : dispute.owner.name;
+                  const senderLabel = isCustomer ? 'Khách' : 'Chủ nhà';
                   return (
                     <li
                       key={c.id}
@@ -166,19 +176,21 @@ export default async function AdminDisputeDetailPage(props: {
                           (isCustomer ? 'bg-ink-700' : 'bg-navy-900')
                         }
                       >
-                        {c.sender.name.slice(0, 1).toUpperCase()}
+                        {(senderName || senderLabel).slice(0, 1).toUpperCase()}
                       </div>
-                      <div className={'max-w-[80%] ' + (isCustomer ? '' : 'text-right')}>
+                      <div
+                        className={
+                          'max-w-[80%] ' + (isCustomer ? '' : 'text-right')
+                        }
+                      >
                         <p className="text-[11px] font-medium text-ink-500">
-                          {c.sender.name} ·{' '}
-                          <span className="text-ink-700">
-                            {c.sender.role === 'customer' ? 'Khách' : 'Chủ nhà'}
-                          </span>{' '}
-                          · {formatDateTime(c.sentAt)}
+                          {senderName || senderLabel} ·{' '}
+                          <span className="text-ink-700">{senderLabel}</span> ·{' '}
+                          {formatDateTime(c.createdAt)}
                         </p>
                         <div
                           className={
-                            'mt-1 rounded-2xl px-4 py-2.5 text-sm ' +
+                            'mt-1 rounded-2xl px-4 py-2.5 text-sm whitespace-pre-line ' +
                             (isCustomer
                               ? 'bg-cream-100 text-ink-900 rounded-tl-sm'
                               : 'bg-navy-50 text-navy-900 rounded-tr-sm')
@@ -186,21 +198,6 @@ export default async function AdminDisputeDetailPage(props: {
                         >
                           {c.content}
                         </div>
-                        {c.attachmentUrl && (
-                          <div
-                            className={
-                              'mt-2 inline-block overflow-hidden rounded-lg border border-ink-200 bg-white p-1 ' +
-                              (isCustomer ? '' : 'ml-auto')
-                            }
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={c.attachmentUrl}
-                              alt="attachment"
-                              className="block max-h-40 rounded"
-                            />
-                          </div>
-                        )}
                       </div>
                     </li>
                   );
@@ -298,6 +295,11 @@ export default async function AdminDisputeDetailPage(props: {
                   >
                     {dispute.propertyName}
                   </Link>
+                  {dispute.propertyCode && (
+                    <p className="text-xs text-ink-500">
+                      Mã: {dispute.propertyCode}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

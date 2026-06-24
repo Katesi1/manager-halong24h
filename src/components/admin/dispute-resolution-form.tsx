@@ -12,8 +12,10 @@ import { Button } from '@/components/ui/button';
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import {
+  DISPUTE_PENALTY_LABEL,
   PENALTY_LABEL,
   VERDICT_LABEL,
+  type DisputePenalty,
   type DisputeStatus,
   type DisputeVerdict,
   type PenaltyType,
@@ -45,6 +47,15 @@ const PENALTIES: PenaltyType[] = [
   'refund_required',
 ];
 
+/** Mức xử phạt BE lưu (enum phẳng). Chọn KHÔNG tự ban — admin ban riêng. */
+const PENALTY_ACTIONS: DisputePenalty[] = [
+  'none',
+  'warning',
+  'refund',
+  'ban_temp',
+  'ban_perm',
+];
+
 export function DisputeResolutionForm({ disputeId, status }: Props) {
   const router = useRouter();
   const { show } = useToast();
@@ -60,6 +71,7 @@ export function DisputeResolutionForm({ disputeId, status }: Props) {
   );
   const [refundAmount, setRefundAmount] = useState<string>('');
   const [durationDays, setDurationDays] = useState<string>('');
+  const [penaltyAction, setPenaltyAction] = useState<DisputePenalty>('none');
   const [resolution, setResolution] = useState('');
 
   // Reject form
@@ -91,6 +103,7 @@ export function DisputeResolutionForm({ disputeId, status }: Props) {
           durationDays: durationDays ? Number(durationDays) : undefined,
           refundAmount: refundAmount ? Number(refundAmount) : undefined,
         },
+        penaltyAction,
         resolution: resolution.trim(),
       });
       if (!r.ok) show(r.error || 'Có lỗi', 'error');
@@ -190,8 +203,10 @@ export function DisputeResolutionForm({ disputeId, status }: Props) {
     );
   }
 
-  // Resolve mode
-  const needsRefund = penaltyType === 'refund_required';
+  // Resolve mode — ô hoàn tiền hiện khi mức phạt BE = refund (giá trị thật gửi
+  // BE) HOẶC khi chọn hình thức nội bộ refund_required.
+  const needsRefund =
+    penaltyType === 'refund_required' || penaltyAction === 'refund';
   const needsDuration = penaltyType === 'ban_temp';
 
   return (
@@ -321,6 +336,28 @@ export function DisputeResolutionForm({ disputeId, status }: Props) {
           rows={4}
           placeholder="VD: Sau khi đọc chat + bill, chủ nhà thừa nhận đã đổi phòng nhưng không thông báo trước. Yêu cầu chủ nhà hoàn 50% (2.250.000đ) cho khách trong 7 ngày…"
         />
+      </div>
+
+      <div>
+        <Label htmlFor="penalty_action">Mức xử phạt lưu hồ sơ</Label>
+        <select
+          id="penalty_action"
+          value={penaltyAction}
+          onChange={(e) =>
+            setPenaltyAction(e.target.value as DisputePenalty)
+          }
+          className="mt-2 h-11 w-full rounded-[10px] border border-ink-300 bg-white px-3 text-sm"
+        >
+          {PENALTY_ACTIONS.map((p) => (
+            <option key={p} value={p}>
+              {DISPUTE_PENALTY_LABEL[p]}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-[11px] text-ink-500">
+          Chọn mức phạt KHÔNG tự động khoá tài khoản — nếu cần ban, hãy thực
+          hiện riêng ở trang người dùng.
+        </p>
       </div>
 
       <div className="flex gap-2 pt-2">

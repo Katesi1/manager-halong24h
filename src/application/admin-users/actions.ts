@@ -5,6 +5,7 @@ import type {
   AdminUser,
   AdminUserFilters,
 } from '@/core/entities/admin-user';
+import { RoleCode } from '@/core/value-objects/role';
 import type { AdminUserRepository } from '../ports/admin-user-repository';
 
 export async function listAdminUsersUseCase(
@@ -74,6 +75,49 @@ export async function updateSubscriptionUseCase(
     );
   }
   return repo.updateSubscription(parsed.data);
+}
+
+const RoleSchema = z.object({
+  userId: z.string().uuid(),
+  role: z.union([
+    z.literal(RoleCode.ADMIN),
+    z.literal(RoleCode.OWNER),
+    z.literal(RoleCode.SALE),
+    z.literal(RoleCode.CUSTOMER),
+  ]),
+});
+
+export async function updateRoleUseCase(
+  repo: AdminUserRepository,
+  raw: unknown,
+): Promise<AdminUser> {
+  const parsed = RoleSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new ValidationError(
+      'Dữ liệu vai trò không hợp lệ',
+      parsed.error.flatten().fieldErrors,
+    );
+  }
+  return repo.updateRole(parsed.data);
+}
+
+const KycBypassSchema = z.object({
+  userId: z.string().uuid(),
+  bypass: z.boolean(),
+});
+
+export async function setKycBypassUseCase(
+  repo: AdminUserRepository,
+  raw: unknown,
+): Promise<AdminUser> {
+  const parsed = KycBypassSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new ValidationError(
+      'Dữ liệu quyền KYC không hợp lệ',
+      parsed.error.flatten().fieldErrors,
+    );
+  }
+  return repo.setKycBypass(parsed.data);
 }
 
 export async function resetPasswordUseCase(

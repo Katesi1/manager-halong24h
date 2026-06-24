@@ -35,6 +35,20 @@ export type PenaltyType =
   | 'kyc_revoke'
   | 'refund_required';
 
+/**
+ * Mức xử phạt mà BE lưu trên dispute (spec `POST /resolve` body field
+ * `penalty` + `GET /:id` response). Đây là enum phẳng của BE — KHÁC với
+ * object `penalty` rich FE-internal (`PenaltyType` + target + duration).
+ *
+ * Lưu ý: chọn mức phạt KHÔNG tự động ban user — admin phải gọi ban riêng.
+ */
+export type DisputePenalty =
+  | 'none'
+  | 'warning'
+  | 'refund'
+  | 'ban_temp'
+  | 'ban_perm';
+
 export interface DisputeEvidence {
   id: string;
   type: 'image' | 'pdf' | 'video' | 'link';
@@ -44,13 +58,17 @@ export interface DisputeEvidence {
   uploadedAt: string;
 }
 
+/**
+ * Tin nhắn trích từ cuộc trò chuyện của đơn đặt phòng (tối đa 20 tin mới
+ * nhất, sắp xếp cũ → mới). BE trả `{ id, senderId, content, createdAt,
+ * isSystem }`; `isSystem=true` là tin hệ thống (vd: "đã xác nhận đặt phòng").
+ */
 export interface DisputeChatExcerpt {
   id: string;
-  messageId: string;
+  senderId: string;
   content: string;
-  sender: { id: string; name: string; role: 'customer' | 'owner' };
-  sentAt: string;
-  attachmentUrl?: string | null;
+  createdAt: string;
+  isSystem: boolean;
 }
 
 export interface DisputeParty {
@@ -66,6 +84,7 @@ export interface Dispute {
   bookingCode: string;
   propertyId: string;
   propertyName: string;
+  propertyCode: string | null;
   customer: DisputeParty;
   owner: DisputeParty;
 
@@ -89,6 +108,11 @@ export interface Dispute {
     durationDays: number | null;
     refundAmount: number | null;
   } | null;
+  /**
+   * Mức xử phạt BE lưu trên dispute (enum phẳng). `null` khi chưa có /
+   * BE chưa trả. KHÔNG tự ban — admin gọi ban riêng.
+   */
+  penaltyAction: DisputePenalty | null;
   resolution: string | null;
 
   createdAt: string;
@@ -114,6 +138,8 @@ export interface ResolveDisputeInput {
     refundAmount?: number;
   };
   resolution: string;
+  /** Mức xử phạt BE lưu (optional, enum phẳng). Mặc định không phạt. */
+  penaltyAction?: DisputePenalty;
 }
 
 export interface RejectDisputeInput {
@@ -161,6 +187,15 @@ export const PENALTY_LABEL: Record<PenaltyType, string> = {
   ban_permanent: 'Ban vĩnh viễn',
   kyc_revoke: 'Huỷ KYC (chủ nhà phải nộp lại)',
   refund_required: 'Yêu cầu hoàn tiền cho khách',
+};
+
+/** Nhãn tiếng Việt cho mức xử phạt BE (enum phẳng `DisputePenalty`). */
+export const DISPUTE_PENALTY_LABEL: Record<DisputePenalty, string> = {
+  none: 'Không phạt',
+  warning: 'Cảnh báo',
+  refund: 'Yêu cầu hoàn tiền',
+  ban_temp: 'Ban tạm thời',
+  ban_perm: 'Ban vĩnh viễn',
 };
 
 /** @deprecated giữ alias để legacy code không vỡ */

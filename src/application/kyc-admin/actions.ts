@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { ValidationError } from '@/core/errors';
 import type {
+  KycAdminDetail,
   KycAdminFilters,
   KycAdminListResult,
   KycAdminSubmission,
@@ -21,6 +22,14 @@ export async function getKycSubmissionUseCase(
 ): Promise<KycAdminSubmission | null> {
   if (!id) return null;
   return repo.getById(id);
+}
+
+export async function getKycDetailUseCase(
+  repo: KycAdminRepository,
+  id: string,
+): Promise<KycAdminDetail | null> {
+  if (!id) return null;
+  return repo.getDetail(id);
 }
 
 export async function approveKycUseCase(

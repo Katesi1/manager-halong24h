@@ -62,6 +62,15 @@ export interface MarkSoldInput {
   date: string;
 }
 
+/** Spec §25.6 — `POST /calendar/bulk`, tối đa 100 items/request. */
+export interface BulkLockInput {
+  mode: 'lock' | 'unlock';
+  items: { propertyId: string; date: string }[];
+}
+
+/** Giới hạn BE: 100 items mỗi request bulk. */
+export const CALENDAR_BULK_MAX_ITEMS = 100;
+
 export const CALENDAR_STATUS_LABEL: Record<CalendarStatus, string> = {
   [CalendarStatus.AVAILABLE]: 'Trống',
   [CalendarStatus.LOCKED]: 'Đã khóa',

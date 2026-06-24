@@ -51,7 +51,7 @@ export default async function NewPropertyPage() {
   }
 
   // v1.12 entitlement (§2A.5) — hết trial / chưa đủ quyền → block.
-  // Nguồn tin cậy: profile (`GET /auth/profile`), không phụ thuộc sub repo mock.
+  // Nguồn tin cậy: profile (`GET /auth/profile`), không phụ thuộc sub repo.
   if (profile.role === RoleCode.OWNER) {
     const entitlement = ownerEntitlement(profile);
     if (entitlement.blockReason) {

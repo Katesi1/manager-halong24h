@@ -10,7 +10,7 @@ import { formatVND } from '@/core/value-objects/vnd';
 import { BOOKING_STATUS_LABEL } from '@/lib/booking-display';
 import { buildPageHref, pageCount, paginate, parsePage } from '@/lib/pagination';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 type TabKey = BookingStatus | 'all';
 

@@ -3,7 +3,10 @@ import 'server-only';
 import type { OpenDisputeData } from '@/application/disputes/open';
 import type {
   Dispute,
+  DisputeChatExcerpt,
+  DisputeEvidence,
   DisputeFilters,
+  DisputePenalty,
   DisputeStatus,
   DisputeType,
   OpenerRole,
@@ -15,13 +18,33 @@ import type { DisputeRepository } from '@/application/ports/dispute-repository';
 import { apiClient } from '../http/api-client';
 
 /**
- * Spec §13 + v1.3 §22 B3 — extended fields (evidence/chatExcerpt/verdict/
- * penalty) defer v2. FE entity giữ field nhưng repo trả `[]`/`null` cho
- * những phần BE chưa expose. UI sẽ ẩn các section đó khi data rỗng.
+ * Spec §13 + v1.3 §22 B3.
+ *
+ * `GET /admin/disputes/:id` (LIVE) trả thêm: `attachments[]`/`evidence[]`
+ * (alias), `resolution`/`verdict` (alias), `penalty` (enum phẳng), và
+ * `chatExcerpts[]` (≤20 tin mới nhất của hội thoại đơn, cũ→mới). Repo map
+ * trực tiếp từ response thật. Danh sách (`GET /admin/disputes`) vẫn có thể
+ * thiếu các field này → fallback `[]`/`null`.
  *
  * Spec dispute type: refund_request|service_quality|damage_claim|no_show|
  * overbooking|other → entity: refund|quality|behavior|no_show|fraud|other.
  */
+const PENALTY_VALUES: readonly DisputePenalty[] = [
+  'none',
+  'warning',
+  'refund',
+  'ban_temp',
+  'ban_perm',
+];
+
+interface SpecChatExcerpt {
+  id: string;
+  senderId: string;
+  content: string;
+  createdAt: string;
+  isSystem?: boolean;
+}
+
 interface SpecDispute {
   id: string;
   bookingId: string;
@@ -37,6 +60,10 @@ interface SpecDispute {
   description: string;
   amount: number | null;
   attachments?: string[];
+  evidence?: string[];
+  chatExcerpts?: SpecChatExcerpt[];
+  penalty?: string | null;
+  verdict?: string | null;
   openerType?: OpenerRole;
   openerName?: string;
   resolution?: string | null;
@@ -45,7 +72,7 @@ interface SpecDispute {
   createdAt: string;
   updatedAt: string;
   // Hydrated fields BE có thể bundle (best-effort)
-  property?: { id: string; name: string };
+  property?: { id: string; name: string; code?: string | null };
   booking?: { id: string; code?: string };
   customer?: {
     id: string;
@@ -54,6 +81,45 @@ interface SpecDispute {
     phone: string | null;
   };
   owner?: { id: string; name: string; email: string; phone: string | null };
+}
+
+/** Suy loại file từ phần mở rộng URL — chỉ để chọn cách render. */
+function evidenceTypeOf(url: string): DisputeEvidence['type'] {
+  const lower = url.split('?')[0]?.toLowerCase() ?? '';
+  if (/\.(jpg|jpeg|png|webp|gif|avif)$/.test(lower)) return 'image';
+  if (lower.endsWith('.pdf')) return 'pdf';
+  if (/\.(mp4|mov|webm)$/.test(lower)) return 'video';
+  return 'link';
+}
+
+/** Map mảng URL `evidence`/`attachments` → DisputeEvidence[] tối thiểu. */
+function mapEvidence(urls: string[]): DisputeEvidence[] {
+  return urls.map((url, i) => ({
+    id: `ev-${i}`,
+    type: evidenceTypeOf(url),
+    url,
+    caption: null,
+    uploadedBy: { id: '', name: '', role: 'anonymous' },
+    uploadedAt: '',
+  }));
+}
+
+function mapChatExcerpts(raw: SpecChatExcerpt[]): DisputeChatExcerpt[] {
+  return raw.map((m) => ({
+    id: m.id,
+    senderId: m.senderId,
+    content: m.content,
+    createdAt: m.createdAt,
+    isSystem: m.isSystem === true,
+  }));
+}
+
+/** BE penalty enum phẳng → entity, các giá trị lạ/`null` → null. */
+function mapPenalty(raw: string | null | undefined): DisputePenalty | null {
+  if (!raw) return null;
+  return PENALTY_VALUES.includes(raw as DisputePenalty)
+    ? (raw as DisputePenalty)
+    : null;
 }
 
 function mapType(s: SpecDispute['type']): DisputeType {
@@ -102,12 +168,17 @@ function mapDispute(s: SpecDispute): Dispute {
     email: '',
     phone: null,
   };
+  // BE trả `evidence` và `attachments` là alias của nhau; ưu tiên evidence.
+  const evidenceUrls = s.evidence ?? s.attachments ?? [];
+  // `verdict` là alias của `resolution`; ưu tiên resolution (text gốc).
+  const resolution = s.resolution ?? s.verdict ?? null;
   return {
     id: s.id,
     bookingId: s.bookingId,
     bookingCode: s.booking?.code ?? s.bookingId.slice(0, 8),
     propertyId: s.property?.id ?? '',
     propertyName: s.property?.name ?? '',
+    propertyCode: s.property?.code ?? null,
     customer: s.customer ?? emptyParty,
     owner: s.owner ?? emptyParty,
     opener: {
@@ -120,11 +191,14 @@ function mapDispute(s: SpecDispute): Dispute {
     subject: s.subject,
     description: s.description,
     amount: s.amount,
-    evidence: [], // BE v1.3 defer
-    chatExcerpts: [], // BE v1.3 defer
-    verdict: null, // BE v1.3 defer
-    penalty: null, // BE v1.3 defer
-    resolution: s.resolution ?? null,
+    evidence: mapEvidence(evidenceUrls),
+    chatExcerpts: mapChatExcerpts(s.chatExcerpts ?? []),
+    // `verdict` (FE-internal: favor_customer|...) BE chưa expose riêng — giữ
+    // null. Field `verdict` BE thực chất là alias text của resolution.
+    verdict: null,
+    penalty: null, // object rich FE-internal — BE chưa expose
+    penaltyAction: mapPenalty(s.penalty),
+    resolution,
     createdAt: s.createdAt,
     updatedAt: s.updatedAt,
     resolvedAt: s.resolvedAt ?? null,
@@ -194,13 +268,14 @@ export class ApiDisputeRepository implements DisputeRepository {
   }
 
   async resolve(input: ResolveDisputeInput): Promise<Dispute> {
-    // Spec v1.3 — chỉ nhận resolution string + refundAmount.
-    // Verdict/penalty (extended fields) FE log nội bộ, không gửi BE.
+    // Spec LIVE — body: resolution + refundAmount + penalty (optional enum).
+    // Object `penalty` rich FE-internal (verdict/target/duration) không gửi BE.
     const data = await apiClient.post<SpecDispute>(
       `/admin/disputes/${input.disputeId}/resolve`,
       {
         resolution: input.resolution,
         refundAmount: input.penalty.refundAmount,
+        ...(input.penaltyAction ? { penalty: input.penaltyAction } : {}),
       },
     );
     return mapDispute(data);

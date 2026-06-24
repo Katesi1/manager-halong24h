@@ -50,6 +50,8 @@ export interface KycAdminSubmission {
 
 /** Thanh toán gắn với hồ sơ KYC (detail §2). */
 export interface KycPayment {
+  /** Có ở endpoint chi tiết `/admin/kyc/:id`; list-level payment không có id. */
+  id?: string;
   planId: string | null;
   cycle: string | null;
   rooms: number | null;
@@ -57,6 +59,79 @@ export interface KycPayment {
   method: string | null;
   status: string | null;
   paidAt: string | null;
+}
+
+/**
+ * 1 ảnh upload đầy đủ trong hồ sơ chi tiết (`GET /admin/kyc/:id`).
+ * Mỗi loại (cccdFront/cccdBack/selfie) có thể là `null` nếu chủ nhà chưa tải.
+ */
+export interface KycUploadDetail {
+  id: string;
+  imageUrl: string | null;
+  imageUrlThumb: string | null;
+  ocrResult: unknown;
+  ocrConfidence: number | null;
+  faceMatchScore: number | null;
+  livenessScore: number | null;
+  provider: string | null;
+  uploadedAt: string | null;
+}
+
+/** 3 ảnh CCCD trước/sau + selfie của hồ sơ chi tiết. */
+export interface KycUploadSet {
+  cccdFront: KycUploadDetail | null;
+  cccdBack: KycUploadDetail | null;
+  selfie: KycUploadDetail | null;
+}
+
+/**
+ * 1 mục trong checklist 7 yếu tố xác minh tự động (`verificationFields[]`).
+ * `source` là chuỗi mô tả chi tiết điểm số / nguồn (vd "front=0.91, back=0.88").
+ */
+export interface KycVerificationField {
+  key: string;
+  label: string;
+  passed: boolean;
+  source?: string | null;
+}
+
+/**
+ * Hồ sơ KYC chi tiết — `GET /admin/kyc/:id` (Auth ADMIN).
+ *
+ * Khác `KycAdminSubmission` (list-level, model 5 yếu tố thủ công): đây là dữ liệu
+ * đầy đủ với 3 ảnh upload (kèm OCR / face-match / liveness), checklist 7 yếu tố
+ * tự động + đếm pass/total, và danh sách thanh toán.
+ */
+export interface KycAdminDetail {
+  id: string;
+  userId: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string | null;
+    avatar: string | null;
+    role: number | null;
+    kycBypass: boolean;
+    kycStatus: KycSubmissionStatus | 'none';
+    createdAt: string | null;
+  };
+  status: KycSubmissionStatus;
+  statusLabel: string | null;
+  rejectReason: string | null;
+  rejectedItems: string[];
+  approvedAt: string | null;
+  approvedById: string | null;
+  trialEndsAt: string | null;
+  chargeStartsAt: string | null;
+  expectedRooms: number | null;
+  uploads: KycUploadSet;
+  payments: KycPayment[];
+  verificationFields: KycVerificationField[];
+  verificationPassedCount: number;
+  verificationTotalCount: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**

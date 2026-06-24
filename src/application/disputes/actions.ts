@@ -50,6 +50,10 @@ const ResolveSchema = z.object({
   verdict: z.enum(['favor_customer', 'favor_owner', 'split', 'no_fault']),
   penalty: PenaltySchema,
   resolution: z.string().min(10, 'Phán quyết tối thiểu 10 ký tự').max(2000),
+  // Mức xử phạt BE lưu (enum phẳng, optional). Không tự ban user.
+  penaltyAction: z
+    .enum(['none', 'warning', 'refund', 'ban_temp', 'ban_perm'])
+    .optional(),
 });
 
 export async function resolveDisputeUseCase(

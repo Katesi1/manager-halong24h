@@ -1,24 +1,30 @@
 import type { Metadata } from 'next';
 
 import { getCurrentProfile } from '@/app/actions/auth';
-import { getMySubscriptionAction } from '@/app/actions/subscriptions';
+import {
+  getMySubscriptionAction,
+  listMyInvoicesAction,
+} from '@/app/actions/subscriptions';
 import { listBillingPlansAction } from '@/app/actions/billing-plans';
 import { listPropertiesAction } from '@/app/actions/properties';
 import { PageHeader } from '@/components/host/page-header';
 import { TierSelector } from '@/components/host/tier-selector';
 import { planLabel, type BillingPlan } from '@/core/entities/billing-plan';
+import type { SubscriptionInvoice } from '@/core/entities/subscription';
 import { formatVND } from '@/core/value-objects/vnd';
 import { formatDate } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Gói cước' };
 
 export default async function HostBillingPage() {
-  const [profile, propertiesResult, subResult, plansResult] = await Promise.all([
-    getCurrentProfile(),
-    listPropertiesAction({ includeInactive: true }),
-    getMySubscriptionAction(),
-    listBillingPlansAction(),
-  ]);
+  const [profile, propertiesResult, subResult, plansResult, invoicesResult] =
+    await Promise.all([
+      getCurrentProfile(),
+      listPropertiesAction({ includeInactive: true }),
+      getMySubscriptionAction(),
+      listBillingPlansAction(),
+      listMyInvoicesAction(),
+    ]);
 
   if (!profile) return null;
 
@@ -26,6 +32,11 @@ export default async function HostBillingPage() {
   const sub = subResult.ok ? subResult.data : null;
   const plans: BillingPlan[] = plansResult.ok ? plansResult.data : [];
   const plansError = !plansResult.ok ? plansResult.error : null;
+  const invoices: SubscriptionInvoice[] = invoicesResult.ok
+    ? invoicesResult.data
+    : [];
+  // SALE chưa gán owner → BE 400; lỗi khác cũng hiện notice thay vì crash.
+  const invoicesError = !invoicesResult.ok ? invoicesResult.error : null;
 
   const currentPlanId = sub?.planId || null;
   // Tên gói lấy từ danh mục admin (theo planId). Không có sub → gói Miễn phí.
@@ -173,11 +184,107 @@ export default async function HostBillingPage() {
         <h2 className="font-display text-xl font-semibold tracking-tight text-navy-900">
           Lịch sử hoá đơn
         </h2>
-        <div className="mt-4 rounded-2xl border border-dashed border-ink-200 bg-white p-12 text-center text-sm text-ink-500">
-          Chưa có hoá đơn nào. Lịch sử thanh toán gói cước sẽ hiển thị tại đây khi
-          backend cung cấp dữ liệu.
-        </div>
+        {invoicesError ? (
+          <div className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200">
+            Không tải được lịch sử hoá đơn: {invoicesError}
+          </div>
+        ) : invoices.length === 0 ? (
+          <div className="mt-4 rounded-2xl border border-dashed border-ink-200 bg-white p-12 text-center text-sm text-ink-500">
+            Chưa có hoá đơn nào. Lịch sử thanh toán gói cước sẽ hiển thị tại đây
+            sau khi bạn đăng ký gói.
+          </div>
+        ) : (
+          <InvoiceTable invoices={invoices} />
+        )}
       </section>
+    </div>
+  );
+}
+
+const INVOICE_KIND_LABEL: Record<SubscriptionInvoice['kind'], string> = {
+  subscription: 'Đăng ký',
+  renew: 'Gia hạn',
+  upgrade: 'Nâng cấp',
+  refund: 'Hoàn tiền',
+};
+
+const INVOICE_STATUS_LABEL: Record<string, string> = {
+  paid: 'Đã thanh toán',
+  pending: 'Chờ thanh toán',
+  failed: 'Thất bại',
+  refunded: 'Đã hoàn tiền',
+  expired: 'Hết hạn',
+};
+
+function invoiceStatusClass(status: string): string {
+  switch (status) {
+    case 'paid':
+      return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
+    case 'refunded':
+      return 'bg-sky-50 text-sky-700 ring-sky-200';
+    case 'failed':
+    case 'expired':
+      return 'bg-rose-50 text-rose-700 ring-rose-200';
+    default:
+      return 'bg-amber-50 text-amber-700 ring-amber-200';
+  }
+}
+
+function InvoiceTable({ invoices }: { invoices: SubscriptionInvoice[] }) {
+  return (
+    <div className="mt-4 overflow-x-auto rounded-2xl bg-white ring-1 ring-ink-200/60">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-ink-200 text-left text-[11px] font-semibold uppercase tracking-wider text-ink-500">
+            <th className="px-4 py-3">Mã hoá đơn</th>
+            <th className="px-4 py-3">Kỳ</th>
+            <th className="px-4 py-3">Gói</th>
+            <th className="px-4 py-3 text-right">Số tiền</th>
+            <th className="px-4 py-3">Trạng thái</th>
+            <th className="px-4 py-3">Ngày thanh toán</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-ink-100">
+          {invoices.map((inv) => (
+            <tr key={inv.id} className="text-ink-700">
+              <td className="px-4 py-3 font-mono text-xs text-navy-900">
+                {inv.invoiceNumber || '—'}
+                <span className="ml-2 inline-flex items-center rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-medium text-ink-600">
+                  {INVOICE_KIND_LABEL[inv.kind]}
+                </span>
+              </td>
+              <td className="px-4 py-3">{inv.period || '—'}</td>
+              <td className="px-4 py-3">
+                {inv.planLabel || (inv.planId ? planLabel(inv.planId) : '—')}
+                {inv.cycle === 'yearly' ? (
+                  <span className="block text-[11px] text-ink-500">
+                    Theo năm
+                  </span>
+                ) : (
+                  <span className="block text-[11px] text-ink-500">
+                    Theo tháng
+                  </span>
+                )}
+              </td>
+              <td className="px-4 py-3 text-right font-semibold text-navy-900">
+                {formatVND(inv.amount)}
+              </td>
+              <td className="px-4 py-3">
+                <span
+                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${invoiceStatusClass(
+                    inv.status,
+                  )}`}
+                >
+                  {INVOICE_STATUS_LABEL[inv.status] ?? inv.status}
+                </span>
+              </td>
+              <td className="px-4 py-3 text-ink-600">
+                {inv.paidAt ? formatDate(inv.paidAt) : '—'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

@@ -309,6 +309,56 @@ export async function getCurrentProfile() {
   }
 }
 
+const UpdateProfileSchema = z.object({
+  fullName: z
+    .string()
+    .trim()
+    .min(2, 'Họ tên tối thiểu 2 ký tự')
+    .max(120, 'Họ tên tối đa 120 ký tự'),
+  email: z.string().trim().email('Email không hợp lệ'),
+  phone: z
+    .string()
+    .trim()
+    .regex(/^0\d{9}$/, 'Số điện thoại phải gồm 10 số, bắt đầu bằng 0')
+    .or(z.literal(''))
+    .optional(),
+});
+
+export async function updateProfileAction(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  // Guard tại chỗ bằng getCurrentProfile (cùng file) để tránh circular import
+  // với auth-guard; chưa đăng nhập → về /login thay vì lỗi mơ hồ.
+  const current = await getCurrentProfile();
+  if (!current) redirect('/login');
+
+  const parsed = UpdateProfileSchema.safeParse({
+    fullName: formData.get('full_name'),
+    email: formData.get('email'),
+    phone: formData.get('phone'),
+  });
+  if (!parsed.success) {
+    return { fieldErrors: flattenFieldErrors(parsed.error.flatten().fieldErrors) };
+  }
+
+  const phone = parsed.data.phone?.trim();
+  try {
+    await authRepository().updateProfile({
+      fullName: parsed.data.fullName,
+      email: parsed.data.email,
+      // Gửi phone chỉ khi có giá trị — tránh BE hiểu nhầm "" là xoá SĐT.
+      ...(phone ? { phone } : {}),
+    });
+    revalidatePath('/host/settings');
+    revalidatePath('/admin/settings');
+    return { ok: true };
+  } catch (raw) {
+    const err = mapApiErrorToDomain(raw);
+    return { error: err.message };
+  }
+}
+
 const ChangePasswordSchema = z.object({
   currentPassword: z.string().min(6, 'Mật khẩu hiện tại tối thiểu 6 ký tự'),
   newPassword: z.string().min(6, 'Mật khẩu mới tối thiểu 6 ký tự'),

@@ -1,12 +1,16 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
 
 import {
+  addSubscriptionCallLogUseCase,
   countOverdueSubscriptionsUseCase,
   freezeSubscriptionUseCase,
   getCurrentSubscriptionUseCase,
   getSubscriptionUseCase,
+  listMyInvoicesUseCase,
+  listSubscriptionCallLogsUseCase,
   listSubscriptionsUseCase,
   markSubscriptionPaidUseCase,
   sumPaidBetweenUseCase,
@@ -40,6 +44,19 @@ export async function getMySubscriptionAction() {
     const profile = await requireManagerRole();
     const ownerId = profile.ownerId ?? profile.id;
     return getCurrentSubscriptionUseCase(subscriptionRepository(), ownerId);
+  });
+}
+
+/**
+ * Lịch sử hoá đơn gói cước của chính owner đang đăng nhập.
+ * SALE đọc của owner mình thuộc về (BE tự resolve qua ownerId).
+ * SALE chưa gán owner → BE 400 `users.saleNotAssigned` → Result.ok = false,
+ * trang hiển thị empty/notice (không crash).
+ */
+export async function listMyInvoicesAction() {
+  return toResult(async () => {
+    await requireManagerRole();
+    return listMyInvoicesUseCase(subscriptionRepository());
   });
 }
 
@@ -109,4 +126,33 @@ export async function unfreezeSubscriptionAction(subscriptionId: string) {
     revalidatePath(`/admin/users/${result.data.ownerId}`);
   }
   return result;
+}
+
+/** Admin ghi nhận ghi chú cuộc gọi đòi nợ. `userId` = OWNER userId. */
+export async function addSubscriptionCallLogAction(
+  userId: string,
+  note: string,
+) {
+  const result = await toResult(async () => {
+    await requireAdmin();
+    const id = z.string().uuid('userId không hợp lệ').parse(userId);
+    return addSubscriptionCallLogUseCase(subscriptionRepository(), {
+      userId: id,
+      note,
+    });
+  });
+  if (result.ok) {
+    revalidatePath('/admin/payments');
+    revalidatePath(`/admin/users/${userId}`);
+  }
+  return result;
+}
+
+/** Admin xem danh sách ghi chú cuộc gọi (newest-first). */
+export async function listSubscriptionCallLogsAction(userId: string) {
+  return toResult(async () => {
+    await requireAdmin();
+    const id = z.string().uuid('userId không hợp lệ').parse(userId);
+    return listSubscriptionCallLogsUseCase(subscriptionRepository(), id);
+  });
 }

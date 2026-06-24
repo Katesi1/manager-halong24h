@@ -9,15 +9,16 @@ import {
   markSoldUseCase,
   unlockDateUseCase,
 } from '@/application/calendar/lock';
-import type { CalendarFilters } from '@/core/entities/calendar';
+import {
+  CALENDAR_BULK_MAX_ITEMS,
+  type CalendarFilters,
+} from '@/core/entities/calendar';
 import { calendarRepository } from '@/infrastructure/container';
 import { requireManagerRole, requireOwnerOfProperty } from '@/lib/auth-guard';
 
 import { toResult } from './_helpers';
 
-/**
- * Calendar — hiện tại MOCK. Khi BE ra endpoint, đổi `calendarRepository()` trong container.ts.
- */
+/** Calendar Server Actions — `ApiCalendarRepository` (spec §6 + §25.6). */
 export async function getCalendarGridAction(input: {
   from: string;
   to: string;
@@ -66,14 +67,23 @@ export async function markSoldAction(input: {
 }
 
 /**
- * Bulk lock/unlock — chạy tuần tự qua use-case đơn lẻ.
- * BE chưa có endpoint bulk; khi có sẽ swap qua 1 API call.
+ * Bulk lock/unlock — 1 request `POST /calendar/bulk` (spec §25.6, max 100 items).
  */
 export async function bulkLockDatesAction(input: {
   items: { propertyId: string; date: string }[];
   mode: 'lock' | 'unlock';
 }) {
   const result = await toResult(async () => {
+    await requireManagerRole();
+    if (input.items.length === 0) {
+      throw new Error('Chưa chọn ngày nào.');
+    }
+    if (input.items.length > CALENDAR_BULK_MAX_ITEMS) {
+      throw new Error(
+        `Tối đa ${CALENDAR_BULK_MAX_ITEMS} ngày mỗi lần. Vui lòng chia nhỏ.`,
+      );
+    }
+    // Mỗi property xuất hiện trong items đều phải thuộc quyền của owner.
     const seenProps = new Set<string>();
     for (const it of input.items) {
       if (!seenProps.has(it.propertyId)) {
@@ -81,12 +91,7 @@ export async function bulkLockDatesAction(input: {
         seenProps.add(it.propertyId);
       }
     }
-    const repo = calendarRepository();
-    if (input.mode === 'lock') {
-      for (const it of input.items) await lockDateUseCase(repo, it);
-    } else {
-      for (const it of input.items) await unlockDateUseCase(repo, it);
-    }
+    await calendarRepository().bulkLock({ mode: input.mode, items: input.items });
     return { count: input.items.length };
   });
   if (result.ok) revalidatePath('/host/calendar');
