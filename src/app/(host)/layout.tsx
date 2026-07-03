@@ -2,9 +2,11 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { getCurrentProfile } from '@/app/actions/auth';
+import { ChatSocketProvider } from '@/components/chat/chat-socket-provider';
 import { ManagerSidebar } from '@/components/layout/manager-sidebar';
 import { ManagerTopbar } from '@/components/layout/topbar';
 import { RoleCode, isManagerRole } from '@/core/value-objects/role';
+import { readTokens } from '@/infrastructure/http/token-storage';
 import {
   SUBSCRIPTION_SETTINGS_PATH,
   ownerEntitlement,
@@ -15,7 +17,10 @@ export default async function HostLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const profile = await getCurrentProfile();
+  const [profile, tokens] = await Promise.all([
+    getCurrentProfile(),
+    readTokens(),
+  ]);
   if (!profile) redirect('/login');
   if (!isManagerRole(profile.role)) redirect('/login');
 
@@ -33,6 +38,10 @@ export default async function HostLayout({
     profile.role === RoleCode.OWNER ? ownerEntitlement(profile) : null;
 
   return (
+    <ChatSocketProvider
+      initialAccessToken={tokens.accessToken ?? ''}
+      currentUserId={profile.id}
+    >
     <div className="flex min-h-screen bg-cream-50">
       <a
         href="#main-content"
@@ -89,5 +98,6 @@ export default async function HostLayout({
         </main>
       </div>
     </div>
+    </ChatSocketProvider>
   );
 }

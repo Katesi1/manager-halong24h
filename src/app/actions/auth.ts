@@ -15,8 +15,16 @@ import type {
 } from '@/core/entities/user';
 import { RoleCode } from '@/core/value-objects/role';
 import { authRepository } from '@/infrastructure/container';
-import { mapApiErrorToDomain } from '@/infrastructure/http/api-error';
-import { clearTokens, writeTokens } from '@/infrastructure/http/token-storage';
+import {
+  ApiError,
+  SessionEndedError,
+  mapApiErrorToDomain,
+} from '@/infrastructure/http/api-error';
+import {
+  clearTokens,
+  readTokens,
+  writeTokens,
+} from '@/infrastructure/http/token-storage';
 
 /**
  * Sanitize redirect target. Chỉ cho phép path nội bộ (`/...`) để chặn
@@ -287,10 +295,45 @@ export async function logoutAction(): Promise<void> {
   redirect('/login');
 }
 
+/**
+ * Refresh accessToken cho chat socket khi nhận `error{tokenExpired}`.
+ * Đọc refreshToken (httpOnly cookie) → `/auth/refresh` → ghi cookie mới →
+ * trả accessToken mới cho client set `auth.token` + reconnect.
+ *
+ * Client KHÔNG đọc được httpOnly cookie nên phải qua Server Action này. Đồng
+ * bộ luôn cookie server-side để REST tiếp tục hợp lệ.
+ */
+export async function refreshChatTokenAction(): Promise<
+  { ok: true; accessToken: string } | { ok: false; kicked?: boolean }
+> {
+  const { refreshToken } = await readTokens();
+  if (!refreshToken) return { ok: false };
+  try {
+    const tokens = await authRepository().refresh(refreshToken);
+    await writeTokens(tokens);
+    return { ok: true, accessToken: tokens.accessToken };
+  } catch (err) {
+    // 403 = phiên bị đá (login thiết bị khác) → client redirect /login kèm lý
+    // do. 401/khác → refreshToken thường hết hạn, client giữ nguyên; request
+    // REST kế tiếp sẽ redirect /login.
+    const status = err instanceof ApiError ? err.status : null;
+    if (status === 403) {
+      await clearTokens();
+      return { ok: false, kicked: true };
+    }
+    return { ok: false };
+  }
+}
+
 export async function getCurrentProfile() {
   try {
     return await getProfileUseCase(authRepository());
   } catch (err) {
+    // Phiên bị đá (refresh trả 403) → token đã bị clear ở api-client. Redirect
+    // /login kèm lý do để hiện thông báo "đăng nhập ở thiết bị khác" (§1.6.1.4).
+    if (err instanceof SessionEndedError) {
+      redirect('/login?reason=session-ended');
+    }
     // Phân biệt unauth (401/403 — user chưa login hoặc token revoke) vs lỗi
     // hệ thống (5xx, network). Cả 2 đều trả null để layout redirect login,
     // nhưng log lỗi hệ thống ra để phát hiện sớm.

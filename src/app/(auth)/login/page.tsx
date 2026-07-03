@@ -19,12 +19,19 @@ export default function LoginPage() {
 function LoginForm() {
   const sp = useSearchParams();
   const redirectTo = sp.get('redirect') ?? '/';
+  const sessionEnded = sp.get('reason') === 'session-ended';
   const [state, formAction] = useActionState<ActionResult, FormData>(loginAction, {});
 
   return (
     <div>
       <h1 className="font-display text-3xl font-bold text-ink-900">Đăng nhập</h1>
       <p className="mt-2 text-sm text-ink-500">Đăng nhập vào trang quản lý Halong24h.</p>
+
+      {sessionEnded && (
+        <div className="mt-6 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800 ring-1 ring-amber-200">
+          Tài khoản đã đăng nhập ở thiết bị khác. Vui lòng đăng nhập lại.
+        </div>
+      )}
 
       <form action={formAction} className="mt-8 space-y-4">
         <input type="hidden" name="redirect" value={redirectTo} />

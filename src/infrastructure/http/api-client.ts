@@ -1,8 +1,8 @@
 import 'server-only';
 
 import { API_BASE_URL, API_TIMEOUT_MS, DEFAULT_LOCALE } from './api-config';
-import { ApiError, type ApiErrorPayload } from './api-error';
-import { readTokens, writeTokens } from './token-storage';
+import { ApiError, SessionEndedError, type ApiErrorPayload } from './api-error';
+import { clearTokens, readTokens, writeTokens } from './token-storage';
 
 export interface ApiSuccess<T> {
   success: true;
@@ -49,6 +49,12 @@ async function refreshTokens(
     body: JSON.stringify({ refreshToken }),
   });
   if (!res.ok) {
+    // 403 = phiên bị đá / refresh token thu hồi (§1.6.1.4). Không cứu được →
+    // xoá token + báo hiệu session ended. 401/khác → lỗi refresh thường.
+    if (res.status === 403) {
+      await clearTokens();
+      throw new SessionEndedError();
+    }
     throw new ApiError(res.status, 'Không thể làm mới phiên đăng nhập');
   }
   const json = (await res.json()) as ApiSuccess<{
@@ -90,6 +96,10 @@ async function request<T>(
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'Accept-Language': opts.locale ?? DEFAULT_LOCALE,
+    // v1.19 (§1.6.1): phân định "slot web" (1 phiên web + 1 phiên mobile song
+    // song). Chỉ 5 endpoint cấp token thực sự dùng, nhưng gắn cho mọi request
+    // là harmless (BE bỏ qua ở endpoint khác) + đảm bảo login/refresh đúng slot.
+    'X-Client-Type': 'web',
     ...opts.headers,
   };
 
@@ -147,6 +157,9 @@ async function request<T>(
           _accessTokenOverride: fresh.accessToken,
         });
       } catch (refreshErr) {
+        // Phiên bị đá (403) → propagate để caller (getCurrentProfile) redirect
+        // /login kèm lý do, KHÔNG nuốt thành 401 chung chung.
+        if (refreshErr instanceof SessionEndedError) throw refreshErr;
         if (process.env.NODE_ENV !== 'production') {
           console.warn(
             '[api-client] refresh failed, falling through to 401',

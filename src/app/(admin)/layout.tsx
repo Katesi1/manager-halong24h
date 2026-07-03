@@ -3,9 +3,11 @@ import { unstable_cache } from 'next/cache';
 
 import { getCurrentProfile } from '@/app/actions/auth';
 import { countPendingKycAdminAction } from '@/app/actions/kyc-admin';
+import { ChatSocketProvider } from '@/components/chat/chat-socket-provider';
 import { ManagerSidebar } from '@/components/layout/manager-sidebar';
 import { ManagerTopbar } from '@/components/layout/topbar';
 import { isAdmin } from '@/core/value-objects/role';
+import { readTokens } from '@/infrastructure/http/token-storage';
 
 const cachedCountPendingKyc = unstable_cache(
   async () => countPendingKycAdminAction(),
@@ -18,7 +20,10 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const profile = await getCurrentProfile();
+  const [profile, tokens] = await Promise.all([
+    getCurrentProfile(),
+    readTokens(),
+  ]);
   if (!profile) redirect('/login');
   if (!isAdmin(profile.role)) redirect('/host');
 
@@ -26,6 +31,10 @@ export default async function AdminLayout({
   const kycPending = kycCountResult.ok ? kycCountResult.data : 0;
 
   return (
+    <ChatSocketProvider
+      initialAccessToken={tokens.accessToken ?? ''}
+      currentUserId={profile.id}
+    >
     <div className="flex min-h-screen bg-cream-50">
       <a
         href="#main-content"
@@ -43,5 +52,6 @@ export default async function AdminLayout({
         </main>
       </div>
     </div>
+    </ChatSocketProvider>
   );
 }

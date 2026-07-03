@@ -3,7 +3,6 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
@@ -21,9 +20,15 @@ import {
 } from '@/components/chat/attachment-picker';
 import { MessageBubble } from '@/components/chat/message-bubble';
 import { ChatStatusBar } from '@/components/chat/status-bar';
+import { useChatConnection } from '@/components/chat/chat-socket-provider';
 import type { Message, MessageAttachment } from '@/core/entities/chat';
-import { emitTypingStart, emitTypingStop } from '@/lib/chat-socket';
-import { useChatSocket } from '@/lib/use-chat-socket';
+import {
+  chatErrorMessage,
+  emitChatRead,
+  emitTypingStart,
+  emitTypingStop,
+} from '@/lib/chat-socket';
+import { useChatEvents } from '@/lib/use-chat-socket';
 
 /** Throttle window cho `typing:start` — spec §17.6 gợi ý 3s. */
 const TYPING_EMIT_INTERVAL_MS = 3000;
@@ -33,13 +38,6 @@ const TYPING_STOP_DELAY_MS = 4000;
 interface Props {
   conversationId: string;
   currentUserId: string;
-  /**
-   * Access token cho Socket.IO `auth.token` (Spec §17.4 connect example).
-   * Cố tình expose JWT vào client bundle vì WS client cần. Tradeoff: token
-   * 15-min TTL + httpOnly cookie vẫn là primary auth. Đừng dùng cho mục đích
-   * khác trên client.
-   */
-  accessToken: string;
   /** ID của peer chính (customer) — dùng để show presence indicator. */
   peerUserId?: string | null;
   /** Tin nhắn ban đầu Server Component đã fetch (oldest-first). */
@@ -51,7 +49,6 @@ interface Props {
 export function ChatThread({
   conversationId,
   currentUserId,
-  accessToken,
   peerUserId,
   initialMessages,
   initialNextCursor,
@@ -75,16 +72,15 @@ export function ChatThread({
   const lastTypingEmitRef = useRef(0);
   const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const wsOpts = useMemo(
-    () => ({ accessToken, locale: 'vi' as const }),
-    [accessToken],
-  );
-
   // Ref tracking action gần nhất để phân biệt append (scroll bottom) vs
   // prepend (giữ vị trí scroll), tránh kéo user về cuối khi loadOlder.
   const lastAppendRef = useRef(true);
 
-  const { socket, connected } = useChatSocket(wsOpts, {
+  // Socket dùng chung, đã connect ở layout (sau login). ChatThread chỉ subscribe
+  // event của hội thoại này — không tự quản connection/token.
+  const { socket, connected } = useChatConnection();
+
+  useChatEvents(socket, {
     onMessage: (p) => {
       if (p.conversationId !== conversationId) return;
       // Bug fix: skip tin nhắn do CHÍNH MÌNH gửi — đã có optimistic + REST
@@ -134,7 +130,12 @@ export function ChatThread({
         return next;
       });
     },
-    onError: (p) => setError(p.message),
+    onError: (p) => {
+      // tokenExpired được Provider xử lý (refresh + reconnect) → không hiện lỗi,
+      // tránh nhấp nháy trong lúc kết nối lại.
+      if (p.code === 'tokenExpired') return;
+      setError(p.message ?? chatErrorMessage(p.code ?? ''));
+    },
   });
 
   useEffect(() => {
@@ -164,12 +165,17 @@ export function ChatThread({
   const lastFromOther =
     lastMessage && lastMessage.senderId !== currentUserId;
   useEffect(() => {
-    if (lastFromOther) void markConversationReadAction(conversationId);
-  }, [conversationId, lastFromOther, lastMessage?.id]);
+    if (!lastFromOther) return;
+    void markConversationReadAction(conversationId);
+    // Emit socket `read` để peer nhận `read:update` realtime (contract §17.4).
+    // REST vẫn giữ để cập nhật badge server-side khi reload.
+    if (socket && connected) emitChatRead(socket, conversationId);
+  }, [conversationId, lastFromOther, lastMessage?.id, socket, connected]);
 
   useEffect(() => {
     void markConversationReadAction(conversationId);
-  }, [conversationId]);
+    if (socket && connected) emitChatRead(socket, conversationId);
+  }, [conversationId, socket, connected]);
 
   useEffect(() => {
     return () => {

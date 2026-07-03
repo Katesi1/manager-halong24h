@@ -130,7 +130,6 @@ export default async function HostMessageDetailPage(props: {
           <ChatThread
             conversationId={id}
             currentUserId={profile.id}
-            accessToken={tokens.accessToken}
             peerUserId={customerOf(conv)?.userId ?? null}
             initialMessages={initialMessages}
             initialNextCursor={initialNextCursor}

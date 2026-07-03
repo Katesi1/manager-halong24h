@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 const COOKIE_ACCESS = 'h24h_access';
 const COOKIE_REFRESH = 'h24h_refresh';
 const ACCESS_MAX_AGE = 15 * 60;
-const REFRESH_MAX_AGE = 7 * 24 * 60 * 60;
+const REFRESH_MAX_AGE = 14 * 24 * 60 * 60; // 14 days (BE §1.7)
 
 const COOKIE_OPTS = {
   httpOnly: true,
@@ -27,6 +27,7 @@ interface RefreshResponse {
 type RefreshResult =
   | { accessToken: string; refreshToken: string }
   | 'network-error'
+  | 'session-ended'
   | null;
 
 async function refreshAtBackend(refreshToken: string): Promise<RefreshResult> {
@@ -40,9 +41,12 @@ async function refreshAtBackend(refreshToken: string): Promise<RefreshResult> {
       cache: 'no-store',
     });
     if (!res.ok) {
-      // 401/403 = refresh token thật sự invalid → logout đúng
       // 5xx = BE đang lỗi → giữ cookie, đừng force logout
-      return res.status >= 500 ? 'network-error' : null;
+      if (res.status >= 500) return 'network-error';
+      // 403 = phiên bị đá (login thiết bị khác cùng loại) — §1.6.1.4
+      if (res.status === 403) return 'session-ended';
+      // 401/khác = refresh token hết hạn thường
+      return null;
     }
     const json = (await res.json()) as RefreshResponse;
     const access =
@@ -94,10 +98,14 @@ export async function middleware(request: NextRequest) {
       // nếu getCurrentProfile cũng fail, nhưng cookie còn để retry kỳ sau.
       return NextResponse.next();
     }
-    if (!pair) {
+    if (pair === 'session-ended' || !pair) {
       const url = request.nextUrl.clone();
       url.pathname = '/login';
       url.searchParams.set('redirect', path);
+      // Phiên bị đá → thêm lý do để trang login hiện thông báo rõ ràng.
+      if (pair === 'session-ended') {
+        url.searchParams.set('reason', 'session-ended');
+      }
       const response = NextResponse.redirect(url);
       response.cookies.delete(COOKIE_ACCESS);
       response.cookies.delete(COOKIE_REFRESH);

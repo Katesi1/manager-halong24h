@@ -74,7 +74,28 @@ export interface PresencePayload {
 }
 
 export interface ChatSocketErrorPayload {
-  message: string;
+  /**
+   * Spec §17.4: `error { code?, message }`. `code='tokenExpired'` (kèm BE
+   * `disconnect(true)` khi accessToken 15' hết hạn giữa session) → client
+   * refresh accessToken (REST) + reconnect. `code` có thể vắng ở lỗi generic.
+   */
+  code?: string;
+  /** Message đã dịch theo locale (BE luôn gửi; để optional cho phòng thủ). */
+  message?: string;
+}
+
+/** Map `error.code` → thông báo tiếng Việt cho UI. */
+export function chatErrorMessage(code: string): string {
+  switch (code) {
+    case 'tokenExpired':
+      return 'Phiên đã hết hạn, đang kết nối lại…';
+    case 'unauthorized':
+      return 'Không có quyền truy cập hội thoại này.';
+    case 'forbidden':
+      return 'Bạn không được phép thực hiện thao tác này.';
+    default:
+      return 'Mất kết nối trò chuyện. Đang thử lại…';
+  }
 }
 
 type EventPayloadMap = {

@@ -15,6 +15,21 @@ export interface ApiErrorPayload {
   errors?: unknown;
   path?: string;
   timestamp?: string;
+  /** v1.19 — mã lỗi ổn định (vd `invalidRefreshToken` khi phiên bị đá). */
+  code?: string;
+}
+
+/**
+ * Phiên đã kết thúc — `/auth/refresh` trả 403 (§1.6.1.4): refresh token bị thu
+ * hồi hoặc phiên bị đá do đăng nhập ở thiết bị khác cùng loại (web/mobile).
+ * Khác với 401 (access token hết hạn — còn cứu được bằng refresh). Gặp lỗi này
+ * FE phải: clear token + báo user + về /login. KHÔNG retry.
+ */
+export class SessionEndedError extends Error {
+  constructor() {
+    super('Phiên đăng nhập đã kết thúc');
+    this.name = 'SessionEndedError';
+  }
 }
 
 export class ApiError extends Error {
