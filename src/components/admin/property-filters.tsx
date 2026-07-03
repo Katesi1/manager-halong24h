@@ -1,8 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Loader2, RotateCcw, Search } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { RotateCcw, Search } from 'lucide-react';
 
 export interface StatusOption {
   key: string;
@@ -24,15 +23,24 @@ const SORT_OPTIONS: { value: string; label: string }[] = [
   { value: 'price-desc', label: 'Giá cao → thấp' },
 ];
 
+const SEARCH_DEBOUNCE_MS = 250;
+
+/**
+ * Controlled filter bar — không tự navigate URL. Parent (client) giữ state và
+ * lọc in-memory ⇒ đổi tab/tìm/sort không gây fetch lại data từ BE.
+ */
 interface PropertyFiltersProps {
   statuses: StatusOption[];
   status: string;
   q: string;
   type: string;
   sort: string;
+  onStatusChange: (key: string) => void;
+  onSearchChange: (value: string) => void;
+  onTypeChange: (type: string) => void;
+  onSortChange: (sort: string) => void;
+  onReset: () => void;
 }
-
-const SEARCH_DEBOUNCE_MS = 350;
 
 export function PropertyFilters({
   statuses,
@@ -40,51 +48,19 @@ export function PropertyFilters({
   q,
   type,
   sort,
+  onStatusChange,
+  onSearchChange,
+  onTypeChange,
+  onSortChange,
+  onReset,
 }: PropertyFiltersProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [isPending, startTransition] = useTransition();
   const [searchValue, setSearchValue] = useState(q);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Đồng bộ khi URL đổi từ bên ngoài (vd: click reset, back button).
+  // Đồng bộ khi parent reset q từ bên ngoài.
   useEffect(() => {
     setSearchValue(q);
   }, [q]);
-
-  const pushParams = useCallback(
-    (mutate: (params: URLSearchParams) => void) => {
-      const params = new URLSearchParams(searchParams.toString());
-      mutate(params);
-      const qs = params.toString();
-      startTransition(() => {
-        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-      });
-    },
-    [pathname, router, searchParams],
-  );
-
-  const setParam = useCallback(
-    (key: string, value: string) => {
-      pushParams((params) => {
-        if (value) params.set(key, value);
-        else params.delete(key);
-      });
-    },
-    [pushParams],
-  );
-
-  const handleSearchChange = useCallback(
-    (value: string) => {
-      setSearchValue(value);
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        setParam('q', value.trim());
-      }, SEARCH_DEBOUNCE_MS);
-    },
-    [setParam],
-  );
 
   useEffect(() => {
     return () => {
@@ -92,13 +68,19 @@ export function PropertyFilters({
     };
   }, []);
 
+  function handleSearchChange(value: string) {
+    setSearchValue(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onSearchChange(value.trim());
+    }, SEARCH_DEBOUNCE_MS);
+  }
+
   const hasFilters = Boolean(status || q || type || (sort && sort !== 'name'));
 
   function handleReset() {
     setSearchValue('');
-    startTransition(() => {
-      router.replace(pathname, { scroll: false });
-    });
+    onReset();
   }
 
   const selectClass =
@@ -114,7 +96,7 @@ export function PropertyFilters({
             <button
               key={s.key || 'all'}
               type="button"
-              onClick={() => setParam('status', s.key)}
+              onClick={() => onStatusChange(s.key)}
               className={
                 'inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition-all ' +
                 (active
@@ -128,9 +110,12 @@ export function PropertyFilters({
                   'rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ' +
                   (active
                     ? 'bg-white/20 text-white'
-                    : s.key === 'suspended' && s.count > 0
-                      ? 'bg-rose-500 text-white'
-                      : 'bg-cream-200 text-ink-600')
+                    : s.key === 'pending' && s.count > 0
+                      ? 'bg-amber-500 text-white'
+                      : (s.key === 'rejected' || s.key === 'suspended') &&
+                          s.count > 0
+                        ? 'bg-rose-500 text-white'
+                        : 'bg-cream-200 text-ink-600')
                 }
               >
                 {s.count}
@@ -143,11 +128,7 @@ export function PropertyFilters({
       {/* Hàng 2 — search + select filters */}
       <div className="mt-3 flex flex-col gap-2.5 border-t border-ink-100 pt-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
-          {isPending ? (
-            <Loader2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-navy-500" />
-          ) : (
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-          )}
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
           <input
             type="search"
             value={searchValue}
@@ -164,7 +145,7 @@ export function PropertyFilters({
           <select
             id="type-filter"
             value={type}
-            onChange={(e) => setParam('type', e.target.value)}
+            onChange={(e) => onTypeChange(e.target.value)}
             className={selectClass}
           >
             {TYPE_OPTIONS.map((o) => (
@@ -180,7 +161,7 @@ export function PropertyFilters({
           <select
             id="sort-filter"
             value={sort || 'name'}
-            onChange={(e) => setParam('sort', e.target.value === 'name' ? '' : e.target.value)}
+            onChange={(e) => onSortChange(e.target.value)}
             className={selectClass}
           >
             {SORT_OPTIONS.map((o) => (

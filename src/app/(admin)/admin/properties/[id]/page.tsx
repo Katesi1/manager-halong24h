@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 
 import { getPropertyAction } from '@/app/actions/properties';
 import { ApprovalActions } from '@/components/admin/approval-actions';
+import { HotToggle } from '@/components/admin/hot-toggle';
 import { PageHeader } from '@/components/host/page-header';
 import { AmenityList } from '@/components/property/amenity-list';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +15,11 @@ import {
   cancellationPolicyLabel,
   propertyTypeLabel,
 } from '@/core/value-objects/property-type';
+import {
+  MODERATION_STATUS_VARIANT,
+  moderationStatusLabel,
+} from '@/lib/property-moderation';
+import { formatDateTime } from '@/lib/format';
 
 export async function generateMetadata(props: {
   params: Promise<{ id: string }>;
@@ -51,11 +57,35 @@ export default async function AdminPropertyDetail(props: {
           { label: property.name },
         ]}
         actions={
-          <Badge variant={property.isActive ? 'success' : 'default'}>
-            {property.isActive ? 'Đang hoạt động' : 'Tạm tắt'}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant={MODERATION_STATUS_VARIANT[property.moderationStatus]}>
+              {moderationStatusLabel(property.moderationStatus)}
+            </Badge>
+            {property.moderationStatus === 'approved' && (
+              <Badge variant={property.isActive ? 'success' : 'default'}>
+                {property.isActive ? 'Đang hiển thị' : 'Chủ đang ẩn'}
+              </Badge>
+            )}
+            {property.isHot && <Badge variant="gold">🔥 Hot</Badge>}
+          </div>
         }
       />
+
+      {property.moderationStatus === 'rejected' &&
+        property.moderationRejectedReason && (
+          <div
+            role="alert"
+            className="mb-6 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-900 ring-1 ring-rose-200"
+          >
+            <span className="font-semibold">Lý do từ chối: </span>
+            {property.moderationRejectedReason}
+            {property.moderationReviewedAt && (
+              <span className="ml-1 text-rose-700/70">
+                ({formatDateTime(property.moderationReviewedAt)})
+              </span>
+            )}
+          </div>
+        )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
@@ -197,11 +227,12 @@ export default async function AdminPropertyDetail(props: {
             <h3 className="overline muted no-dash text-[10px]">
               Hành động Admin
             </h3>
-            <div className="mt-4">
+            <div className="mt-4 space-y-3">
               <ApprovalActions
                 propertyId={property.id}
-                status={property.isActive ? 'active' : 'suspended'}
+                status={property.moderationStatus}
               />
+              <HotToggle propertyId={property.id} isHot={property.isHot} />
             </div>
           </div>
 

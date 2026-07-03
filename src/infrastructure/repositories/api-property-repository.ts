@@ -132,4 +132,8 @@ export class ApiPropertyRepository implements PropertyRepository {
       reason ? { reason } : undefined,
     );
   }
+
+  async setHot(id: string, isHot: boolean): Promise<Property> {
+    return apiClient.patch<Property>(`/properties/${id}/hot`, { isHot });
+  }
 }

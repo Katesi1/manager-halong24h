@@ -1,88 +1,49 @@
 import type { Metadata } from 'next';
-import Image from 'next/image';
-import Link from 'next/link';
-import {
-  BedDouble,
-  Bath,
-  Building2,
-  ImageOff,
-  MapPin,
-  SearchX,
-  Users,
-} from 'lucide-react';
 
 import { listPropertiesAction } from '@/app/actions/properties';
+import type { AdminPropertyRow } from '@/components/admin/admin-property-card';
 import {
-  PropertyFilters,
-  type StatusOption,
-} from '@/components/admin/property-filters';
+  PropertiesBrowser,
+  type PropertiesBrowserInitial,
+} from '@/components/admin/properties-browser';
 import { PageHeader } from '@/components/host/page-header';
-import { Badge } from '@/components/ui/badge';
-import { Pagination } from '@/components/ui/pagination';
-import type { Property } from '@/core/entities/property';
-import { propertyTypeLabel } from '@/core/value-objects/property-type';
-import { formatVNDShort } from '@/lib/format';
-import { buildPageHref, pageCount, paginate, parsePage } from '@/lib/pagination';
+import type { ModerationStatus, Property } from '@/core/entities/property';
+import { parsePage } from '@/lib/pagination';
 
-export const metadata: Metadata = { title: 'Cơ sở (toàn hệ thống)' };
+export const metadata: Metadata = { title: 'Duyệt cơ sở' };
 
-const PAGE_SIZE = 12;
+const STATUS_KEYS: ModerationStatus[] = [
+  'pending',
+  'approved',
+  'rejected',
+  'suspended',
+];
 
 /**
- * Trạng thái cơ sở (không còn luồng "duyệt": OWNER đã KYC tạo phòng là active
- * ngay — BE set isActive=true khi tạo). Admin chỉ tạm khoá cơ sở vi phạm:
- *  - "Đang hoạt động" = isActive=true
- *  - "Tạm khoá" = isActive=false (admin đã khoá)
+ * Map Property (DTO đầy đủ từ BE) → AdminPropertyRow rút gọn. Giảm payload
+ * serialize xuống Client Component (bỏ amenities/policies/description/…).
  */
-type Status = 'active' | 'suspended' | '';
-
-function coverImage(p: Property): string | null {
-  return (
-    p.images.find((i) => i.isCover)?.imageUrl ?? p.images[0]?.imageUrl ?? null
-  );
-}
-
-function isSuspended(p: Property): boolean {
-  return !p.isActive;
-}
-
-function matchesStatus(p: Property, status: Status): boolean {
-  if (status === 'active') return p.isActive;
-  if (status === 'suspended') return isSuspended(p);
-  return true;
-}
-
-function matchesQuery(p: Property, q: string): boolean {
-  if (!q) return true;
-  const haystack = [
-    p.name,
-    p.code,
-    p.address ?? '',
-    p.owner?.name ?? '',
-    p.owner?.phone ?? '',
-    p.ownerId,
-  ]
-    .join(' ')
-    .toLowerCase();
-  return haystack.includes(q);
-}
-
-function sortProperties(list: Property[], sort: string): Property[] {
-  const sorted = [...list];
-  switch (sort) {
-    case 'bookings':
-      return sorted.sort((a, b) => b.bookingCount - a.bookingCount);
-    case 'price-asc':
-      return sorted.sort(
-        (a, b) => (a.weekdayPrice ?? Infinity) - (b.weekdayPrice ?? Infinity),
-      );
-    case 'price-desc':
-      return sorted.sort(
-        (a, b) => (b.weekdayPrice ?? -1) - (a.weekdayPrice ?? -1),
-      );
-    default:
-      return sorted.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
-  }
+function toRow(p: Property): AdminPropertyRow {
+  return {
+    id: p.id,
+    name: p.name,
+    code: p.code,
+    type: p.type,
+    address: p.address,
+    ownerId: p.ownerId,
+    ownerName: p.owner?.name ?? null,
+    moderationStatus: p.moderationStatus,
+    isActive: p.isActive,
+    isHot: p.isHot,
+    bedrooms: p.bedrooms,
+    bathrooms: p.bathrooms,
+    maxGuests: p.maxGuests,
+    standardGuests: p.standardGuests,
+    weekdayPrice: p.weekdayPrice,
+    coverUrl:
+      p.images.find((i) => i.isCover)?.imageUrl ?? p.images[0]?.imageUrl ?? null,
+    bookingCount: p.bookingCount,
+  };
 }
 
 export default async function AdminPropertiesPage(props: {
@@ -95,311 +56,34 @@ export default async function AdminPropertiesPage(props: {
   }>;
 }) {
   const sp = await props.searchParams;
-  const status: Status = (
-    ['active', 'suspended'].includes(sp.status ?? '') ? sp.status : ''
-  ) as Status;
-  const q = (sp.q ?? '').trim().toLowerCase();
-  const typeFilter = sp.type ?? '';
-  const sort = sp.sort ?? 'name';
 
+  // Một lần fetch toàn bộ; lọc/tìm/sort/phân trang do Client Component xử lý
+  // in-memory ⇒ thao tác sau đó không gọi lại BE.
   const result = await listPropertiesAction({ includeInactive: true });
-  const all: Property[] = result.ok ? result.data : [];
+  const rows: AdminPropertyRow[] = result.ok ? result.data.map(toRow) : [];
   const apiError = !result.ok ? result.error : null;
 
-  const counts = {
-    total: all.length,
-    active: all.filter((p) => p.isActive).length,
-    suspended: all.filter(isSuspended).length,
+  const initial: PropertiesBrowserInitial = {
+    status: STATUS_KEYS.includes((sp.status ?? '') as ModerationStatus)
+      ? (sp.status as ModerationStatus)
+      : '',
+    q: sp.q ?? '',
+    type: ['0', '1', '2'].includes(sp.type ?? '') ? (sp.type as string) : '',
+    sort: ['name', 'bookings', 'price-asc', 'price-desc'].includes(sp.sort ?? '')
+      ? (sp.sort as string)
+      : 'name',
+    page: parsePage(sp.page),
   };
-
-  const filtered = sortProperties(
-    all.filter(
-      (p) =>
-        matchesStatus(p, status) &&
-        matchesQuery(p, q) &&
-        (typeFilter === '' || String(p.type) === typeFilter),
-    ),
-    sort,
-  );
-
-  const statusOptions: StatusOption[] = [
-    { key: '', label: 'Tất cả', count: counts.total },
-    { key: 'active', label: 'Đang hoạt động', count: counts.active },
-    { key: 'suspended', label: 'Tạm khoá', count: counts.suspended },
-  ];
-
-  const currentPage = parsePage(sp.page);
-  const totalPages = pageCount(filtered.length, PAGE_SIZE);
-  const pageItems = paginate(filtered, currentPage, PAGE_SIZE);
-
-  function pageHref(page: number) {
-    return buildPageHref('/admin/properties', {
-      status: status || undefined,
-      q: sp.q,
-      type: typeFilter || undefined,
-      sort: sort !== 'name' ? sort : undefined,
-      page: page > 1 ? String(page) : undefined,
-    });
-  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       <PageHeader
         eyebrow="Vận hành hệ thống"
-        title="Cơ sở (toàn hệ thống)"
-        description="Tạm khoá cơ sở vi phạm · Theo dõi hoạt động toàn hệ thống."
+        title="Duyệt cơ sở"
+        description="Duyệt / từ chối cơ sở mới · Tạm ngưng cơ sở vi phạm · Đánh dấu Hot."
       />
 
-      {apiError && (
-        <div
-          role="alert"
-          className="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200"
-        >
-          <span className="font-semibold">Không tải được cơ sở: </span>
-          {apiError}
-        </div>
-      )}
-
-      {/* Stat summary — clickable để lọc nhanh */}
-      <div className="mb-6 grid grid-cols-3 gap-3">
-        <StatTile
-          label="Tổng cơ sở"
-          value={counts.total}
-          href="/admin/properties"
-          active={status === ''}
-          accent="navy"
-        />
-        <StatTile
-          label="Đang hoạt động"
-          value={counts.active}
-          href="/admin/properties?status=active"
-          active={status === 'active'}
-          accent="emerald"
-        />
-        <StatTile
-          label="Tạm khoá"
-          value={counts.suspended}
-          href="/admin/properties?status=suspended"
-          active={status === 'suspended'}
-          accent="rose"
-        />
-      </div>
-
-      <PropertyFilters
-        statuses={statusOptions}
-        status={status}
-        q={sp.q ?? ''}
-        type={typeFilter}
-        sort={sort}
-      />
-
-      {filtered.length === 0 ? (
-        <EmptyState filtered={all.length > 0} status={status} />
-      ) : (
-        <>
-          <p className="mb-3 text-xs text-ink-500">
-            Hiển thị{' '}
-            <span className="font-semibold text-ink-700">{filtered.length}</span>{' '}
-            cơ sở
-            {filtered.length !== counts.total && ` / ${counts.total} tổng`}
-          </p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {pageItems.map((p) => (
-              <PropertyCard key={p.id} property={p} />
-            ))}
-          </div>
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={filtered.length}
-            pageSize={PAGE_SIZE}
-            buildHref={pageHref}
-          />
-        </>
-      )}
-    </div>
-  );
-}
-
-// Lưu ý: class phải là chuỗi literal đầy đủ để Tailwind scanner phát hiện —
-// KHÔNG ghép động kiểu `'hover:' + ring` (sẽ không sinh ra CSS).
-const ACCENT_CLASSES: Record<
-  string,
-  { activeRing: string; hoverRing: string; dot: string; value: string }
-> = {
-  navy: {
-    activeRing: 'ring-2 ring-navy-300',
-    hoverRing: 'ring-ink-200/60 hover:ring-navy-300',
-    dot: 'bg-navy-700',
-    value: 'text-navy-900',
-  },
-  emerald: {
-    activeRing: 'ring-2 ring-emerald-300',
-    hoverRing: 'ring-ink-200/60 hover:ring-emerald-300',
-    dot: 'bg-emerald-500',
-    value: 'text-emerald-700',
-  },
-  rose: {
-    activeRing: 'ring-2 ring-rose-300',
-    hoverRing: 'ring-ink-200/60 hover:ring-rose-300',
-    dot: 'bg-rose-500',
-    value: 'text-rose-700',
-  },
-};
-
-function StatTile({
-  label,
-  value,
-  href,
-  active,
-  accent,
-}: {
-  label: string;
-  value: number;
-  href: string;
-  active: boolean;
-  accent: keyof typeof ACCENT_CLASSES;
-}) {
-  const a = ACCENT_CLASSES[accent];
-  return (
-    <Link
-      href={href}
-      className={
-        'group rounded-2xl bg-white p-4 shadow-card ring-1 transition-all hover:-translate-y-0.5 hover:shadow-lg ' +
-        (active ? a.activeRing : a.hoverRing)
-      }
-    >
-      <div className="flex items-center gap-1.5">
-        <span className={'h-1.5 w-1.5 rounded-full ' + a.dot} />
-        <p className="overline muted no-dash text-[10px]">{label}</p>
-      </div>
-      <p
-        className={
-          'mt-1.5 font-display text-2xl font-semibold leading-none tracking-tight ' +
-          a.value
-        }
-      >
-        {value}
-      </p>
-    </Link>
-  );
-}
-
-function PropertyCard({ property: p }: { property: Property }) {
-  const cover = coverImage(p);
-  const suspended = isSuspended(p);
-  const ownerLabel = p.owner?.name ?? `${p.ownerId.slice(0, 12)}…`;
-
-  return (
-    <Link
-      href={`/admin/properties/${p.id}`}
-      className="group flex flex-col overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-ink-200/60 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:ring-navy-300"
-    >
-      <div className="relative aspect-[16/10] w-full overflow-hidden bg-cream-100">
-        {cover ? (
-          <Image
-            src={cover}
-            alt={p.name}
-            fill
-            sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-ink-300">
-            <ImageOff className="h-8 w-8" />
-          </div>
-        )}
-        <div className="absolute left-2.5 top-2.5">
-          {suspended ? (
-            <Badge variant="danger">🔒 Tạm khoá</Badge>
-          ) : (
-            <Badge variant="success">✓ Đang hoạt động</Badge>
-          )}
-        </div>
-        <div className="absolute right-2.5 top-2.5">
-          <span className="inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
-            <Building2 className="h-3 w-3" />
-            {propertyTypeLabel(p.type)}
-          </span>
-        </div>
-      </div>
-
-      <div className="flex flex-1 flex-col p-4">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="line-clamp-1 font-semibold text-ink-900 group-hover:text-navy-700">
-            {p.name}
-          </h3>
-          <span className="shrink-0 rounded bg-cream-100 px-1.5 py-0.5 font-mono text-[10px] text-ink-500">
-            {p.code}
-          </span>
-        </div>
-
-        <p className="mt-1 flex items-center gap-1 text-xs text-ink-500">
-          <MapPin className="h-3 w-3 shrink-0" />
-          <span className="line-clamp-1">{p.address ?? 'Hạ Long'}</span>
-        </p>
-
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-ink-600">
-          <span className="inline-flex items-center gap-1">
-            <BedDouble className="h-3.5 w-3.5 text-ink-400" />
-            {p.bedrooms ?? '-'} phòng
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <Bath className="h-3.5 w-3.5 text-ink-400" />
-            {p.bathrooms ?? '-'} WC
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <Users className="h-3.5 w-3.5 text-ink-400" />
-            {p.maxGuests ?? p.standardGuests ?? '-'} khách
-          </span>
-        </div>
-
-        <div className="mt-3 flex items-end justify-between border-t border-ink-100 pt-3">
-          <div className="min-w-0">
-            <p className="truncate text-[11px] text-ink-400">
-              Chủ:{' '}
-              <span className="font-medium text-ink-600">{ownerLabel}</span>
-            </p>
-            <p className="text-[11px] text-ink-400">
-              {p.bookingCount} lượt đặt
-            </p>
-          </div>
-          {p.weekdayPrice != null && (
-            <p className="shrink-0 text-right">
-              <span className="font-display text-base font-semibold text-navy-900">
-                {formatVNDShort(p.weekdayPrice)}
-              </span>
-              <span className="text-[11px] text-ink-400"> /đêm</span>
-            </p>
-          )}
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function EmptyState({
-  filtered,
-  status,
-}: {
-  filtered: boolean;
-  status: Status;
-}) {
-  return (
-    <div className="rounded-2xl border border-dashed border-ink-200 bg-white p-16 text-center">
-      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-cream-200">
-        <SearchX className="h-7 w-7 text-ink-400" />
-      </div>
-      <p className="text-sm font-medium text-ink-700">
-        {status === 'suspended'
-          ? 'Không có cơ sở bị tạm khoá'
-          : 'Không có cơ sở phù hợp'}
-      </p>
-      <p className="mt-1 text-xs text-ink-500">
-        {filtered
-          ? 'Thử bỏ bộ lọc hoặc đổi từ khoá tìm kiếm.'
-          : 'Chưa có cơ sở nào trong hệ thống.'}
-      </p>
+      <PropertiesBrowser rows={rows} apiError={apiError} initial={initial} />
     </div>
   );
 }

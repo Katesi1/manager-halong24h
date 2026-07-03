@@ -26,8 +26,11 @@ export const UPLOAD_ALLOWED_MIME = [
 
 export type UploadMime = (typeof UPLOAD_ALLOWED_MIME)[number];
 
-/** 10MB per spec. */
+/** 10MB per spec §23.3. */
 export const UPLOAD_MAX_SIZE_BYTES = 10 * 1024 * 1024;
+
+/** Tên tệp tối đa — spec §23.3 (BE tự sanitize, FE fail-fast). */
+export const UPLOAD_MAX_FILENAME_LEN = 255;
 
 /** Spec §17.5 — chat attachment validation. */
 export const CHAT_ATTACHMENT_MAX_COUNT = 5;

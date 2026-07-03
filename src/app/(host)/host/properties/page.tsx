@@ -15,6 +15,10 @@ import {
   propertyTypeLabel,
 } from '@/core/value-objects/property-type';
 import { buildPageHref, pageCount, paginate, parsePage } from '@/lib/pagination';
+import {
+  MODERATION_STATUS_VARIANT,
+  moderationStatusLabel,
+} from '@/lib/property-moderation';
 
 const PAGE_SIZE = 12;
 
@@ -99,13 +103,25 @@ export default async function PropertiesListPage(props: {
                     <h3 className="font-semibold text-ink-900 line-clamp-1 group-hover:text-navy-700">
                       {p.name}
                     </h3>
-                    <Badge variant={p.isActive ? 'success' : 'default'}>
-                      {p.isActive ? 'Đang bật' : 'Tạm tắt'}
-                    </Badge>
+                    {p.moderationStatus === 'approved' ? (
+                      <Badge variant={p.isActive ? 'success' : 'default'}>
+                        {p.isActive ? 'Đang bật' : 'Tạm tắt'}
+                      </Badge>
+                    ) : (
+                      <Badge variant={MODERATION_STATUS_VARIANT[p.moderationStatus]}>
+                        {moderationStatusLabel(p.moderationStatus)}
+                      </Badge>
+                    )}
                   </div>
                   <p className="mt-1 text-xs text-ink-500">
                     {p.address ?? 'Hạ Long'} · {propertyTypeLabel(p.type)}
                   </p>
+                  {p.moderationStatus === 'rejected' &&
+                    p.moderationRejectedReason && (
+                      <p className="mt-1 text-xs text-rose-700">
+                        Lý do từ chối: {p.moderationRejectedReason}
+                      </p>
+                    )}
                   <div className="mt-auto flex flex-wrap items-center gap-2 pt-2">
                     <span className="text-xs text-ink-700">
                       🛏️ {p.bedrooms ?? '-'} phòng ngủ · 👥 tối đa {p.maxGuests ?? '-'}

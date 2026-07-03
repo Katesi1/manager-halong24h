@@ -1,7 +1,10 @@
 'use server';
 
+import { z } from 'zod';
+
 import {
   UPLOAD_ALLOWED_MIME,
+  UPLOAD_MAX_FILENAME_LEN,
   UPLOAD_MAX_SIZE_BYTES,
   type UploadResult,
 } from '@/core/entities/upload';
@@ -23,10 +26,16 @@ export async function uploadFileAction(formData: FormData) {
     if (!(file instanceof File)) {
       throw new Error('Không tìm thấy file để tải lên');
     }
+    if (file.size === 0) {
+      throw new Error('Tệp rỗng, vui lòng chọn tệp khác');
+    }
     if (file.size > UPLOAD_MAX_SIZE_BYTES) {
       throw new Error(
         `File quá lớn (${(file.size / 1024 / 1024).toFixed(1)}MB). Tối đa 10MB.`,
       );
+    }
+    if (file.name.length > UPLOAD_MAX_FILENAME_LEN) {
+      throw new Error('Tên tệp quá dài (tối đa 255 ký tự)');
     }
     if (
       file.type &&
@@ -46,6 +55,7 @@ export async function uploadFileAction(formData: FormData) {
 export async function deleteUploadAction(uploadId: string) {
   return toResult<void>(async () => {
     await requireAuthenticated();
-    await apiClient.delete(`/uploads/${uploadId}`);
+    const id = z.string().uuid('Mã tệp không hợp lệ').parse(uploadId);
+    await apiClient.delete(`/uploads/${id}`);
   });
 }

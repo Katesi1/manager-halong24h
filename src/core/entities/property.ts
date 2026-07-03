@@ -5,6 +5,15 @@ import type {
 } from '../value-objects/property-type';
 import type { VND } from '../value-objects/vnd';
 
+/**
+ * Trạng thái duyệt cơ sở (spec §4.5). Vòng đời:
+ *  - pending   — chờ admin duyệt (mới tạo, BE chưa auto-approve)
+ *  - approved  — được phép hoạt động; public khi isActive=true
+ *  - rejected  — admin từ chối (kèm reason); OWNER sửa lại → BE auto approved
+ *  - suspended — admin tạm ngưng cơ sở đang approved; OWNER không tự bật lại
+ */
+export type ModerationStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
+
 /** R16 — Quy định nội bộ có cấu trúc. */
 export type ChildrenPolicy = 'allowed' | 'with_conditions' | 'not_allowed';
 export type PetPolicy = 'allowed' | 'with_fee' | 'not_allowed';
@@ -33,6 +42,14 @@ export interface Property {
   address: string | null;
   mapLink: string | null;
   isActive: boolean;
+  /** Trạng thái duyệt (spec §4.5). BE luôn trả về cùng property DTO. */
+  moderationStatus: ModerationStatus;
+  /** Lý do admin từ chối (chỉ có khi moderationStatus='rejected'). */
+  moderationRejectedReason: string | null;
+  /** Thời điểm admin duyệt/từ chối/tạm ngưng gần nhất. */
+  moderationReviewedAt: string | null;
+  /** Badge "Hot" do admin curated (spec §4.10). */
+  isHot: boolean;
   bedrooms: number | null;
   bathrooms: number | null;
   standardGuests: number | null;

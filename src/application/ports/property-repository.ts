@@ -37,4 +37,6 @@ export interface PropertyRepository {
   approve(id: string): Promise<Property>;
   reject(id: string, reason: string): Promise<Property>;
   suspend(id: string, reason?: string): Promise<Property>;
+  /** Spec §4.10 — bật/tắt badge "Hot" (admin only). */
+  setHot(id: string, isHot: boolean): Promise<Property>;
 }

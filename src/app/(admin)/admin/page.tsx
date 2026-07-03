@@ -71,7 +71,7 @@ export default async function AdminOverviewPage() {
     : 0;
 
   const pendingProperties = properties.filter(
-    (p) => !p.isActive && p.bookingCount === 0,
+    (p) => p.moderationStatus === 'pending',
   );
   const totalOwners = users.filter((u) => u.role === RoleCode.OWNER).length;
   const totalCustomers = users.filter((u) => u.role === RoleCode.CUSTOMER).length;

@@ -11,23 +11,61 @@ import type {
   MessageListResult,
   SendMessageInput,
 } from '@/core/entities/chat';
+import { CHAT_ATTACHMENT_MAX_COUNT } from '@/core/entities/upload';
 import { chatRepository } from '@/infrastructure/container';
 import { requireAuthenticated } from '@/lib/auth-guard';
 
 import { toResult } from './_helpers';
 
+/**
+ * Validation chat — đối chiếu spec §17 (Chat REST) + §23 (Uploads).
+ *
+ * Mọi Server Action là biên vào Application layer ⇒ validate Zod đầy đủ.
+ * BE vẫn double-check (authoritative); FE fail-fast để UX rõ + chặn input rác.
+ */
+
+const MAX_CONTENT_LEN = 5000;
+const MAX_SUBJECT_LEN = 200;
+const MAX_PAGE_LIMIT = 100;
+
+/** Spec §17.5 / §23.5 — ràng buộc 1 attachment. */
 const AttachmentSchema = z.object({
-  url: z.string().url().startsWith('https://'),
-  type: z.string().max(100),
-  name: z.string().max(255),
+  url: z
+    .string()
+    .url('URL đính kèm không hợp lệ')
+    .max(2048, 'URL đính kèm quá dài (tối đa 2048 ký tự)')
+    .startsWith('https://', 'URL đính kèm phải dùng HTTPS'),
+  type: z.string().max(100, 'Loại tệp không hợp lệ'),
+  name: z.string().max(255, 'Tên tệp quá dài (tối đa 255 ký tự)'),
   size: z.number().int().nonnegative(),
+});
+
+const ConversationMemberRoleEnum = z.enum([
+  'owner',
+  'sale',
+  'customer',
+  'admin',
+]);
+
+const FiltersSchema = z
+  .object({
+    role: ConversationMemberRoleEnum.optional(),
+    page: z.number().int().positive().optional(),
+    limit: z.number().int().positive().max(MAX_PAGE_LIMIT).optional(),
+  })
+  .optional();
+
+const ListMessagesSchema = z.object({
+  conversationId: z.string().uuid('Mã hội thoại không hợp lệ'),
+  cursor: z.string().max(255).optional(),
+  limit: z.number().int().positive().max(MAX_PAGE_LIMIT).optional(),
 });
 
 const SendSchema = z
   .object({
-    conversationId: z.string().uuid(),
-    content: z.string().max(5000),
-    attachments: z.array(AttachmentSchema).max(5).optional(),
+    conversationId: z.string().uuid('Mã hội thoại không hợp lệ'),
+    content: z.string().max(MAX_CONTENT_LEN, 'Tin nhắn quá dài (tối đa 5000 ký tự)'),
+    attachments: z.array(AttachmentSchema).max(CHAT_ATTACHMENT_MAX_COUNT).optional(),
   })
   .refine(
     (v) => v.content.trim().length > 0 || (v.attachments?.length ?? 0) > 0,
@@ -37,21 +75,34 @@ const SendSchema = z
     },
   );
 
-const CreateSchema = z.object({
-  type: z.enum(['booking', 'support', 'staff']),
-  bookingId: z.string().uuid().optional(),
-  subject: z.string().max(200).optional(),
-});
+const CreateSchema = z
+  .object({
+    type: z.enum(['booking', 'support', 'staff']),
+    bookingId: z.string().uuid('Mã đặt phòng không hợp lệ').optional(),
+    subject: z.string().max(MAX_SUBJECT_LEN).optional(),
+  })
+  // Spec §17.1 — conversation type "booking" idempotent theo bookingId.
+  .refine((v) => v.type !== 'booking' || Boolean(v.bookingId), {
+    message: 'Hội thoại theo đặt phòng cần mã đặt phòng',
+    path: ['bookingId'],
+  });
 
 const EditSchema = z.object({
-  messageId: z.string().uuid(),
-  content: z.string().min(1).max(5000),
+  messageId: z.string().uuid('Mã tin nhắn không hợp lệ'),
+  content: z
+    .string()
+    .trim()
+    .min(1, 'Nội dung không được để trống')
+    .max(MAX_CONTENT_LEN, 'Tin nhắn quá dài (tối đa 5000 ký tự)'),
 });
+
+const UuidSchema = z.string().uuid('Mã không hợp lệ');
 
 export async function listConversationsAction(filters?: ConversationFilters) {
   return toResult<Conversation[]>(async () => {
     await requireAuthenticated();
-    return chatRepository().listConversations(filters);
+    const parsed = FiltersSchema.parse(filters);
+    return chatRepository().listConversations(parsed);
   });
 }
 
@@ -75,7 +126,8 @@ export async function createConversationAction(input: CreateConversationInput) {
 export async function getConversationAction(id: string) {
   return toResult<Conversation | null>(async () => {
     await requireAuthenticated();
-    return chatRepository().getConversation(id);
+    const conversationId = UuidSchema.parse(id);
+    return chatRepository().getConversation(conversationId);
   });
 }
 
@@ -86,7 +138,12 @@ export async function listMessagesAction(
 ) {
   return toResult<MessageListResult>(async () => {
     await requireAuthenticated();
-    return chatRepository().listMessages(conversationId, cursor, limit);
+    const parsed = ListMessagesSchema.parse({ conversationId, cursor, limit });
+    return chatRepository().listMessages(
+      parsed.conversationId,
+      parsed.cursor,
+      parsed.limit,
+    );
   });
 }
 
@@ -103,8 +160,9 @@ export async function sendMessageAction(input: SendMessageInput) {
 export async function markConversationReadAction(conversationId: string) {
   return toResult<void>(async () => {
     await requireAuthenticated();
-    await chatRepository().markRead(conversationId);
-    revalidatePath(`/conversations/${conversationId}`);
+    const id = UuidSchema.parse(conversationId);
+    await chatRepository().markRead(id);
+    revalidatePath(`/conversations/${id}`);
   });
 }
 
@@ -122,6 +180,7 @@ export async function editMessageAction(input: {
 export async function deleteMessageAction(messageId: string) {
   return toResult<void>(async () => {
     await requireAuthenticated();
-    await chatRepository().deleteMessage(messageId);
+    const id = UuidSchema.parse(messageId);
+    await chatRepository().deleteMessage(id);
   });
 }
