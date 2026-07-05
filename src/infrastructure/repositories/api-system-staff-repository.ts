@@ -12,9 +12,9 @@ import type { SystemStaffRepository } from '@/application/ports/system-staff-rep
 import { apiClient } from '../http/api-client';
 
 /**
- * List lấy từ `GET /users?scope=system` (spec §26.3.2 — BE tự ép role=2),
- * response là user shape thường (KHÔNG hydrate `permissions[]`).
- * `POST /users` (§26.4) trả cùng shape (không có createdAt).
+ * List lấy từ `GET /admin/system-staff` (spec §26.3 — trả kèm `permissions[]`
+ * mỗi user để hiển thị tóm tắt quyền ngay trong bảng). BE tự lọc role=SALE +
+ * scope=system. `POST /users` (§26.4) trả cùng shape (không có createdAt).
  */
 interface SpecSystemSale {
   id: string;
@@ -43,21 +43,22 @@ function mapSale(s: SpecSystemSale): SystemSale {
 
 export class ApiSystemStaffRepository implements SystemStaffRepository {
   async list(filters?: SystemSaleFilters): Promise<SystemSale[]> {
-    // Spec §26.3.2 — `GET /users?scope=system` (BE tự ép role=SALE).
+    // Spec §26.3 — `GET /admin/system-staff?isActive=true|false|all`. Trả kèm
+    // `permissions[]` mỗi user. `all` để browser tự lọc/đếm tab in-memory.
+    const isActive =
+      filters?.isActive === undefined ? 'all' : String(filters.isActive);
     const data = await apiClient.get<
       SpecSystemSale[] | { items: SpecSystemSale[] }
-    >('/users', {
-      query: { scope: 'system' },
+    >('/admin/system-staff', {
+      query: { isActive },
       cache: 'no-store',
     });
     const arr = Array.isArray(data) ? data : (data.items ?? []);
     return arr
-      // Lọc phòng thủ đúng yêu cầu nghiệp vụ: role=2 + scope=system.
-      .filter((r) => (r.role === undefined || r.role === 2) && r.scope === 'system')
-      .map(mapSale)
-      .filter((s) =>
-        filters?.isActive === undefined ? true : s.isActive === filters.isActive,
-      );
+      // BE đã lọc role=SALE + scope=system; chỉ lọc phòng thủ khi field có mặt.
+      .filter((r) => r.role === undefined || r.role === 2)
+      .filter((r) => r.scope == null || r.scope === 'system')
+      .map(mapSale);
   }
 
   async create(input: CreateSystemSaleInput): Promise<SystemSale> {

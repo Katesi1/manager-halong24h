@@ -44,6 +44,11 @@ export function notificationHref(
     case 'payment':
     case 'subscription':
       return area === 'admin' ? '/admin/payments' : '/host/billing';
+    case 'bank':
+    case 'bank_account':
+    case 'bank_submitted':
+      // ADMIN: queue duyệt STK; OWNER: màn tài khoản nhận tiền (spec §3.3.1).
+      return area === 'admin' ? '/admin/bank-accounts' : '/host/settings/bank';
     default:
       return null;
   }

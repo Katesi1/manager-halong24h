@@ -8,6 +8,8 @@ import { ProfileForm } from '@/components/account/profile-form';
 import { KycStatusCard } from '@/components/host/kyc-status-card';
 import { NotificationPrefs } from '@/components/host/notifications/notification-prefs';
 import { PageHeader } from '@/components/host/page-header';
+import { Badge } from '@/components/ui/badge';
+import { BANK_STATUS_LABEL, type BankStatus } from '@/core/entities/bank-account';
 import type { KycStatusResponse } from '@/core/entities/kyc';
 import { RoleCode } from '@/core/value-objects/role';
 
@@ -124,6 +126,43 @@ export default async function HostSettingsPage() {
           </SettingsCard>
         )}
 
+        {/* Tài khoản nhận tiền (OWNER) */}
+        {isOwner && (
+          <SettingsCard
+            id="bank"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                <line x1="3" y1="22" x2="21" y2="22" />
+                <line x1="6" y1="18" x2="6" y2="11" />
+                <line x1="10" y1="18" x2="10" y2="11" />
+                <line x1="14" y1="18" x2="14" y2="11" />
+                <line x1="18" y1="18" x2="18" y2="11" />
+                <polygon points="12 2 20 7 4 7" />
+              </svg>
+            }
+            title="Tài khoản nhận tiền"
+            description="STK ngân hàng nhận cọc từ khách (sinh mã VietQR). Cần quản trị viên duyệt."
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-ink-600">Trạng thái:</span>
+                <Badge variant={bankStatusVariant(profile.bankStatus)}>
+                  {BANK_STATUS_LABEL[normalizeBankStatus(profile.bankStatus)]}
+                </Badge>
+              </div>
+              <Link
+                href="/host/settings/bank"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-navy-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-navy-800"
+              >
+                Quản lý tài khoản nhận tiền
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+          </SettingsCard>
+        )}
+
         {/* Password */}
         <SettingsCard
           id="password"
@@ -156,6 +195,25 @@ export default async function HostSettingsPage() {
       </div>
     </div>
   );
+}
+
+function normalizeBankStatus(s: BankStatus | null | undefined): BankStatus {
+  return s ?? 'none';
+}
+
+function bankStatusVariant(
+  s: BankStatus | null | undefined,
+): Parameters<typeof Badge>[0]['variant'] {
+  switch (s) {
+    case 'approved':
+      return 'success';
+    case 'pending':
+      return 'gold';
+    case 'rejected':
+      return 'danger';
+    default:
+      return 'default';
+  }
 }
 
 function SettingsCard({

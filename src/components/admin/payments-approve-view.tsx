@@ -1,7 +1,8 @@
 import Link from 'next/link';
-import { Banknote, CheckCircle2, Clock, Inbox, Search, Wallet } from 'lucide-react';
+import { CheckCircle2, Clock, Inbox, Search, Wallet } from 'lucide-react';
 
 import { PaymentSessionsTable } from '@/components/admin/payment-sessions-table';
+import { ReceivingBankPanel } from '@/components/admin/receiving-bank-panel';
 import {
   PAYMENTS_PAGE_SIZE,
   buildPaymentsHref,
@@ -13,6 +14,7 @@ import {
   type PaymentSession,
   type PaymentSessionStatus,
 } from '@/core/entities/payment-session';
+import type { ReceivingBankAccount } from '@/core/entities/platform-bank';
 import { formatVND } from '@/lib/format';
 
 const SESSION_TABS: { key: string; label: string; icon: typeof Clock }[] = [
@@ -47,6 +49,8 @@ interface Props {
   currentPage: number;
   pageHref: (page: number) => string;
   error?: string;
+  receivingBank: ReceivingBankAccount;
+  receivingBankError?: string;
 }
 
 /** View "Chờ duyệt thanh toán" — hàng đợi đối soát chuyển khoản + kích hoạt gói. */
@@ -60,6 +64,8 @@ export function PaymentsApproveView({
   currentPage,
   pageHref,
   error,
+  receivingBank,
+  receivingBankError,
 }: Props) {
   const activeKey = status ?? 'pending';
   const wantStatus =
@@ -109,42 +115,15 @@ export function PaymentsApproveView({
           hint={paidTotal > 0 ? `${formatVND(paidTotal)} đã thu` : undefined}
         />
         <StatCard label="Tổng session" value={String(sessions.length)} />
-        <StatCard label="TK nhận tiền" value="ACB 21169431" hint="NGUYEN VU NAM" />
+        <StatCard
+          label="TK nhận tiền mua gói"
+          value={receivingBank.bankAccountNumber ?? '—'}
+          hint={receivingBank.bankAccountName ?? receivingBank.bankName ?? undefined}
+        />
       </div>
 
-      {/* Bank account banner */}
-      <div className="mb-6 overflow-hidden rounded-2xl bg-gradient-to-br from-amber-50 via-amber-50 to-orange-50 p-5 ring-1 ring-amber-200/80">
-        <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-sm">
-            <Banknote className="h-6 w-6" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">
-              Tài khoản nhận chuyển khoản
-            </p>
-            <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-              <span className="font-mono text-2xl font-bold tracking-tight text-amber-950">
-                21169431
-              </span>
-              <span className="text-sm font-medium text-amber-900">
-                Á Châu (ACB)
-              </span>
-              <span className="text-sm text-amber-800">·</span>
-              <span className="text-sm font-medium text-amber-900">
-                NGUYEN VU NAM
-              </span>
-            </div>
-            <p className="mt-2 text-xs text-amber-800">
-              Nội dung CK của user theo định dạng:{' '}
-              <code className="rounded bg-white/60 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-amber-900 ring-1 ring-amber-200">
-                HALONG24H &lt;sessionId&gt;
-              </code>{' '}
-              · Tìm giao dịch khớp trong app banking rồi bấm "Đã nhận tiền" để
-              kích hoạt gói — không cần nhập mã giao dịch.
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* Bank account panel — STK nền tảng nhận tiền mua gói (§10.7), ADMIN sửa được */}
+      <ReceivingBankPanel bank={receivingBank} error={receivingBankError} />
 
       {/* Tabs + Search */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

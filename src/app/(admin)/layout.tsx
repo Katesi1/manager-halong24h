@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { unstable_cache } from 'next/cache';
 
 import { getCurrentProfile } from '@/app/actions/auth';
+import { countPendingBankAccountsAction } from '@/app/actions/bank-accounts';
 import { countPendingKycAdminAction } from '@/app/actions/kyc-admin';
 import { ChatSocketProvider } from '@/components/chat/chat-socket-provider';
 import { ManagerSidebar } from '@/components/layout/manager-sidebar';
@@ -13,6 +14,12 @@ const cachedCountPendingKyc = unstable_cache(
   async () => countPendingKycAdminAction(),
   ['kyc-pending-count'],
   { revalidate: 60, tags: ['kyc-pending-count'] },
+);
+
+const cachedCountPendingBank = unstable_cache(
+  async () => countPendingBankAccountsAction(),
+  ['bank-pending-count'],
+  { revalidate: 60, tags: ['bank-pending-count'] },
 );
 
 export default async function AdminLayout({
@@ -27,8 +34,12 @@ export default async function AdminLayout({
   if (!profile) redirect('/login');
   if (!isAdmin(profile.role)) redirect('/host');
 
-  const kycCountResult = await cachedCountPendingKyc();
+  const [kycCountResult, bankCountResult] = await Promise.all([
+    cachedCountPendingKyc(),
+    cachedCountPendingBank(),
+  ]);
   const kycPending = kycCountResult.ok ? kycCountResult.data : 0;
+  const bankPending = bankCountResult.ok ? bankCountResult.data : 0;
 
   return (
     <ChatSocketProvider
@@ -42,7 +53,7 @@ export default async function AdminLayout({
       >
         Bỏ qua đến nội dung chính
       </a>
-      <ManagerSidebar profile={profile} badges={{ kyc: kycPending }} />
+      <ManagerSidebar profile={profile} badges={{ kyc: kycPending, bank: bankPending }} />
       <div className="flex-1 min-w-0 flex flex-col">
         <header className="sticky top-0 z-20">
           <ManagerTopbar profile={profile} adminAlerts={{ kycPending: kycPending }} />

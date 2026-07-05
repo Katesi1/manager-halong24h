@@ -7,7 +7,7 @@ import type {
 
 /** Spec §26 — quản lý System SALE (ADMIN). */
 export interface SystemStaffRepository {
-  /** GET /users?scope=system (§26.3.2) — BE tự ép role=SALE. */
+  /** GET /admin/system-staff (§26.3) — trả kèm `permissions[]` mỗi user. */
   list(filters?: SystemSaleFilters): Promise<SystemSale[]>;
   /** POST /users { role: 2, scope: "system" } — tạo trực tiếp (spec §26.4). */
   create(input: CreateSystemSaleInput): Promise<SystemSale>;

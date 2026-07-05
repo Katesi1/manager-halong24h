@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Banknote, Wallet } from 'lucide-react';
 
 import { listPaymentSessionsAction } from '@/app/actions/payment-sessions';
+import { getReceivingBankAction } from '@/app/actions/platform-bank';
 import {
   countOverdueSubscriptionsAction,
   listSubscriptionsAction,
@@ -17,6 +18,7 @@ import {
   isPaymentSessionActionable,
   type PaymentSession,
 } from '@/core/entities/payment-session';
+import type { ReceivingBankAccount } from '@/core/entities/platform-bank';
 import {
   type Subscription,
   type SubscriptionFilters,
@@ -53,12 +55,13 @@ export default async function AdminPaymentsPage(props: {
   // Fetch cả 2 nguồn: cần đủ count cho segmented control + bảng của view hiển
   // thị. Không filter status ở BE để count luôn là tổng (lọc status client-side
   // trong từng view).
-  const [listResult, overdueResult, paidResult, sessionResult] =
+  const [listResult, overdueResult, paidResult, sessionResult, bankResult] =
     await Promise.all([
       listSubscriptionsAction(subFilters),
       countOverdueSubscriptionsAction(),
       sumPaidSubscriptionsAction(from, to),
       listPaymentSessionsAction({ search, limit: 100 }),
+      getReceivingBankAction(),
     ]);
 
   const allSubscriptions: Subscription[] = listResult.ok ? listResult.data : [];
@@ -67,6 +70,19 @@ export default async function AdminPaymentsPage(props: {
   const allSessions: PaymentSession[] = sessionResult.ok
     ? sessionResult.data
     : [];
+
+  const FALLBACK_BANK: ReceivingBankAccount = {
+    bankBin: null,
+    bankName: null,
+    bankAccountNumber: null,
+    bankAccountName: null,
+    source: 'env',
+    updatedAt: null,
+  };
+  const receivingBank: ReceivingBankAccount = bankResult.ok
+    ? bankResult.data
+    : FALLBACK_BANK;
+  const receivingBankError = !bankResult.ok ? bankResult.error : undefined;
 
   const actionableSessions = allSessions.filter((s) =>
     isPaymentSessionActionable(s, now),
@@ -154,6 +170,8 @@ export default async function AdminPaymentsPage(props: {
           currentPage={currentPage}
           pageHref={pageHref}
           error={!sessionResult.ok ? sessionResult.error : undefined}
+          receivingBank={receivingBank}
+          receivingBankError={receivingBankError}
         />
       ) : (
         <PaymentsSubsView

@@ -18,6 +18,7 @@ import {
   History,
   Inbox,
   KeyRound,
+  Landmark,
   LayoutGrid,
   LogOut,
   type LucideIcon,
@@ -39,7 +40,7 @@ import type { UserProfile } from '@/core/entities/user';
 import { RoleCode } from '@/core/value-objects/role';
 import { cn } from '@/lib/utils';
 
-type BadgeKey = 'kyc' | 'leads';
+type BadgeKey = 'kyc' | 'leads' | 'bank';
 
 interface NavItem {
   href: string;
@@ -87,6 +88,7 @@ const ADMIN_GROUPS: NavGroup[] = [
     collapsible: true,
     items: [
       { href: '/admin/payments', label: 'Gói cước chủ nhà', icon: Wallet },
+      { href: '/admin/bank-accounts', label: 'Duyệt tài khoản nhận tiền', icon: Landmark, badgeKey: 'bank' },
       { href: '/admin/disputes', label: 'Khiếu nại', icon: AlertTriangle },
       { href: '/admin/reviews', label: 'Kiểm duyệt review', icon: MessageSquare },
       { href: '/admin/reports', label: 'Báo cáo hệ thống', icon: TrendingUp },
@@ -113,7 +115,8 @@ const HOST_GROUPS: NavGroup[] = [
     items: [
       { href: '/host', label: 'Tổng quan', icon: LayoutGrid, exact: true },
       { href: '/host/billing', label: 'Gói cước', icon: CreditCard, hideForSale: true },
-      { href: '/host/settings', label: 'Cài đặt cá nhân', icon: Settings },
+      { href: '/host/settings/bank', label: 'Tài khoản nhận tiền', icon: Landmark, hideForSale: true },
+      { href: '/host/settings', label: 'Cài đặt cá nhân', icon: Settings, exact: true },
     ],
   },
   {

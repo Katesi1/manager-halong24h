@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { Search, ShieldCheck } from 'lucide-react';
 
@@ -14,6 +15,8 @@ export interface SystemSaleRow {
   phone: string | null;
   isActive: boolean;
   createdAt: string;
+  /** Số module đã cấp ít nhất 1 quyền (spec §26 — tổng 18 module). */
+  grantedModules: number;
 }
 
 type StatusFilter = 'all' | 'active' | 'disabled';
@@ -157,6 +160,7 @@ export function SystemSalesBrowser({
                 <th className="px-4 py-3 text-left font-medium">Nhân viên</th>
                 <th className="px-4 py-3 text-left font-medium">Liên hệ</th>
                 <th className="px-4 py-3 text-left font-medium">Trạng thái</th>
+                <th className="px-4 py-3 text-left font-medium">Quyền</th>
                 <th className="px-4 py-3 text-left font-medium">Ngày tạo</th>
                 <th className="px-4 py-3 text-right font-medium w-44">
                   Hành động
@@ -184,6 +188,27 @@ export function SystemSalesBrowser({
                         Tạm khóa
                       </span>
                     )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/admin/permissions?userId=${s.id}`}
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 transition-colors',
+                        s.grantedModules > 0
+                          ? 'bg-navy-50 text-navy-800 ring-navy-200 hover:bg-navy-100'
+                          : 'bg-cream-100 text-ink-500 ring-ink-200 hover:bg-cream-200',
+                      )}
+                      title={
+                        s.grantedModules > 0
+                          ? `Đã cấp ${s.grantedModules}/18 module — bấm để sửa`
+                          : 'Chưa cấp quyền — bấm để cấp'
+                      }
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      {s.grantedModules > 0
+                        ? `${s.grantedModules} module`
+                        : 'Cấp quyền'}
+                    </Link>
                   </td>
                   <td className="px-4 py-3 text-ink-600">
                     {formatDate(s.createdAt)}

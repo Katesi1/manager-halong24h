@@ -27,6 +27,10 @@ export default async function AdminSystemStaffPage(props: {
         phone: s.phone,
         isActive: s.isActive,
         createdAt: s.createdAt,
+        // Module được coi là "đã cấp" khi bật ít nhất 1 trong 4 quyền CRUD.
+        grantedModules: s.permissions.filter(
+          (p) => p.canCreate || p.canRead || p.canUpdate || p.canDelete,
+        ).length,
       }))
     : [];
 

@@ -1,4 +1,5 @@
 import type { RoleCode } from '../value-objects/role';
+import type { BankStatus } from './bank-account';
 
 export interface Permission {
   module: string;
@@ -92,6 +93,17 @@ export interface UserProfile extends AuthUser {
   trialEndsAt: string | null;
   nextChargeAt: string | null;
   permissions: Permission[];
+  /**
+   * Thông tin nhận tiền OWNER (spec §2.5 / §3.3, v1.21) — 4 field bank = giá trị
+   * ĐÃ DUYỆT (sinh VietQR). `bankStatus` cho biết STK đang chờ duyệt / bị từ chối.
+   * Role khác OWNER thường `null`. BE trả sẵn trong `/auth/profile` (cast trực tiếp).
+   */
+  bankBin?: string | null;
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
+  bankAccountName?: string | null;
+  bankStatus?: BankStatus | null;
+  bankRejectReason?: string | null;
 }
 
 export function findPermission(

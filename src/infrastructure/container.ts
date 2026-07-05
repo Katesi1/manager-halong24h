@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { AuditLogRepository } from '@/application/ports/audit-log-repository';
 import type { AuthRepository } from '@/application/ports/auth-repository';
+import type { BankAccountRepository } from '@/application/ports/bank-account-repository';
 import type { BillingPlanRepository } from '@/application/ports/billing-plan-repository';
 import type { BookingRepository } from '@/application/ports/booking-repository';
 import type { CalendarRepository } from '@/application/ports/calendar-repository';
@@ -11,6 +12,7 @@ import type { DisputeRepository } from '@/application/ports/dispute-repository';
 import type { GuestRepository } from '@/application/ports/guest-repository';
 import type { NotificationRepository } from '@/application/ports/notification-repository';
 import type { PaymentSessionRepository } from '@/application/ports/payment-session-repository';
+import type { PlatformBankRepository } from '@/application/ports/platform-bank-repository';
 import type { PropertyRepository } from '@/application/ports/property-repository';
 import type { ReviewRepository } from '@/application/ports/review-repository';
 import type { SubscriptionRepository } from '@/application/ports/subscription-repository';
@@ -25,6 +27,7 @@ import type { SystemStaffRepository } from '@/application/ports/system-staff-rep
 import { ApiAdminUserRepository } from './repositories/api-admin-user-repository';
 import { ApiAuditLogRepository } from './repositories/api-audit-log-repository';
 import { ApiAuthRepository } from './repositories/api-auth-repository';
+import { ApiBankAccountRepository } from './repositories/api-bank-account-repository';
 import { ApiBillingPlanRepository } from './repositories/api-billing-plan-repository';
 import { ApiBookingRepository } from './repositories/api-booking-repository';
 import { ApiCalendarRepository } from './repositories/api-calendar-repository';
@@ -38,6 +41,7 @@ import { ApiLeadRepository } from './repositories/api-lead-repository';
 import { ApiPermissionRepository } from './repositories/api-permission-repository';
 import { ApiNotificationRepository } from './repositories/api-notification-repository';
 import { ApiPaymentSessionRepository } from './repositories/api-payment-session-repository';
+import { ApiPlatformBankRepository } from './repositories/api-platform-bank-repository';
 import { ApiPropertyRepository } from './repositories/api-property-repository';
 import { ApiReviewRepository } from './repositories/api-review-repository';
 import { ApiStaffRepository } from './repositories/api-staff-repository';
@@ -56,6 +60,12 @@ export function authRepository(): AuthRepository {
 
 export function propertyRepository(): PropertyRepository {
   return new ApiPropertyRepository();
+}
+
+export function bankAccountRepository(): BankAccountRepository {
+  // Spec §3.3 (v1.21) — `/users/me/bank` (OWNER) + `/admin/bank-accounts` +
+  // `/admin/users/:id/bank/(approve|reject)` (ADMIN). Luồng duyệt STK nhận tiền.
+  return new ApiBankAccountRepository();
 }
 
 export function dashboardRepository(): DashboardRepository {
@@ -78,6 +88,12 @@ export function notificationRepository(): NotificationRepository {
 export function paymentSessionRepository(): PaymentSessionRepository {
   // Spec v1.6 §10.3 — /admin/payments live (manual reconcile flow).
   return new ApiPaymentSessionRepository();
+}
+
+export function platformBankRepository(): PlatformBankRepository {
+  // Spec §10.7 (v1.21) — STK nền tảng nhận tiền mua gói. ADMIN sửa trực tiếp,
+  // không có luồng duyệt (khác STK cọc OWNER §3.3).
+  return new ApiPlatformBankRepository();
 }
 
 export function disputeRepository(): DisputeRepository {
