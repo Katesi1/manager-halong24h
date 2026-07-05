@@ -20,6 +20,7 @@ import type { KycRepository } from '@/application/ports/kyc-repository';
 import type { LeadRepository } from '@/application/ports/lead-repository';
 import type { PermissionRepository } from '@/application/ports/permission-repository';
 import type { StaffRepository } from '@/application/ports/staff-repository';
+import type { SystemStaffRepository } from '@/application/ports/system-staff-repository';
 
 import { ApiAdminUserRepository } from './repositories/api-admin-user-repository';
 import { ApiAuditLogRepository } from './repositories/api-audit-log-repository';
@@ -41,6 +42,7 @@ import { ApiPropertyRepository } from './repositories/api-property-repository';
 import { ApiReviewRepository } from './repositories/api-review-repository';
 import { ApiStaffRepository } from './repositories/api-staff-repository';
 import { ApiSubscriptionRepository } from './repositories/api-subscription-repository';
+import { ApiSystemStaffRepository } from './repositories/api-system-staff-repository';
 
 /**
  * Container — resolve mỗi port về implementation REST API thật.
@@ -91,6 +93,11 @@ export function calendarRepository(): CalendarRepository {
 
 export function staffRepository(): StaffRepository {
   return new ApiStaffRepository();
+}
+
+export function systemStaffRepository(): SystemStaffRepository {
+  // Spec §26.3 — /admin/system-staff/* live (System SALE admin-grade).
+  return new ApiSystemStaffRepository();
 }
 
 export function kycRepository(): KycRepository {

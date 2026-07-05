@@ -6,6 +6,7 @@ import { listAdminUsersAction } from '@/app/actions/admin-users';
 import { getPermissionsAction } from '@/app/actions/permissions';
 import { PermissionEditor } from '@/components/admin/permission-editor';
 import { PageHeader } from '@/components/host/page-header';
+import { modulesForScope } from '@/core/entities/permission';
 import { RoleCode } from '@/core/value-objects/role';
 
 export const metadata: Metadata = { title: 'Phân quyền' };
@@ -43,6 +44,13 @@ export default async function AdminPermissionsPage(props: {
       : null;
     const label = user ? `${user.name} (${user.email})` : userId;
 
+    // Sale hệ thống (scope=system) → 18 module (4 owner + 14 admin, spec §26.5).
+    const isSystem = res.data.scope === 'system';
+    const modules = modulesForScope(res.data.scope);
+    const hint = isSystem
+      ? 'Sale hệ thống — quyền trên toàn nền tảng, mặc định tắt hết. Chỉ bật những module nhân viên này phụ trách.'
+      : undefined;
+
     return (
       <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
         <PageHeader
@@ -58,6 +66,8 @@ export default async function AdminPermissionsPage(props: {
           userId={userId}
           userLabel={label}
           initial={res.data.permissions}
+          modules={modules}
+          hint={hint}
         />
       </div>
     );
@@ -114,7 +124,11 @@ export default async function AdminPermissionsPage(props: {
                   </td>
                   <td className="px-4 py-3 text-ink-600">{u.email}</td>
                   <td className="px-4 py-3 text-ink-600">
-                    {u.ownerId ? (
+                    {u.scope === 'system' ? (
+                      <span className="inline-flex rounded-full bg-navy-900/5 px-2.5 py-0.5 text-xs font-medium text-navy-800 ring-1 ring-navy-900/15">
+                        Sale hệ thống
+                      </span>
+                    ) : u.ownerId ? (
                       <code className="text-xs">{u.ownerId.slice(0, 8)}</code>
                     ) : (
                       <span className="text-amber-700">Chưa gán</span>

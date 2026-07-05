@@ -694,6 +694,17 @@ function Step2({
 }: StepProps & {
   toggleArray: (key: 'amenities' | 'services', val: string) => void;
 }) {
+  const allAmenities = (data.amenities ?? []).length === AMENITIES.length;
+  const allServices = (data.services ?? []).length === SERVICES.length;
+
+  function toggleAll(key: 'amenities' | 'services') {
+    const isAll = key === 'amenities' ? allAmenities : allServices;
+    const keys = isAll
+      ? []
+      : (key === 'amenities' ? AMENITIES : SERVICES).map((x) => x.key);
+    update(key, keys);
+  }
+
   return (
     <div className="space-y-5">
       <h2 className="font-display text-2xl font-semibold tracking-tight text-navy-900">
@@ -701,7 +712,16 @@ function Step2({
       </h2>
 
       <div>
-        <Label>Tiện nghi</Label>
+        <div className="flex items-center justify-between">
+          <Label>Tiện nghi</Label>
+          <button
+            type="button"
+            onClick={() => toggleAll('amenities')}
+            className="mb-1.5 text-xs font-medium text-navy-700 hover:underline"
+          >
+            {allAmenities ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+          </button>
+        </div>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4">
           {AMENITIES.map((a) => {
             const checked = (data.amenities ?? []).includes(a.key);
@@ -728,7 +748,16 @@ function Step2({
       </div>
 
       <div>
-        <Label>Dịch vụ thêm</Label>
+        <div className="flex items-center justify-between">
+          <Label>Dịch vụ thêm</Label>
+          <button
+            type="button"
+            onClick={() => toggleAll('services')}
+            className="mb-1.5 text-xs font-medium text-navy-700 hover:underline"
+          >
+            {allServices ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+          </button>
+        </div>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
           {SERVICES.map((s) => {
             const checked = (data.services ?? []).includes(s.key);
@@ -837,18 +866,16 @@ function Step2({
           <div>
             <Label>Giờ check-in / check-out</Label>
             <div className="flex items-center gap-2">
-              <Input
-                type="time"
-                aria-label="Giờ check-in"
+              <TimeSelect24
+                ariaLabel="Giờ check-in"
                 value={data.checkInTime ?? POLICY_DEFAULTS.checkInTime}
-                onChange={(e) => update('checkInTime', e.target.value)}
+                onChange={(v) => update('checkInTime', v)}
               />
               <span className="text-xs text-ink-500">đến</span>
-              <Input
-                type="time"
-                aria-label="Giờ check-out"
+              <TimeSelect24
+                ariaLabel="Giờ check-out"
                 value={data.checkOutTime ?? POLICY_DEFAULTS.checkOutTime}
-                onChange={(e) => update('checkOutTime', e.target.value)}
+                onChange={(v) => update('checkOutTime', v)}
               />
             </div>
           </div>
@@ -856,18 +883,16 @@ function Step2({
           <div>
             <Label>Giờ yên tĩnh</Label>
             <div className="flex items-center gap-2">
-              <Input
-                type="time"
-                aria-label="Giờ yên tĩnh bắt đầu"
+              <TimeSelect24
+                ariaLabel="Giờ yên tĩnh bắt đầu"
                 value={data.quietHoursStart ?? POLICY_DEFAULTS.quietHoursStart}
-                onChange={(e) => update('quietHoursStart', e.target.value)}
+                onChange={(v) => update('quietHoursStart', v)}
               />
               <span className="text-xs text-ink-500">đến</span>
-              <Input
-                type="time"
-                aria-label="Giờ yên tĩnh kết thúc"
+              <TimeSelect24
+                ariaLabel="Giờ yên tĩnh kết thúc"
                 value={data.quietHoursEnd ?? POLICY_DEFAULTS.quietHoursEnd}
-                onChange={(e) => update('quietHoursEnd', e.target.value)}
+                onChange={(v) => update('quietHoursEnd', v)}
               />
             </div>
           </div>
@@ -884,6 +909,64 @@ function Step2({
           placeholder="Quy định bổ sung ngoài 6 nội quy trên (tùy chọn)..."
         />
       </div>
+    </div>
+  );
+}
+
+/** 2 dropdown giờ (0–23) + phút riêng biệt, hiển thị 24h — thay input type="time" vì trình duyệt hiện AM/PM theo locale hệ điều hành. */
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) =>
+  String(i).padStart(2, '0'),
+);
+const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, i) =>
+  String(i * 5).padStart(2, '0'),
+);
+
+function TimeSelect24({
+  value,
+  onChange,
+  ariaLabel,
+}: {
+  value: string; // "HH:mm"
+  onChange: (v: string) => void;
+  ariaLabel: string;
+}) {
+  const [hour = '00', minute = '00'] = value.split(':');
+  // Phút lẻ (VD "17" từ bản nháp cũ) vẫn hiển thị được, không bị mất.
+  const minuteOptions = MINUTE_OPTIONS.includes(minute)
+    ? MINUTE_OPTIONS
+    : [minute, ...MINUTE_OPTIONS];
+  const selectClass = cn(
+    'h-11 rounded-[10px] border border-ink-300 bg-white px-2.5 text-sm',
+    'focus:border-ink-900 focus:outline-none focus:ring-2 focus:ring-ink-100',
+  );
+  return (
+    <div className="flex items-center gap-1">
+      <select
+        aria-label={`${ariaLabel} — giờ`}
+        value={hour}
+        onChange={(e) => onChange(`${e.target.value}:${minute}`)}
+        className={selectClass}
+      >
+        {HOUR_OPTIONS.map((h) => (
+          <option key={h} value={h}>
+            {h}
+          </option>
+        ))}
+      </select>
+      <span className="text-xs text-ink-500">giờ</span>
+      <select
+        aria-label={`${ariaLabel} — phút`}
+        value={minute}
+        onChange={(e) => onChange(`${hour}:${e.target.value}`)}
+        className={selectClass}
+      >
+        {minuteOptions.map((m) => (
+          <option key={m} value={m}>
+            {m}
+          </option>
+        ))}
+      </select>
+      <span className="text-xs text-ink-500">phút</span>
     </div>
   );
 }
@@ -1025,6 +1108,11 @@ function NumberField({
 
 const PRICE_MAX = 100_000_000;
 
+/** "1500000" → "1.500.000" (dấu chấm ngăn cách hàng nghìn kiểu VN). */
+function formatThousands(n: number): string {
+  return n.toLocaleString('vi-VN');
+}
+
 function PriceField({
   label,
   hint,
@@ -1041,22 +1129,19 @@ function PriceField({
       <Label>{label}</Label>
       <div className="relative">
         <Input
-          type="number"
+          type="text"
           inputMode="numeric"
-          min={0}
-          max={PRICE_MAX}
-          step={10000}
-          value={value ?? ''}
+          value={value !== undefined ? formatThousands(value) : ''}
           onChange={(e) => {
-            const raw = e.target.value;
-            if (raw === '') {
+            // Bỏ mọi ký tự không phải số (dấu chấm format, chữ dán nhầm…)
+            const digits = e.target.value.replace(/\D/g, '');
+            if (digits === '') {
               onChange(undefined);
               return;
             }
-            const num = Number(raw);
+            const num = Number(digits);
             if (!Number.isFinite(num)) return;
-            const clamped = Math.min(PRICE_MAX, Math.max(0, num));
-            onChange(clamped);
+            onChange(Math.min(PRICE_MAX, num));
           }}
           className="pr-12"
         />

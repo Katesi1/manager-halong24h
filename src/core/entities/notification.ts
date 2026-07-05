@@ -14,6 +14,9 @@ export interface Notification {
   title: string;
   body: string | null;
   link: string | null;
+  /** Đối tượng notification trỏ tới (spec §8.2) — vd 'booking', 'conversation' */
+  targetType: string | null;
+  targetId: string | null;
   readAt: string | null;
   createdAt: string;
   metadata?: Record<string, unknown>;

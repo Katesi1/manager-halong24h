@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Bell } from 'lucide-react';
@@ -11,19 +11,47 @@ import {
 } from '@/app/actions/notifications';
 import { cn } from '@/lib/utils';
 import { relativeTime } from '@/lib/format';
+import { notificationHref, type ManagerArea } from '@/lib/notification-link';
 import type { Notification } from '@/core/entities/notification';
 import { useToast } from '@/components/ui/toast';
 
 interface Props {
   notifications: Notification[];
   unreadCount: number;
+  /** Khu vực đang đứng — quyết định deep-link trỏ /admin/* hay /host/* */
+  area?: ManagerArea;
 }
 
-export function NotificationBell({ notifications, unreadCount }: Props) {
+export function NotificationBell({
+  notifications,
+  unreadCount,
+  area = 'host',
+}: Props) {
   const router = useRouter();
   const { show } = useToast();
   const [open, setOpen] = useState(false);
   const [, startTransition] = useTransition();
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Không dùng backdrop `fixed inset-0`: topbar có backdrop-blur nên
+  // position:fixed của con bị giới hạn trong topbar, không phủ được cả trang.
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: PointerEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
 
   function onMarkRead(id: string, link: string | null) {
     startTransition(async () => {
@@ -50,7 +78,7 @@ export function NotificationBell({ notifications, unreadCount }: Props) {
   }
 
   return (
-    <div className="relative">
+    <div ref={rootRef} className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -66,13 +94,7 @@ export function NotificationBell({ notifications, unreadCount }: Props) {
       </button>
 
       {open && (
-        <>
-          <div
-            className="fixed inset-0 z-30"
-            onClick={() => setOpen(false)}
-            aria-hidden
-          />
-          <div className="absolute right-0 top-12 z-40 w-80 rounded-2xl bg-white shadow-floating ring-1 ring-ink-200">
+        <div className="absolute right-0 top-12 z-40 w-80 rounded-2xl bg-white shadow-floating ring-1 ring-ink-200">
             <div className="flex items-center justify-between border-b border-ink-200 px-4 py-3">
               <p className="font-display text-lg font-semibold tracking-tight text-navy-900">
                 Thông báo
@@ -95,11 +117,12 @@ export function NotificationBell({ notifications, unreadCount }: Props) {
               ) : (
                 notifications.map((n) => {
                   const unread = !n.readAt;
+                  const href = notificationHref(n, area);
                   return (
                     <li key={n.id}>
                       <button
                         type="button"
-                        onClick={() => onMarkRead(n.id, n.link)}
+                        onClick={() => onMarkRead(n.id, href)}
                         className={cn(
                           'block w-full text-left px-4 py-3 transition-colors hover:bg-cream-100',
                           unread && 'bg-navy-50/30',
@@ -145,8 +168,7 @@ export function NotificationBell({ notifications, unreadCount }: Props) {
                 Xem tất cả thông báo →
               </Link>
             </div>
-          </div>
-        </>
+        </div>
       )}
     </div>
   );

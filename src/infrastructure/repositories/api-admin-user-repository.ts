@@ -29,6 +29,8 @@ interface SpecUserWithStats {
   avatar?: string | null;
   role: RoleCode;
   ownerId: string | null;
+  /** Spec §26 — `owner` (SALE thuộc chủ nhà) | `system` (Sale hệ thống). */
+  scope?: 'owner' | 'system' | null;
   isActive: boolean;
   emailVerified?: boolean;
   bannedAt?: string | null;
@@ -70,6 +72,7 @@ function mapUser(s: SpecUserWithStats): AdminUser {
     role: s.role,
     status: mapStatus(s),
     ownerId: s.ownerId,
+    scope: s.scope ?? null,
     bookingCount: s.bookingCount ?? 0,
     propertyCount: s.propertyCount ?? 0,
     disputeCount: s.stats?.disputeCount ?? 0,
@@ -94,6 +97,8 @@ export class ApiAdminUserRepository implements AdminUserRepository {
         q: filters?.search,
         ownerId: filters?.ownerId,
         kycStatus: filters?.kycStatus,
+        // Spec §26.3.2 — lọc SALE theo scope server-side (BE tự ép role=2).
+        scope: filters?.scope,
       },
       cache: 'no-store',
     });

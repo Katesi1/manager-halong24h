@@ -2,13 +2,18 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { getBookingAction } from '@/app/actions/bookings';
+import { getPropertyAction } from '@/app/actions/properties';
 import { BookingActions } from '@/components/host/booking-actions';
 import { OpenDisputeButton } from '@/components/host/open-dispute-button';
 import { PageHeader } from '@/components/host/page-header';
 import { Badge } from '@/components/ui/badge';
 import type { Booking, BookingStatus } from '@/core/entities/booking';
 import { formatVND } from '@/core/value-objects/vnd';
-import { formatBookingTotal, holdSecondsLeft } from '@/lib/booking-display';
+import {
+  estimateBookingTotal,
+  formatBookingTotal,
+  holdSecondsLeft,
+} from '@/lib/booking-display';
 import { formatDate, formatDateTime } from '@/lib/format';
 
 const STATUS_LABEL: Record<BookingStatus, string> = {
@@ -42,9 +47,25 @@ export default async function BookingDetailPage(props: {
   const booking: Booking = result.data;
 
   const hasTotal = booking.totalPrice != null;
-  const remaining = hasTotal
-    ? Math.max(0, booking.totalPrice! - (booking.deposit ?? 0))
-    : null;
+
+  // BE chưa chốt giá (đơn HOLD/CONFIRMED) → tạm tính từ bảng giá cơ sở
+  let estimatedTotal: number | null = null;
+  if (!hasTotal && (booking.status === 'hold' || booking.status === 'confirmed')) {
+    const propResult = await getPropertyAction(booking.propertyId);
+    if (propResult.ok && propResult.data) {
+      estimatedTotal = estimateBookingTotal(
+        propResult.data,
+        booking.checkInAt,
+        booking.checkOutAt,
+      );
+    }
+  }
+
+  const effectiveTotal = booking.totalPrice ?? estimatedTotal;
+  const remaining =
+    effectiveTotal != null
+      ? Math.max(0, effectiveTotal - (booking.deposit ?? 0))
+      : null;
   const fullyPaid = hasTotal && remaining === 0 && booking.totalPrice! > 0;
 
   return (
@@ -138,7 +159,21 @@ export default async function BookingDetailPage(props: {
               {fullyPaid && <Badge variant="success">Đã nhận đủ</Badge>}
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <Stat label="Tổng" value={formatBookingTotal(booking.totalPrice)} />
+              <Stat
+                label="Tổng"
+                value={
+                  hasTotal
+                    ? formatBookingTotal(booking.totalPrice)
+                    : estimatedTotal != null
+                      ? `≈ ${formatVND(estimatedTotal)}`
+                      : 'Chưa chốt giá'
+                }
+                hint={
+                  !hasTotal && estimatedTotal != null
+                    ? 'Tạm tính theo bảng giá — chốt khi ghi nhận thanh toán'
+                    : undefined
+                }
+              />
               <Stat
                 label="Khách đã chuyển"
                 value={formatVND(booking.deposit)}
@@ -146,7 +181,13 @@ export default async function BookingDetailPage(props: {
               />
               <Stat
                 label="Còn lại"
-                value={remaining == null ? 'Chưa chốt giá' : formatVND(remaining)}
+                value={
+                  remaining == null
+                    ? 'Chưa chốt giá'
+                    : hasTotal
+                      ? formatVND(remaining)
+                      : `≈ ${formatVND(remaining)}`
+                }
                 color={remaining != null && remaining > 0 ? 'amber' : 'emerald'}
               />
             </div>
@@ -204,7 +245,7 @@ export default async function BookingDetailPage(props: {
                 <BookingActions
                   bookingId={booking.id}
                   status={booking.status}
-                  totalPrice={booking.totalPrice ?? 0}
+                  totalPrice={effectiveTotal ?? 0}
                   alreadyPaid={booking.deposit ?? 0}
                 />
               </div>
@@ -268,10 +309,12 @@ function Stat({
   label,
   value,
   color = 'navy',
+  hint,
 }: {
   label: string;
   value: string;
   color?: 'navy' | 'emerald' | 'amber';
+  hint?: string;
 }) {
   const colorClass: Record<string, string> = {
     navy: 'text-ink-900',
@@ -284,6 +327,7 @@ function Stat({
         {label}
       </p>
       <p className={`mt-1 text-lg font-bold ${colorClass[color]}`}>{value}</p>
+      {hint && <p className="mt-0.5 text-[11px] text-ink-500">{hint}</p>}
     </div>
   );
 }

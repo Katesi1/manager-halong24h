@@ -16,6 +16,13 @@ interface Props {
   userId: string;
   userLabel: string;
   initial: PermissionRow[];
+  /**
+   * Danh sách module hiển thị — 4 owner-scope (mặc định) hoặc 18 module cho
+   * Sale hệ thống (spec §26.5). Truyền từ page theo `matrix.scope`.
+   */
+  modules?: PermissionModule[];
+  /** Mô tả ngắn dưới tên user (thay câu mặc định 4-module). */
+  hint?: string;
 }
 
 const CRUD_KEYS = ['canCreate', 'canRead', 'canUpdate', 'canDelete'] as const;
@@ -26,11 +33,14 @@ const CRUD_LABEL: Record<(typeof CRUD_KEYS)[number], string> = {
   canDelete: 'Xoá',
 };
 
-function normalizeRows(initial: PermissionRow[]): PermissionRow[] {
+function normalizeRows(
+  initial: PermissionRow[],
+  modules: PermissionModule[],
+): PermissionRow[] {
   const byModule = new Map<PermissionModule, PermissionRow>(
     initial.map((r) => [r.module, r]),
   );
-  return PERMISSION_MODULES.map(
+  return modules.map(
     (m) =>
       byModule.get(m) ?? {
         module: m,
@@ -59,10 +69,18 @@ function equal(a: PermissionRow[], b: PermissionRow[]): boolean {
   return true;
 }
 
-export function PermissionEditor({ userId, userLabel, initial }: Props) {
-  const [rows, setRows] = useState<PermissionRow[]>(() => normalizeRows(initial));
+export function PermissionEditor({
+  userId,
+  userLabel,
+  initial,
+  modules = PERMISSION_MODULES,
+  hint,
+}: Props) {
+  const [rows, setRows] = useState<PermissionRow[]>(() =>
+    normalizeRows(initial, modules),
+  );
   const [saved, setSaved] = useState<PermissionRow[]>(() =>
-    normalizeRows(initial),
+    normalizeRows(initial, modules),
   );
   const [pending, startTransition] = useTransition();
 
@@ -124,7 +142,8 @@ export function PermissionEditor({ userId, userLabel, initial }: Props) {
           {userLabel}
         </h2>
         <p className="mt-1 text-xs text-ink-500">
-          Chỉ áp dụng cho vai trò SALE — 4 module × 4 thao tác (thêm, xem, sửa, xoá).
+          {hint ??
+            'Chỉ áp dụng cho vai trò SALE — 4 module × 4 thao tác (thêm, xem, sửa, xoá).'}
         </p>
       </div>
 

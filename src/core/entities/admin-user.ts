@@ -17,6 +17,8 @@ export interface AdminUser {
   status: AdminUserStatus;
   /** ID Owner (chỉ SALE có; null nếu SALE chưa được gán) */
   ownerId: string | null;
+  /** Spec §26 — SALE scope: `owner` (thuộc chủ nhà) | `system` (Sale hệ thống, admin-grade) */
+  scope: 'owner' | 'system' | null;
   /** Số booking đã tạo (cho mọi role — customer thì là booking đã đặt) */
   bookingCount: number;
   /** Số property sở hữu (chỉ OWNER) */
@@ -39,6 +41,8 @@ export interface AdminUserFilters {
   search?: string;
   ownerId?: string;
   kycStatus?: AdminUser['kycStatus'];
+  /** Spec §26.3.2 — `GET /users?scope=` lọc SALE theo scope server-side */
+  scope?: 'owner' | 'system' | 'all';
 }
 
 export interface BanUserInput {

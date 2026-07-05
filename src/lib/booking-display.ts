@@ -45,6 +45,42 @@ export function formatBookingTotal(amount: number | null | undefined): string {
 }
 
 /**
+ * Tạm tính tổng tiền booking từ bảng giá cơ sở khi BE chưa chốt giá
+ * (`totalAmount=null` cho đơn HOLD/CONFIRMED — spec §5.3).
+ *
+ * Cộng giá từng đêm trong [checkIn, checkOut): đêm T6/T7/CN dùng
+ * `weekendPrice` (fallback `weekdayPrice`) — cùng quy ước dow 0/5/6 với
+ * pricing engine ([lib/pricing.ts]). KHÔNG tính được giá lễ/phụ thu → đây
+ * là số ước lượng, UI phải ghi rõ "tạm tính". Trả `null` khi thiếu bảng
+ * giá hoặc ngày không hợp lệ.
+ */
+export function estimateBookingTotal(
+  prices: { weekdayPrice: number | null; weekendPrice: number | null },
+  checkIn: string,
+  checkOut: string,
+): number | null {
+  if (prices.weekdayPrice == null) return null;
+  const start = new Date(checkIn.slice(0, 10));
+  const end = new Date(checkOut.slice(0, 10));
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  if (start >= end) return null;
+
+  let total = 0;
+  let nights = 0;
+  const cur = new Date(start);
+  while (cur < end && nights < 366) {
+    const dow = cur.getDay();
+    const isWeekend = dow === 0 || dow === 5 || dow === 6;
+    total += isWeekend
+      ? (prices.weekendPrice ?? prices.weekdayPrice)
+      : prices.weekdayPrice;
+    cur.setDate(cur.getDate() + 1);
+    nights += 1;
+  }
+  return total;
+}
+
+/**
  * Số giây còn lại của đơn HOLD cho đồng hồ đếm ngược.
  *
  * Ưu tiên `holdRemainingSeconds` (server tính tại thời điểm trả response →

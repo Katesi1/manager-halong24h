@@ -76,6 +76,7 @@ const ADMIN_GROUPS: NavGroup[] = [
     items: [
       { href: '/admin/kyc', label: 'Duyệt KYC', icon: ShieldCheck, badgeKey: 'kyc' },
       { href: '/admin/users', label: 'Người dùng', icon: Users },
+      { href: '/admin/system-staff', label: 'Tài khoản Sale hệ thống', icon: UserCog },
       { href: '/admin/properties', label: 'Toàn bộ cơ sở', icon: Building },
       { href: '/admin/bookings', label: 'Toàn bộ đặt phòng', icon: BedDouble },
     ],

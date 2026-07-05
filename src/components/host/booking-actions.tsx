@@ -189,13 +189,15 @@ export function BookingActions({
             <Label htmlFor="payment_amount">Số tiền (VNĐ)</Label>
             <Input
               id="payment_amount"
-              type="number"
-              min={1}
-              max={remaining}
-              step={100000}
-              value={paymentAmount}
-              onChange={(e) => setPaymentAmount(e.target.value)}
-              placeholder={String(remaining)}
+              type="text"
+              inputMode="numeric"
+              value={
+                paymentAmount ? Number(paymentAmount).toLocaleString('vi-VN') : ''
+              }
+              onChange={(e) =>
+                setPaymentAmount(e.target.value.replace(/\D/g, ''))
+              }
+              placeholder={remaining.toLocaleString('vi-VN')}
             />
           </div>
           <div className="flex gap-2">
@@ -310,13 +312,15 @@ function CancelPenaltyPreview({
     reasonLen < 10 ? 'mt-1 text-[11px] text-red-600' : 'mt-1 text-[11px] text-ink-500';
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Escape closes the inline dialog; focus the container on mount for a11y.
+  // Focus container CHỈ lúc mount (screen reader đọc role=dialog). Không được
+  // đặt trong effect có deps thay đổi theo render — sẽ cướp focus khỏi textarea
+  // mỗi lần gõ phím.
   useEffect(() => {
-    const node = containerRef.current;
-    if (node) {
-      // Focus container so screen readers announce role=dialog + aria-labelledby.
-      node.focus();
-    }
+    containerRef.current?.focus();
+  }, []);
+
+  // Escape closes the inline dialog.
+  useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape' && !pending) {
         e.preventDefault();

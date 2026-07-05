@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import {
-  PERMISSION_MODULES,
+  ALL_PERMISSION_MODULES,
   type PermissionMatrix,
   type PermissionModule,
 } from '@/core/entities/permission';
@@ -14,8 +14,10 @@ import { requireAdmin } from '@/lib/auth-guard';
 import { toResult } from './_helpers';
 
 const RowSchema = z.object({
+  // Nhận cả owner-scope + admin-scope module — BE tự validate theo scope của
+  // target user (spec §26.5: scope=owner mà gửi admin-scope module → 400).
   module: z.enum(
-    PERMISSION_MODULES as [PermissionModule, ...PermissionModule[]],
+    ALL_PERMISSION_MODULES as [PermissionModule, ...PermissionModule[]],
   ),
   canCreate: z.boolean(),
   canRead: z.boolean(),
