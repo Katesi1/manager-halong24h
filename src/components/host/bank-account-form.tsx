@@ -5,6 +5,7 @@ import { CheckCircle2, Clock, Landmark, XCircle } from 'lucide-react';
 
 import { submitMyBankAction } from '@/app/actions/bank-accounts';
 import type { ActionResult } from '@/app/actions/auth';
+import { BankSelect } from '@/components/common/bank-select';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
@@ -125,43 +126,12 @@ export function BankAccountForm({ state }: Props) {
             Nhập chính xác thông tin STK chính chủ (khớp tên đã xác minh KYC).
           </div>
 
-          <div>
-            <Label htmlFor="bankBin" required>
-              Mã ngân hàng (BIN)
-            </Label>
-            <Input
-              id="bankBin"
-              name="bankBin"
-              inputMode="numeric"
-              maxLength={6}
-              defaultValue={prefill.bankBin ?? ''}
-              placeholder="970436"
-              required
-            />
-            {formState.fieldErrors?.bankBin && (
-              <p className="mt-1 text-xs text-red-600">
-                {formState.fieldErrors.bankBin}
-              </p>
-            )}
-            <p className="mt-1 text-[11px] text-ink-400">
-              Mã NAPAS 6 chữ số của ngân hàng (VD: 970436 = Vietcombank).
-            </p>
-          </div>
-
-          <div>
-            <Label htmlFor="bankName">Tên ngân hàng</Label>
-            <Input
-              id="bankName"
-              name="bankName"
-              defaultValue={prefill.bankName ?? ''}
-              placeholder="Vietcombank"
-            />
-            {formState.fieldErrors?.bankName && (
-              <p className="mt-1 text-xs text-red-600">
-                {formState.fieldErrors.bankName}
-              </p>
-            )}
-          </div>
+          <BankSelect
+            defaultBin={prefill.bankBin}
+            defaultName={prefill.bankName}
+            error={formState.fieldErrors?.bankBin}
+            required
+          />
 
           <div>
             <Label htmlFor="bankAccountNumber" required>

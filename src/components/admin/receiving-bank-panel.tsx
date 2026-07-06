@@ -1,11 +1,12 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Banknote, Pencil } from 'lucide-react';
 
 import type { ActionResult } from '@/app/actions/auth';
 import { updateReceivingBankAction } from '@/app/actions/platform-bank';
+import { BankSelect } from '@/components/common/bank-select';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input, Label } from '@/components/ui/input';
@@ -35,12 +36,18 @@ export function ReceivingBankPanel({ bank, error }: Props) {
     initialState,
   );
 
+  // Guard: mỗi kết quả `state` chỉ xử lý đúng 1 lần. Vì effect có `router.refresh()`
+  // (trigger re-render), guard này chặn vòng lặp kể cả nếu `show`/`router` đổi ref.
+  const handledStateRef = useRef<ActionResult | null>(null);
   useEffect(() => {
+    if (handledStateRef.current === state) return;
     if (state.ok) {
+      handledStateRef.current = state;
       show('Đã cập nhật tài khoản nhận tiền mua gói.', 'success');
       setOpen(false);
       router.refresh();
     } else if (state.error) {
+      handledStateRef.current = state;
       show(state.error, 'error');
     }
   }, [state, show, router]);
@@ -87,16 +94,11 @@ export function ReceivingBankPanel({ bank, error }: Props) {
               {bank.bankAccountName ?? '—'}
             </span>
           </div>
-          <p className="mt-2 text-xs text-amber-800">
-            Nội dung CK của user theo định dạng:{' '}
-            <code className="rounded bg-white/60 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-amber-900 ring-1 ring-amber-200">
-              HALONG24H &lt;sessionId&gt;
-            </code>{' '}
-            · Dùng để sinh mã VietQR khi chủ nhà mua / gia hạn gói cước.
-            {isDb && bank.updatedAt && (
-              <> · Cập nhật {formatDateTime(bank.updatedAt)}.</>
-            )}
-          </p>
+          {isDb && bank.updatedAt && (
+            <p className="mt-2 text-xs text-amber-800">
+              Cập nhật {formatDateTime(bank.updatedAt)}.
+            </p>
+          )}
           {error && (
             <p className="mt-2 text-xs text-rose-700">
               Không tải được STK hiện hành: {error}
@@ -131,44 +133,13 @@ export function ReceivingBankPanel({ bank, error }: Props) {
           </p>
 
           <form action={formAction} className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="rb-bankBin" required>
-                Mã ngân hàng (BIN)
-              </Label>
-              <Input
-                id="rb-bankBin"
-                name="bankBin"
-                inputMode="numeric"
-                maxLength={6}
-                defaultValue={prefill.bankBin ?? ''}
-                placeholder="970416"
-                required
-              />
-              {state.fieldErrors?.bankBin && (
-                <p className="mt-1 text-xs text-red-600">
-                  {state.fieldErrors.bankBin}
-                </p>
-              )}
-              <p className="mt-1 text-[11px] text-ink-400">
-                Mã NAPAS 6 chữ số (VD: 970416 = ACB).
-              </p>
-            </div>
-
-            <div>
-              <Label htmlFor="rb-bankName">Tên ngân hàng</Label>
-              <Input
-                id="rb-bankName"
-                name="bankName"
-                maxLength={100}
-                defaultValue={prefill.bankName ?? ''}
-                placeholder="ACB"
-              />
-              {state.fieldErrors?.bankName && (
-                <p className="mt-1 text-xs text-red-600">
-                  {state.fieldErrors.bankName}
-                </p>
-              )}
-            </div>
+            <BankSelect
+              id="rb-bankBin"
+              defaultBin={prefill.bankBin}
+              defaultName={prefill.bankName}
+              error={state.fieldErrors?.bankBin}
+              required
+            />
 
             <div>
               <Label htmlFor="rb-bankAccountNumber" required>

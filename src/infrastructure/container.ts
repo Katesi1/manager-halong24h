@@ -12,6 +12,7 @@ import type { DisputeRepository } from '@/application/ports/dispute-repository';
 import type { GuestRepository } from '@/application/ports/guest-repository';
 import type { NotificationRepository } from '@/application/ports/notification-repository';
 import type { PaymentSessionRepository } from '@/application/ports/payment-session-repository';
+import type { PaymentPurchaseRepository } from '@/application/ports/payment-purchase-repository';
 import type { PlatformBankRepository } from '@/application/ports/platform-bank-repository';
 import type { PropertyRepository } from '@/application/ports/property-repository';
 import type { ReviewRepository } from '@/application/ports/review-repository';
@@ -41,6 +42,7 @@ import { ApiLeadRepository } from './repositories/api-lead-repository';
 import { ApiPermissionRepository } from './repositories/api-permission-repository';
 import { ApiNotificationRepository } from './repositories/api-notification-repository';
 import { ApiPaymentSessionRepository } from './repositories/api-payment-session-repository';
+import { ApiPaymentPurchaseRepository } from './repositories/api-payment-purchase-repository';
 import { ApiPlatformBankRepository } from './repositories/api-platform-bank-repository';
 import { ApiPropertyRepository } from './repositories/api-property-repository';
 import { ApiReviewRepository } from './repositories/api-review-repository';
@@ -88,6 +90,11 @@ export function notificationRepository(): NotificationRepository {
 export function paymentSessionRepository(): PaymentSessionRepository {
   // Spec v1.6 §10.3 — /admin/payments live (manual reconcile flow).
   return new ApiPaymentSessionRepository();
+}
+
+export function paymentPurchaseRepository(): PaymentPurchaseRepository {
+  // Spec §10.2 — OWNER mua/gia hạn gói (/payments/quote + initiate + active).
+  return new ApiPaymentPurchaseRepository();
 }
 
 export function platformBankRepository(): PlatformBankRepository {

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { Check, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Check, Loader2, X } from 'lucide-react';
 import * as RDialog from '@radix-ui/react-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { startPlanPaymentAction } from '@/app/actions/payments-purchase';
 import { formatVND } from '@/core/value-objects/vnd';
 import {
   POPULAR_PLAN_ID,
@@ -12,9 +13,19 @@ import {
   yearlySavingsPercent,
   type BillingPlan,
 } from '@/core/entities/billing-plan';
+import type { PaymentInitiateResult } from '@/core/entities/payment-session';
 import { Badge } from '@/components/ui/badge';
+import { vietQRImageUrlFor } from '@/lib/vietqr';
 
 type Cycle = 'monthly' | 'yearly';
+
+/** Số phòng gửi kèm khi tạo phiên thanh toán — ưu tiên catalog, fallback suy từ planId. */
+function roomsForPlan(plan: BillingPlan): number {
+  if (plan.rooms && plan.rooms > 0) return plan.rooms;
+  const m = /^rooms_(\d+)/.exec(plan.id);
+  if (m) return parseInt(m[1]!, 10);
+  return 1;
+}
 
 interface TierSelectorProps {
   /** Danh mục gói cước do admin quản lý (`/billing/plans`). */
@@ -173,6 +184,7 @@ export function TierSelector({ plans, currentPlanId }: TierSelectorProps) {
                   <PlanTransferInfo
                     plan={selected}
                     cycle={cycle}
+                    rooms={roomsForPlan(selected)}
                     onClose={() => setSelected(null)}
                   />
                 </motion.div>
@@ -185,17 +197,50 @@ export function TierSelector({ plans, currentPlanId }: TierSelectorProps) {
   );
 }
 
+type LoadState =
+  | { phase: 'loading' }
+  | { phase: 'error'; message: string }
+  | { phase: 'ready'; session: PaymentInitiateResult; alreadyPending: boolean };
+
 function PlanTransferInfo({
   plan,
   cycle,
+  rooms,
   onClose,
 }: {
   plan: BillingPlan;
   cycle: Cycle;
+  rooms: number;
   onClose: () => void;
 }) {
   const isContact = plan.monthlyPrice === 0 && plan.yearlyPrice === 0;
-  const price = priceFor(plan, cycle);
+  const [state, setState] = useState<LoadState>({ phase: 'loading' });
+  // Chỉ tạo phiên đúng 1 lần khi mở dialog (component remount mỗi lần chọn gói).
+  const startedRef = useRef(false);
+
+  useEffect(() => {
+    if (isContact || startedRef.current) return;
+    startedRef.current = true;
+    startPlanPaymentAction({ planId: plan.id, cycle, rooms })
+      .then((res) => {
+        if (res.ok) {
+          setState({
+            phase: 'ready',
+            session: res.data.session,
+            alreadyPending: res.data.alreadyPending,
+          });
+        } else {
+          setState({ phase: 'error', message: res.error });
+        }
+      })
+      .catch(() =>
+        setState({
+          phase: 'error',
+          message: 'Không tạo được phiên thanh toán. Vui lòng thử lại.',
+        }),
+      );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>
@@ -218,37 +263,21 @@ function PlanTransferInfo({
           Gói này tính phí theo hợp đồng. Vui lòng liên hệ Halong24h để được báo
           giá và kích hoạt.
         </p>
+      ) : state.phase === 'loading' ? (
+        <div className="flex items-center gap-2 py-8 text-sm text-ink-500">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Đang tạo phiên thanh toán…
+        </div>
+      ) : state.phase === 'error' ? (
+        <p className="mt-3 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-900 ring-1 ring-rose-200">
+          {state.message}
+        </p>
       ) : (
-        <>
-          <p className="mt-2 text-sm text-ink-500">
-            Số tiền cần thanh toán ({cycle === 'yearly' ? 'theo năm' : 'theo tháng'}):
-          </p>
-          <p className="mt-1 font-display text-2xl font-bold text-navy-900">
-            {price ? formatVND(price) : '—'}
-            <span className="ml-1 text-xs font-normal text-ink-500">chưa gồm VAT</span>
-          </p>
-
-          <div className="mt-4 rounded-lg bg-cream-100 p-4 text-sm">
-            <p className="font-semibold text-navy-900">Thông tin chuyển khoản</p>
-            <p className="mt-1 text-ink-700">
-              Ngân hàng: <strong>Vietcombank</strong>
-            </p>
-            <p className="text-ink-700">
-              STK: <strong>1234567890</strong>
-            </p>
-            <p className="text-ink-700">
-              Chủ TK: <strong>CONG TY HALONG24H</strong>
-            </p>
-            <p className="text-ink-700">
-              Nội dung: <strong>GOI {plan.id.toUpperCase()}</strong>
-            </p>
-          </div>
-        </>
+        <PaymentSessionView session={state.session} pending={state.alreadyPending} />
       )}
 
       <p className="mt-4 text-xs text-ink-500">
-        Sau khi chuyển khoản, admin sẽ xác nhận và kích hoạt gói cho bạn. Gói mới
-        có hiệu lực từ kỳ thanh toán tiếp theo.
+        Sau khi chuyển khoản, admin sẽ xác nhận và kích hoạt gói cho bạn.
       </p>
 
       <div className="mt-5 flex justify-end">
@@ -259,6 +288,76 @@ function PlanTransferInfo({
         >
           Đã hiểu
         </button>
+      </div>
+    </>
+  );
+}
+
+/** Hiển thị STK nền tảng THẬT + QR + nội dung CK từ phiên đã tạo. */
+function PaymentSessionView({
+  session,
+  pending,
+}: {
+  session: PaymentInitiateResult;
+  pending: boolean;
+}) {
+  const { bankInfo, totalAmount, ckContent } = session;
+  const qrUrl = vietQRImageUrlFor({
+    bankBin: bankInfo.bankBin,
+    accountNumber: bankInfo.accountNumber,
+    accountName: bankInfo.accountName,
+    amount: totalAmount,
+    memo: ckContent,
+  });
+
+  return (
+    <>
+      {pending && (
+        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200">
+          Bạn đang có một phiên thanh toán chờ xác nhận. Vui lòng hoàn tất chuyển
+          khoản bên dưới.
+        </p>
+      )}
+
+      <p className="mt-2 text-sm text-ink-500">Số tiền cần thanh toán:</p>
+      <p className="mt-1 font-display text-2xl font-bold text-navy-900">
+        {formatVND(totalAmount)}
+        <span className="ml-1 text-xs font-normal text-ink-500">đã gồm VAT</span>
+      </p>
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-start">
+        <div className="rounded-lg bg-cream-100 p-4 text-sm">
+          <p className="font-semibold text-navy-900">Thông tin chuyển khoản</p>
+          <p className="mt-1 text-ink-700">
+            Ngân hàng: <strong>{bankInfo.bankName ?? '—'}</strong>
+          </p>
+          <p className="text-ink-700">
+            STK: <strong>{bankInfo.accountNumber ?? '—'}</strong>
+          </p>
+          <p className="text-ink-700">
+            Chủ TK: <strong>{bankInfo.accountName ?? '—'}</strong>
+          </p>
+          <p className="text-ink-700">
+            Nội dung: <strong className="break-all">{ckContent || '—'}</strong>
+          </p>
+          <p className="mt-2 text-[11px] text-ink-500">
+            Nhập đúng nội dung CK để hệ thống đối soát tự động.
+          </p>
+        </div>
+
+        {qrUrl && (
+          <div className="mx-auto flex flex-col items-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={qrUrl}
+              alt="Mã VietQR thanh toán"
+              width={160}
+              height={160}
+              className="h-40 w-40 rounded-lg ring-1 ring-ink-200"
+            />
+            <span className="mt-1 text-[11px] text-ink-500">Quét để chuyển khoản</span>
+          </div>
+        )}
       </div>
     </>
   );

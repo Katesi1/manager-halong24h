@@ -37,6 +37,42 @@ export interface PaymentSession {
   updatedAt: string;
 }
 
+/** Thông tin chuyển khoản + VietQR do BE trả trong `initiate`/`active` (spec §10.2). */
+export interface PaymentBankInfo {
+  bankName: string | null;
+  accountNumber: string | null;
+  accountName: string | null;
+  bankBin: string | null;
+  /** Nội dung CK chuẩn — "HALONG24H <sessionId>". */
+  content: string;
+  /** Chuỗi EMV VietQR (BE sinh) — có thể render client-side nếu cần. */
+  vietQrPayload: string | null;
+}
+
+/**
+ * Kết quả tạo phiên mua gói — `POST /payments/initiate` / `GET /payments/active`
+ * (spec §10.2). Chứa STK nền tảng THẬT (đồng bộ từ cấu hình admin) + QR + số tiền.
+ */
+export interface PaymentInitiateResult {
+  sessionId: string;
+  status: PaymentSessionStatus;
+  /** Số tiền phải trả (ĐÃ gồm VAT — BE tính, FE không tự cộng). */
+  totalAmount: number;
+  planId: string;
+  planLabel: string;
+  cycle: 'monthly' | 'yearly';
+  rooms: number;
+  bankInfo: PaymentBankInfo;
+  /** Nội dung CK = HALONG24H <sessionId>. */
+  ckContent: string;
+  /** ISO — QR hết hạn (15 phút) để countdown. */
+  qrExpiresAt: string | null;
+  /** ISO — session hết hạn (24h). */
+  expiresAt: string | null;
+  /** 'subscription' | 'renew' | 'upgrade' | null. */
+  kind: string | null;
+}
+
 export interface PaymentSessionFilters {
   status?: PaymentSessionStatus;
   from?: string;
