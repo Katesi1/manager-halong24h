@@ -63,8 +63,12 @@ export async function markBookingPaidUseCase(
   amount?: number,
 ): Promise<Booking> {
   if (!id) throw new ValidationError('Thiếu id booking');
-  if (amount !== undefined && amount <= 0) {
-    throw new ValidationError('Số tiền phải > 0');
+  // NaN <= 0 là false → phải chặn tường minh; kèm cận trên tránh số vô lý.
+  if (
+    amount !== undefined &&
+    (!Number.isFinite(amount) || amount <= 0 || amount > 10_000_000_000)
+  ) {
+    throw new ValidationError('Số tiền thanh toán không hợp lệ');
   }
   return repo.markPaid(id, amount);
 }

@@ -30,6 +30,19 @@ function AttachmentList({
   return (
     <div className="mt-2 space-y-1.5">
       {attachments.map((a, i) => {
+        // Tin đến qua WS không đi qua Zod của sendMessageAction → re-validate
+        // scheme lúc render, chặn javascript:/data: lọt vào href/src (stored XSS).
+        if (!/^https:\/\//i.test(a.url)) {
+          return (
+            <p
+              key={`${a.url}-${i}`}
+              className="text-xs italic text-ink-400"
+              title={a.url}
+            >
+              (Tệp đính kèm không hợp lệ)
+            </p>
+          );
+        }
         const isImg = isImageMime(a.type);
         if (isImg) {
           return (

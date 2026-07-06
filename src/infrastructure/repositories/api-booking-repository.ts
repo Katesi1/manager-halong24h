@@ -127,11 +127,6 @@ export class ApiBookingRepository implements BookingRepository {
       const data = await apiClient.get<SpecBooking>(`/bookings/${id}`, {
         cache: 'no-store',
       });
-      if (process.env.NODE_ENV !== 'production') {
-        // TEMP DEBUG — xác minh BE có trả tổng tiền không (xoá sau khi verify)
-        // eslint-disable-next-line no-console
-        console.log('[debug booking raw]', JSON.stringify(data));
-      }
       return mapBooking(data);
     } catch (err) {
       if (

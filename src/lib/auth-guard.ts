@@ -5,7 +5,8 @@ import { redirect } from 'next/navigation';
 import { getCurrentProfile } from '@/app/actions/auth';
 import { ForbiddenError, NotFoundError, UnauthorizedError } from '@/core/errors';
 import type { UserProfile } from '@/core/entities/user';
-import { propertyRepository } from '@/infrastructure/container';
+import type { Booking } from '@/core/entities/booking';
+import { bookingRepository, propertyRepository } from '@/infrastructure/container';
 import { RoleCode, isAdmin, isManagerRole } from '@/core/value-objects/role';
 
 /**
@@ -100,4 +101,26 @@ export async function requireOwnerOfProperty(
     throw new ForbiddenError('Bạn không có quyền truy cập cơ sở này');
   }
   return profile;
+}
+
+/**
+ * Đảm bảo current user sở hữu booking (qua cơ sở của booking) — hoặc ADMIN.
+ * Trả kèm `booking` đã fetch để caller tái sử dụng (tránh fetch 2 lần ở read).
+ * ADMIN bypass. OWNER/SALE: booking.propertyId phải thuộc owner của họ.
+ */
+export async function requireOwnerOfBooking(
+  bookingId: string,
+): Promise<{ profile: UserProfile; booking: Booking }> {
+  const profile = await requireManagerRole();
+  if (!bookingId) throw new NotFoundError('Không tìm thấy đặt phòng');
+  const booking = await bookingRepository().getById(bookingId);
+  if (!booking) throw new NotFoundError('Không tìm thấy đặt phòng');
+  if (isAdmin(profile.role)) return { profile, booking };
+  const property = await propertyRepository().getById(booking.propertyId);
+  const myOwnerId =
+    profile.role === RoleCode.OWNER ? profile.id : profile.ownerId;
+  if (!property || !myOwnerId || property.ownerId !== myOwnerId) {
+    throw new ForbiddenError('Bạn không có quyền với đặt phòng này');
+  }
+  return { profile, booking };
 }

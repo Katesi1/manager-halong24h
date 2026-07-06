@@ -13,7 +13,7 @@ import { listDisputesUseCase } from '@/application/disputes/list';
 import { openDisputeUseCase } from '@/application/disputes/open';
 import type { DisputeFilters } from '@/core/entities/dispute';
 import { disputeRepository } from '@/infrastructure/container';
-import { requireAdmin, requireManagerRole } from '@/lib/auth-guard';
+import { requireAdmin, requireOwnerOfBooking } from '@/lib/auth-guard';
 import { RoleCode } from '@/core/value-objects/role';
 
 import { toResult } from './_helpers';
@@ -94,7 +94,8 @@ export async function openDisputeAction(input: {
   amount?: number;
 }) {
   const result = await toResult(async () => {
-    const profile = await requireManagerRole();
+    // Chỉ mở được dispute trên booking thuộc quyền của mình (ADMIN bypass).
+    const { profile } = await requireOwnerOfBooking(input.bookingId);
     const openerRole: 'owner' | 'admin' =
       profile.role === RoleCode.ADMIN ? 'admin' : 'owner';
     return openDisputeUseCase(disputeRepository(), {

@@ -12,10 +12,31 @@ import type {
   SendMessageInput,
 } from '@/core/entities/chat';
 import { CHAT_ATTACHMENT_MAX_COUNT } from '@/core/entities/upload';
+import { ForbiddenError, NotFoundError } from '@/core/errors';
+import { isAdmin } from '@/core/value-objects/role';
 import { chatRepository } from '@/infrastructure/container';
 import { requireAuthenticated } from '@/lib/auth-guard';
 
 import { toResult } from './_helpers';
+
+/**
+ * Đảm bảo current user là THÀNH VIÊN của hội thoại (hoặc ADMIN) trước khi đọc
+ * dữ liệu — chặn đoán conversationId để xem hội thoại/tin nhắn của người khác.
+ * Trả conversation đã fetch để caller tái dùng (getConversation không fetch 2 lần).
+ * Write (send/edit/delete) để BE enforce (hot-path, BE authoritative).
+ */
+async function requireConversationMember(
+  conversationId: string,
+): Promise<Conversation> {
+  const profile = await requireAuthenticated();
+  const conv = await chatRepository().getConversation(conversationId);
+  if (!conv) throw new NotFoundError('Không tìm thấy hội thoại');
+  if (isAdmin(profile.role)) return conv;
+  if (!conv.members.some((m) => m.userId === profile.id)) {
+    throw new ForbiddenError('Bạn không thuộc hội thoại này');
+  }
+  return conv;
+}
 
 /**
  * Validation chat — đối chiếu spec §17 (Chat REST) + §23 (Uploads).
@@ -125,9 +146,9 @@ export async function createConversationAction(input: CreateConversationInput) {
 
 export async function getConversationAction(id: string) {
   return toResult<Conversation | null>(async () => {
-    await requireAuthenticated();
     const conversationId = UuidSchema.parse(id);
-    return chatRepository().getConversation(conversationId);
+    // Chỉ thành viên (hoặc ADMIN) mới đọc được — chống đoán id xem hội thoại lạ.
+    return requireConversationMember(conversationId);
   });
 }
 
@@ -137,8 +158,9 @@ export async function listMessagesAction(
   limit?: number,
 ) {
   return toResult<MessageListResult>(async () => {
-    await requireAuthenticated();
     const parsed = ListMessagesSchema.parse({ conversationId, cursor, limit });
+    // Chặn đọc lịch sử tin nhắn của hội thoại mình không thuộc.
+    await requireConversationMember(parsed.conversationId);
     return chatRepository().listMessages(
       parsed.conversationId,
       parsed.cursor,

@@ -9,6 +9,7 @@ import type {
   DeleteBillingPlanResult,
 } from '@/core/entities/billing-plan';
 import { billingPlanRepository } from '@/infrastructure/container';
+import { requireAdmin } from '@/lib/auth-guard';
 
 function toError(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
@@ -30,6 +31,7 @@ export async function listBillingPlansAction(): Promise<Result<BillingPlan[]>> {
 
 export async function listAllBillingPlansAction(): Promise<Result<BillingPlan[]>> {
   try {
+    await requireAdmin();
     const data = await billingPlanRepository().listAll();
     return { ok: true, data };
   } catch (err) {
@@ -72,6 +74,7 @@ export async function createBillingPlanAction(
     };
   }
   try {
+    await requireAdmin();
     const data = await billingPlanRepository().create(parsed.data);
     revalidateAll();
     return { ok: true, data };
@@ -96,6 +99,7 @@ export async function updateBillingPlanAction(
     };
   }
   try {
+    await requireAdmin();
     const data = await billingPlanRepository().update(idCheck.data, parsed.data);
     revalidateAll();
     return { ok: true, data };
@@ -110,6 +114,7 @@ export async function deleteBillingPlanAction(
   const idCheck = idSchema.safeParse(id);
   if (!idCheck.success) return { ok: false, error: 'ID gói không hợp lệ' };
   try {
+    await requireAdmin();
     const data = await billingPlanRepository().delete(idCheck.data);
     revalidateAll();
     return { ok: true, data };
