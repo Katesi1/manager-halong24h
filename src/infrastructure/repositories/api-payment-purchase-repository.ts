@@ -6,6 +6,7 @@ import type {
   PaymentSessionStatus,
 } from '@/core/entities/payment-session';
 import { paymentSessionPlanLabel } from '@/core/entities/payment-session';
+import { PaymentPendingError } from '@/core/errors';
 import type {
   InitiateInput,
   PaymentPurchaseRepository,
@@ -14,6 +15,7 @@ import type {
 } from '@/application/ports/payment-purchase-repository';
 
 import { apiClient } from '../http/api-client';
+import { ApiError } from '../http/api-error';
 
 interface SpecBankInfo {
   bankName?: string | null;
@@ -90,14 +92,28 @@ export class ApiPaymentPurchaseRepository implements PaymentPurchaseRepository {
   }
 
   async initiate(input: InitiateInput): Promise<PaymentInitiateResult> {
-    const data = await apiClient.post<SpecSession>('/payments/initiate', {
-      planId: input.planId,
-      cycle: input.cycle,
-      method: 'bank_transfer',
-      rooms: input.rooms,
-      totalAmount: input.totalAmount,
-    });
-    return mapSession(data);
+    try {
+      const data = await apiClient.post<SpecSession>('/payments/initiate', {
+        planId: input.planId,
+        cycle: input.cycle,
+        method: 'bank_transfer',
+        rooms: input.rooms,
+        totalAmount: input.totalAmount,
+      });
+      return mapSession(data);
+    } catch (err) {
+      // Chỉ 409 `paymentPending` mới nên hiện lại phiên đang chờ; các lỗi khác
+      // (amountMismatch/planNotFound/subscriptionFrozen/downgradeScheduled) phải
+      // nổi lên nguyên trạng (spec §10.2.5).
+      if (
+        err instanceof ApiError &&
+        err.status === 409 &&
+        err.payload?.code === 'paymentPending'
+      ) {
+        throw new PaymentPendingError(err.message);
+      }
+      throw err;
+    }
   }
 
   async getActive(): Promise<PaymentInitiateResult | null> {

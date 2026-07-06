@@ -19,14 +19,6 @@ import { vietQRImageUrlFor } from '@/lib/vietqr';
 
 type Cycle = 'monthly' | 'yearly';
 
-/** Số phòng gửi kèm khi tạo phiên thanh toán — ưu tiên catalog, fallback suy từ planId. */
-function roomsForPlan(plan: BillingPlan): number {
-  if (plan.rooms && plan.rooms > 0) return plan.rooms;
-  const m = /^rooms_(\d+)/.exec(plan.id);
-  if (m) return parseInt(m[1]!, 10);
-  return 1;
-}
-
 interface TierSelectorProps {
   /** Danh mục gói cước do admin quản lý (`/billing/plans`). */
   plans: BillingPlan[];
@@ -184,7 +176,6 @@ export function TierSelector({ plans, currentPlanId }: TierSelectorProps) {
                   <PlanTransferInfo
                     plan={selected}
                     cycle={cycle}
-                    rooms={roomsForPlan(selected)}
                     onClose={() => setSelected(null)}
                   />
                 </motion.div>
@@ -205,12 +196,10 @@ type LoadState =
 function PlanTransferInfo({
   plan,
   cycle,
-  rooms,
   onClose,
 }: {
   plan: BillingPlan;
   cycle: Cycle;
-  rooms: number;
   onClose: () => void;
 }) {
   const isContact = plan.monthlyPrice === 0 && plan.yearlyPrice === 0;
@@ -221,7 +210,7 @@ function PlanTransferInfo({
   useEffect(() => {
     if (isContact || startedRef.current) return;
     startedRef.current = true;
-    startPlanPaymentAction({ planId: plan.id, cycle, rooms })
+    startPlanPaymentAction({ planId: plan.id, cycle })
       .then((res) => {
         if (res.ok) {
           setState({
@@ -302,6 +291,7 @@ function PaymentSessionView({
   pending: boolean;
 }) {
   const { bankInfo, totalAmount, ckContent } = session;
+  const hasBank = Boolean(bankInfo.bankBin && bankInfo.accountNumber);
   const qrUrl = vietQRImageUrlFor({
     bankBin: bankInfo.bankBin,
     accountNumber: bankInfo.accountNumber,
@@ -314,8 +304,9 @@ function PaymentSessionView({
     <>
       {pending && (
         <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200">
-          Bạn đang có một phiên thanh toán chờ xác nhận. Vui lòng hoàn tất chuyển
-          khoản bên dưới.
+          Bạn đang có một phiên thanh toán chờ xác nhận cho gói{' '}
+          <strong>{session.planLabel}</strong>. Vui lòng hoàn tất chuyển khoản
+          bên dưới.
         </p>
       )}
 
@@ -325,7 +316,17 @@ function PaymentSessionView({
         <span className="ml-1 text-xs font-normal text-ink-500">đã gồm VAT</span>
       </p>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-start">
+      {!hasBank && (
+        <p className="mt-4 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-900 ring-1 ring-rose-200">
+          Chưa cấu hình tài khoản nhận tiền. Vui lòng liên hệ Halong24h để hoàn
+          tất thanh toán.
+        </p>
+      )}
+
+      <div
+        className="mt-4 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-start"
+        hidden={!hasBank}
+      >
         <div className="rounded-lg bg-cream-100 p-4 text-sm">
           <p className="font-semibold text-navy-900">Thông tin chuyển khoản</p>
           <p className="mt-1 text-ink-700">

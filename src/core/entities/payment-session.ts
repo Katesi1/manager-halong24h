@@ -88,6 +88,18 @@ export interface MarkSessionPaidInput {
   reference?: string;
 }
 
+/**
+ * Số phòng canonical suy từ `planId` — nguồn tin cậy server-side để KHÔNG tin
+ * `rooms` do client gửi (chống thao túng giá). `enterprise` = 0 (không mua qua
+ * luồng self-service; giá custom qua subscriptionPriceOverride).
+ */
+export function roomsFromPlanId(planId: string): number {
+  if (planId === 'enterprise') return 0;
+  if (planId === 'starter_test') return 1;
+  const m = /^rooms_(\d+)/.exec(planId);
+  return m ? parseInt(m[1]!, 10) : 1;
+}
+
 /** Tên gói dễ đọc từ planId — fallback khi BE không trả `planLabel`. */
 export function paymentSessionPlanLabel(planId: string, rooms: number): string {
   if (planId === 'enterprise') return 'Doanh nghiệp';

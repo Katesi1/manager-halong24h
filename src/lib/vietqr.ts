@@ -46,7 +46,9 @@ export function vietQRImageUrlFor(p: {
     addInfo: p.memo,
   });
   if (p.accountName) params.set('accountName', p.accountName);
-  return `https://img.vietqr.io/image/${p.bankBin}-${p.accountNumber}-compact2.jpg?${params.toString()}`;
+  const bin = encodeURIComponent(p.bankBin);
+  const acct = encodeURIComponent(p.accountNumber);
+  return `https://img.vietqr.io/image/${bin}-${acct}-compact2.jpg?${params.toString()}`;
 }
 
 /** Sinh memo unique cho booking */

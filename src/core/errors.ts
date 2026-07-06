@@ -50,3 +50,15 @@ export class NetworkError extends DomainError {
     this.name = 'NetworkError';
   }
 }
+
+/**
+ * User đã có phiên thanh toán đang chờ (BE trả 409 `paymentPending`) — spec §10.2.
+ * Khác các 409 khác (frozen/downgrade/markPaidDuplicate): chỉ lỗi này mới nên
+ * fallback hiển thị lại phiên đang chờ thay vì báo lỗi.
+ */
+export class PaymentPendingError extends DomainError {
+  constructor(message = 'Bạn đang có phiên thanh toán chờ xác nhận') {
+    super('PAYMENT_PENDING', message);
+    this.name = 'PaymentPendingError';
+  }
+}
