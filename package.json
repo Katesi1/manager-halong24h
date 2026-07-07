@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p 3001",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "tele-bot": "node scripts/tele-bot/bot.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

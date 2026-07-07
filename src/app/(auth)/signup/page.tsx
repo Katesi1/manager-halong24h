@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import Link from 'next/link';
 import { signupAction, type ActionResult } from '@/app/actions/auth';
 import { Input, Label } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { SubmitButton } from '@/components/auth/submit-button';
 import { cn } from '@/lib/utils';
 
@@ -76,10 +77,9 @@ export default function SignupPage() {
           <Label htmlFor="password" required>
             Mật khẩu
           </Label>
-          <Input
+          <PasswordInput
             id="password"
             name="password"
-            type="password"
             autoComplete="new-password"
             required
             placeholder="••••••••"

@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 
 import { getPropertyAction } from '@/app/actions/properties';
 import { PageHeader } from '@/components/host/page-header';
+import { PropertyDangerZone } from '@/components/host/property-danger-zone';
 import { PropertyWizard } from '@/components/host/property-wizard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -91,6 +92,12 @@ export default async function PropertyEditPage(props: {
           </p>
         </Link>
       </div>
+
+      <PropertyDangerZone
+        propertyId={property.id}
+        propertyName={property.name}
+        isActive={property.isActive}
+      />
     </div>
   );
 }

@@ -3,7 +3,8 @@
 import { useActionState, useEffect, useRef, useState } from 'react';
 
 import { changePasswordAction, type ActionResult } from '@/app/actions/auth';
-import { Input, Label } from '@/components/ui/input';
+import { Label } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { useToast } from '@/components/ui/toast';
 import { Button } from '@/components/ui/button';
 
@@ -50,10 +51,9 @@ export function PasswordForm() {
         <Label htmlFor="currentPassword" required>
           Mật khẩu hiện tại
         </Label>
-        <Input
+        <PasswordInput
           id="currentPassword"
           name="currentPassword"
-          type="password"
           autoComplete="current-password"
           required
           minLength={6}
@@ -68,10 +68,9 @@ export function PasswordForm() {
         <Label htmlFor="newPassword" required>
           Mật khẩu mới
         </Label>
-        <Input
+        <PasswordInput
           id="newPassword"
           name="newPassword"
-          type="password"
           autoComplete="new-password"
           required
           minLength={6}
@@ -86,10 +85,9 @@ export function PasswordForm() {
         <Label htmlFor="confirm" required>
           Xác nhận mật khẩu mới
         </Label>
-        <Input
+        <PasswordInput
           id="confirm"
           name="confirm"
-          type="password"
           autoComplete="new-password"
           required
           minLength={6}

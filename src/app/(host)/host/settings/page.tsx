@@ -110,19 +110,6 @@ export default async function HostSettingsPage() {
             description="Trạng thái xác minh CCCD + face match. Nộp hồ sơ trên web hoặc app mobile."
           >
             <KycStatusCard status={kycStatus} />
-            {kycStatus.kycStatus !== 'approved' && !kycStatus.kycBypass && (
-              <div className="mt-4">
-                <Link
-                  href="/host/kyc"
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-navy-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-navy-800"
-                >
-                  Tải lên hồ sơ KYC
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                </Link>
-              </div>
-            )}
           </SettingsCard>
         )}
 

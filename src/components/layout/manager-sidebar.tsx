@@ -147,8 +147,25 @@ const HOST_GROUPS: NavGroup[] = [
 type TabKey = 'admin' | 'host';
 
 interface ManagerSidebarProps {
-  profile: Pick<UserProfile, 'role' | 'name' | 'email'>;
+  profile: Pick<UserProfile, 'id' | 'role' | 'name' | 'email' | 'ownerId'>;
   badges?: Partial<Record<BadgeKey, number>>;
+}
+
+/**
+ * Link lịch CTV kèm id chủ nhà: OWNER = chính mình, SALE = chủ quản lý mình.
+ * ADMIN không gắn owner cụ thể → link không kèm param.
+ */
+function saleCalendarHref(
+  profile: Pick<UserProfile, 'id' | 'role' | 'ownerId'>,
+): string {
+  const ownerId =
+    profile.role === RoleCode.OWNER
+      ? profile.id
+      : profile.role === RoleCode.SALE
+        ? profile.ownerId
+        : null;
+  const base = `${SALE_CALENDAR_URL}/calendar/properties`;
+  return ownerId ? `${base}?ownerId=${encodeURIComponent(ownerId)}` : base;
 }
 
 export function ManagerSidebar({
@@ -170,7 +187,13 @@ export function ManagerSidebar({
 
   const visibleGroups = currentGroups.map((g) => ({
     ...g,
-    items: g.items.filter((item) => !(isSale && item.hideForSale)),
+    items: g.items
+      .filter((item) => !(isSale && item.hideForSale))
+      .map((item) =>
+        item.href === SALE_CALENDAR_URL
+          ? { ...item, href: saleCalendarHref(profile) }
+          : item,
+      ),
   })).filter((g) => g.items.length > 0);
 
   const tabSwitcher = isAdmin && (

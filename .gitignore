@@ -35,6 +35,9 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# tele-bot runtime state
+scripts/tele-bot/state.json
+
 # vercel
 .vercel
 

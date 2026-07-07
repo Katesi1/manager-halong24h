@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
-import { Eye, EyeOff, Pencil, UserPlus } from 'lucide-react';
+import { Pencil, UserPlus } from 'lucide-react';
 
 import {
   createSystemSaleAction,
@@ -11,50 +11,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input, Label } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { toast } from '@/components/ui/toast';
 
 function FieldError({ errors }: { errors?: string[] }) {
   if (!errors?.length) return null;
   return <p className="mt-1 text-xs text-rose-600">{errors[0]}</p>;
-}
-
-/** Ô mật khẩu có nút con mắt bật/tắt hiển thị. */
-function PasswordInput({
-  id,
-  value,
-  onChange,
-  placeholder,
-  required,
-}: {
-  id: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  required?: boolean;
-}) {
-  const [visible, setVisible] = useState(false);
-  return (
-    <div className="relative">
-      <Input
-        id={id}
-        type={visible ? 'text' : 'password'}
-        required={required}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="pr-11"
-      />
-      <button
-        type="button"
-        tabIndex={-1}
-        onClick={() => setVisible((v) => !v)}
-        aria-label={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-500 hover:text-ink-900"
-      >
-        {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-      </button>
-    </div>
-  );
 }
 
 /** Tạo trực tiếp System SALE (spec §26.4) — admin đặt mật khẩu ngay. */
@@ -153,7 +115,10 @@ export function SystemSaleCreateDialog() {
                   id="ss_password"
                   required
                   value={form.password}
-                  onChange={(v) => setForm((f) => ({ ...f, password: v }))}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setForm((f) => ({ ...f, password: v }));
+                  }}
                   placeholder="Tối thiểu 8 ký tự, có chữ và số"
                 />
                 <FieldError errors={fieldErrors.password} />
@@ -304,7 +269,10 @@ export function SystemSaleEditDialog({
               <PasswordInput
                 id="sse_password"
                 value={form.newPassword}
-                onChange={(v) => setForm((f) => ({ ...f, newPassword: v }))}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setForm((f) => ({ ...f, newPassword: v }));
+                }}
                 placeholder="Để trống nếu không đổi"
               />
               <FieldError errors={fieldErrors.newPassword} />

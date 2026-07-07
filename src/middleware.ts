@@ -72,7 +72,14 @@ async function refreshAtBackend(refreshToken: string): Promise<RefreshResult> {
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
-  const publicPaths = ['/login', '/signup', '/forgot-password', '/legal'];
+  const publicPaths = [
+    '/login',
+    '/signup',
+    '/forgot-password',
+    '/reset-password',
+    '/auth/reset-password', // alias khớp link email BE → redirect /reset-password
+    '/legal',
+  ];
   if (
     publicPaths.some((p) => path.startsWith(p)) ||
     path.startsWith('/_next') ||

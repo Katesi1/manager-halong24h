@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { loginAction, type ActionResult } from '@/app/actions/auth';
 import { Input, Label } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { GoogleLoginSection } from '@/components/auth/google-login-section';
 import { SubmitButton } from '@/components/auth/submit-button';
 
@@ -20,6 +21,7 @@ function LoginForm() {
   const sp = useSearchParams();
   const redirectTo = sp.get('redirect') ?? '/';
   const sessionEnded = sp.get('reason') === 'session-ended';
+  const passwordReset = sp.get('reset') === '1';
   const [state, formAction] = useActionState<ActionResult, FormData>(loginAction, {});
 
   return (
@@ -30,6 +32,12 @@ function LoginForm() {
       {sessionEnded && (
         <div className="mt-6 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800 ring-1 ring-amber-200">
           Tài khoản đã đăng nhập ở thiết bị khác. Vui lòng đăng nhập lại.
+        </div>
+      )}
+
+      {passwordReset && (
+        <div className="mt-6 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700 ring-1 ring-emerald-100">
+          ✓ Đã đặt lại mật khẩu thành công. Đăng nhập bằng mật khẩu mới.
         </div>
       )}
 
@@ -59,10 +67,9 @@ function LoginForm() {
           <Label htmlFor="password" required>
             Mật khẩu
           </Label>
-          <Input
+          <PasswordInput
             id="password"
             name="password"
-            type="password"
             autoComplete="current-password"
             required
             placeholder="••••••••"
