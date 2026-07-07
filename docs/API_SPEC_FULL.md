@@ -103,6 +103,17 @@ FE đọc `errors[field]` để hiện inline error per-field.
 | 429 | Rate limit | "Quá nhiều yêu cầu, thử lại sau" |
 | 5xx | Server error | Toast + retry exponential backoff 3 lần |
 
+> **Global DB error mapping (v1.24 · 2026-07-05)** — Trước đây lỗi ràng buộc DB (trùng unique, không tìm thấy row, sai khoá ngoại) chưa được service bắt sẽ rơi ra **500 thô**. Từ v1.24, `AllExceptionsFilter` tự dịch lỗi Prisma phổ biến sang HTTP status hợp lý + `code` máy-đọc-được, **áp dụng cho MỌI endpoint**:
+>
+> | Lỗi DB | HTTP | `code` | `message` | Extra |
+> |---|---|---|---|---|
+> | Trùng unique (P2002) | **409** | `DUPLICATE_ENTRY` | "Dữ liệu đã tồn tại (bị trùng)" | `conflictFields: string[]` (vd `["phone"]`) |
+> | Không tìm thấy row để update/delete (P2025) | **404** | `NOT_FOUND` | "Không tìm thấy dữ liệu" | — |
+> | Sai khoá ngoại (P2003) | **400** | `INVALID_REFERENCE` | "Dữ liệu tham chiếu không hợp lệ" | — |
+> | Giá trị sai/quá dài (P2000/P2005/P2006), Prisma validation | **400** | `INVALID_DATA` / `PRISMA_VALIDATION` | "Dữ liệu không hợp lệ" | — |
+>
+> Đây là **lưới an toàn** — endpoint có message nghiệp vụ riêng vẫn trả message cụ thể trước (vd tạo/sửa user trùng phone → 409 "Số điện thoại đã được đăng ký"). FE nên ưu tiên đọc `message` để hiển thị; dùng `code` khi cần phân nhánh logic. `conflictFields` giúp FE highlight đúng ô bị trùng.
+
 ### 1.5 Kiểu dữ liệu
 
 | Kiểu | Format | Ví dụ |
@@ -1166,17 +1177,18 @@ Base path: `/properties`.
 | `POST` | `/properties/:id/suspend` | `{ reason? }` |
 | `PATCH` | `/properties/:id/hot` | `{ isHot: true \| false }` — bật/tắt badge Hot (xem §4.10) |
 
-> **Business rule (v1.9+, confirmed v1.16.4)**: OWNER đã KYC + subscription active/trial → `POST /properties` tạo ngay `moderationStatus = "approved"`, `isActive = true` (public mặc định). OWNER tự bật/tắt `isActive` qua `PATCH /properties/:id`. ADMIN/SALE tạo thay mặt owner cũng `approved` + `isActive = true`.
-> **Điều kiện tạo phòng**: KYC approved (hoặc `kycBypass`) + subscription entitled — hai cổng độc lập, không còn hàng chờ duyệt admin khi tạo mới.
-> **OWNER/SALE list:** `GET /properties` tự động bao gồm property `inactive/rejected/suspended` của mình (không cần truyền `?includeInactive=true`). ADMIN/khác phải truyền `?includeInactive=true` mới thấy inactive.
+> ⚠️ **Business rule ĐỔI LẠI (v1.25 · 2026-07-06) — ADMIN duyệt phòng OWNER đăng**: OWNER/SALE `POST /properties` (vẫn cần KYC + subscription entitled) → tạo ở **`moderationStatus = "pending"`**, `isActive = true` — **KHÔNG public cho tới khi ADMIN duyệt**. Chỉ khi caller là **ADMIN** thì tạo `approved` ngay. Trước v1.25 mọi property mới auto-`approved`; nay quay lại có hàng chờ duyệt.
+> **Điều kiện tạo phòng**: KYC approved (hoặc `kycBypass`) + subscription entitled — vẫn là 2 cổng độc lập; đạt 2 cổng này mới tạo được (dạng `pending`), rồi ADMIN duyệt để public.
+> **OWNER/SALE list:** `GET /properties` tự động bao gồm property `pending/inactive/rejected/suspended` của mình (không cần truyền `?includeInactive=true`). ADMIN/khác phải truyền `?includeInactive=true` mới thấy inactive.
+> **Response khi tạo (pending)**: message = `properties.createPendingSuccess` ("Đã gửi cơ sở, vui lòng chờ quản trị viên duyệt"). FE hiển thị trạng thái "chờ duyệt", KHÔNG coi là đã public.
 >
-> **Tab "Chờ duyệt" của admin FE:** Vì auto-approve khi tạo, tab này **về cơ bản sẽ trống** với property mới. Chỉ chứa property bị OWNER edit sau khi admin reject (BE đã wire reset `pending`? — KHÔNG, code hiện reset thẳng về `approved`, xem [properties.service.ts:362-368](src/modules/properties/properties.service.ts#L362-L368)). Trong thực tế, sau v1.16.4 (legacy sweep) **không còn row `pending` nào**. Admin chủ yếu dùng `/reject` và `/suspend` để xử lý ngược, không cần queue duyệt phòng mới.
+> **Tab "Chờ duyệt" của admin FE:** Giờ **có dữ liệu thật** — mọi phòng OWNER/SALE đăng mới + phòng bị reject rồi OWNER sửa lại (xem dưới). Admin duyệt qua `POST /properties/:id/approve` (→ approved + isActive=true → public) hoặc `POST /properties/:id/reject`. Lọc queue bằng `GET /properties?moderationStatus=pending`. BE push `property_pending_review` (deepLink `/admin/properties/:id`) tới toàn bộ ADMIN mỗi khi có phòng mới chờ duyệt.
 
 **Moderation status**:
-- `approved` — property được phép hoạt động; public khi `isActive = true`. Trạng thái mặc định mọi property mới.
-- `rejected` — admin từ chối → `isActive = false`; OWNER edit lại → auto `approved`, tự bật `isActive` nếu muốn public
-- `suspended` — admin tạm ngưng property đang hoạt động → `isActive = false`; OWNER **không** tự bật lại (`PATCH isActive=true` → 403); cần admin `POST /properties/:id/approve`
-- `pending` — **DEPRECATED**. Code mới không bao giờ tạo trạng thái này. Dữ liệu legacy đã được sweep về `approved` ở v1.16.4 (xem changelog). Vẫn giữ trong enum để query `?moderationStatus=pending` không vỡ.
+- `pending` — **(v1.25) trạng thái mặc định của phòng OWNER/SALE mới đăng** — chờ ADMIN duyệt; KHÔNG public (web khách + calendar public-grid đều ẩn). Public khi ADMIN approve.
+- `approved` — property đã duyệt; public khi `isActive = true`. Là trạng thái khi ADMIN tạo trực tiếp, hoặc sau khi ADMIN approve.
+- `rejected` — admin từ chối → `isActive = false`; OWNER edit lại → **về `pending`** (gửi duyệt lại, KHÔNG auto-approve nữa — đổi ở v1.25).
+- `suspended` — admin tạm ngưng property đang hoạt động → `isActive = false`; OWNER **không** tự bật lại (`PATCH isActive=true` → 403); cần admin `POST /properties/:id/approve`.
 
 ### 4.5 PropertyDto (admin/owner — full)
 
@@ -1756,7 +1768,9 @@ Base path: `/calendar`.
 - `propertyId` (UUID, optional) — chọn 1 property
 - `propertyIds` (optional) — chọn nhiều property cùng lúc. Chấp nhận **CSV** (`?propertyIds=uuid1,uuid2`) **hoặc** array repeat (`?propertyIds=uuid1&propertyIds=uuid2`)
 - `type` (optional, number) — filter theo loại property
-- Nếu không truyền `propertyId` và `propertyIds` → trả tất cả properties của user (grid) hoặc tất cả properties đang hoạt động (public-grid)
+- Nếu không truyền `propertyId` và `propertyIds` → trả tất cả properties của user (grid) hoặc tất cả properties public (public-grid)
+
+> **Visibility `public-grid` (v1.25 · 2026-07-06)**: chỉ trả property `isActive=true` AND `deletedAt=null` AND **`moderationStatus='approved'`** — đồng bộ với web khách hàng (§4.1). Phòng đã xóa (`isActive=false`), chờ duyệt (`pending`), bị từ chối/tạm ngưng đều **KHÔNG** hiện trên public-grid. `GET /calendar/grid` (auth, nội bộ) vẫn hiển thị phòng của OWNER/SALE kể cả pending để họ quản lý.
 
 ### 6.2 Grid response
 
@@ -2128,7 +2142,7 @@ BE gửi **hybrid message** — kèm cả `notification` block (tray auto-displa
 - Foreground: đã có event `message:new` từ WebSocket → FE suppress notification tray thủ công.
 - Background/killed: OS tự hiện tray từ `apns.alert` / Android `notification` block. Tap → mở `data.deepLink`.
 
-`pushType` (nằm trong `data.type`): `booking_*`, `payment_*`, `subscription_*`, `chat_message`, `lead_new`, `dispute_opened`, `dispute_resolved`, `subscription_frozen`, `subscription_price_changed`, `kyc_*`, `staff_invite_accepted`, `property_approved | rejected | suspended`, `property_updated | property_price_updated | property_images_updated`, `calendar_locked | calendar_unlocked | calendar_sold | calendar_bulk_locked | calendar_bulk_unlocked`, ...
+`pushType` (nằm trong `data.type`): `booking_*`, `payment_*`, `subscription_*`, `chat_message`, `lead_new`, `dispute_opened`, `dispute_resolved`, `subscription_frozen`, `subscription_price_changed`, `kyc_*`, `staff_invite_accepted`, `property_approved | rejected | suspended`, `property_pending_review` (gửi ADMIN khi có phòng mới chờ duyệt, deepLink `/admin/properties/:id`), `property_updated | property_price_updated | property_images_updated`, `calendar_locked | calendar_unlocked | calendar_sold | calendar_bulk_locked | calendar_bulk_unlocked`, ...
 
 > **Đồng bộ cả TEAM khi sửa phòng / khoá lịch (NEW).** Khi **bất kỳ thành viên team** (owner hoặc SALE thuộc owner) **sửa phòng** (`property_updated` / `property_price_updated` / `property_images_updated`) hoặc **khoá/mở/đánh dấu-bán lịch** (`calendar_locked` / `calendar_unlocked` / `calendar_sold`) → BE tạo notification + push FCM tới **owner + tất cả SALE của owner đó**, **TRỪ người vừa thao tác** (không tự báo cho chính mình). Nhờ vậy mọi thành viên biết **phòng nào** bị lock/unlock, phòng nào sửa (message luôn kèm `Tên phòng (MÃ)`). Bulk lock/unlock (`POST /calendar/bulk`) gộp **1 push tổng mỗi property** (`calendar_bulk_locked/unlocked`) thay vì mỗi ngày. `deepLink = /host/properties/{propertyId}`, `targetType = 'property'`.
 
@@ -3315,6 +3329,25 @@ CONVERSATION_MEMBER_ROLE = 'owner' | 'sale' | 'customer' | 'admin'
 ---
 
 ## 21. Changelog & Bug fixes
+
+### v1.25 — 2026-07-06 (ADMIN duyệt phòng OWNER đăng + đồng bộ visibility calendar)
+
+Đảo lại business rule auto-approve: phòng OWNER/SALE đăng phải qua ADMIN duyệt; đồng bộ filter public giữa web khách và calendar.
+
+| Thay đổi | Chi tiết |
+|---|---|
+| `POST /properties` (OWNER/SALE) | Tạo ở `moderationStatus='pending'` thay vì `approved`. ADMIN tạo trực tiếp vẫn `approved`. Message trả về `properties.createPendingSuccess`. Push `property_pending_review` tới ADMIN. Xem §4.4. |
+| `PATCH /properties/:id` (OWNER sửa phòng `rejected`) | Về `pending` (gửi duyệt lại) thay vì auto-`approved`. |
+| `GET /calendar/public-grid` | Thêm filter `moderationStatus='approved'` — chỉ hiện phòng `isActive=true` + đã duyệt (đồng bộ web khách §4.1). Phòng đã xóa/pending/rejected/suspended đều ẩn. `GET /calendar/grid` (auth) không đổi — OWNER/SALE vẫn thấy phòng pending của mình để quản lý. |
+| pushType mới | `property_pending_review` (gửi ADMIN, deepLink `/admin/properties/:id`). |
+| i18n | `properties.createPendingSuccess` (vi/en). |
+
+**Ảnh hưởng dữ liệu**: property hiện hữu đều đã `approved` → không phòng nào bị ẩn oan. Chỉ phòng **đăng mới từ v1.25** mới ở trạng thái `pending`. Không cần migration.
+
+**Ảnh hưởng FE**:
+- FE web quản lý: tab "Chờ duyệt" (`GET /properties?moderationStatus=pending`) giờ có dữ liệu thật → dựng UI duyệt (`POST /properties/:id/approve` / `/reject`). Badge/queue nên hiển thị.
+- FE app OWNER: sau khi đăng phòng, hiển thị trạng thái "chờ duyệt" (đọc `moderationStatus='pending'` hoặc message trả về), không coi là đã public.
+- FE web khách + trang lịch public: không phải đổi gì — BE đã tự ẩn phòng chưa duyệt.
 
 ### v1.22 — 2026-07-04 (Avatar trong hồ sơ tài khoản)
 

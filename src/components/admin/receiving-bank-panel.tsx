@@ -1,5 +1,7 @@
 'use client';
 
+import { refetchApiResources } from '@/lib/use-api-resource';
+
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Banknote, Pencil } from 'lucide-react';
@@ -46,6 +48,7 @@ export function ReceivingBankPanel({ bank, error }: Props) {
       show('Đã cập nhật tài khoản nhận tiền mua gói.', 'success');
       setOpen(false);
       router.refresh();
+      refetchApiResources();
     } else if (state.error) {
       handledStateRef.current = state;
       show(state.error, 'error');

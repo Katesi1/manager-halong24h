@@ -1,5 +1,7 @@
 'use client';
 
+import { refetchApiResources } from '@/lib/use-api-resource';
+
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import * as Popover from '@radix-ui/react-popover';
@@ -205,6 +207,7 @@ export function CalendarGrid({ properties }: CalendarGridProps) {
           onDone={() => {
             clearSelection();
             router.refresh();
+            refetchApiResources();
           }}
         />
       )}
@@ -558,6 +561,7 @@ function CellMenu({
       else {
         onClose();
         router.refresh();
+        refetchApiResources();
       }
     });
   }
@@ -570,6 +574,7 @@ function CellMenu({
       else {
         onClose();
         router.refresh();
+        refetchApiResources();
       }
     });
   }

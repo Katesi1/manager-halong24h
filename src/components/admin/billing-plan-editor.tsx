@@ -1,5 +1,7 @@
 'use client';
 
+import { refetchApiResources } from '@/lib/use-api-resource';
+
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -104,6 +106,7 @@ export function BillingPlanEditor({ initialPlans }: Props) {
         toast.success(`Đã cập nhật gói "${planLabel(editingId)}"`);
         cancelEdit();
         router.refresh();
+        refetchApiResources();
       } else {
         toast.error(res.error);
       }
@@ -125,6 +128,7 @@ export function BillingPlanEditor({ initialPlans }: Props) {
         setNewDraft(emptyDraft());
         setAdding(false);
         router.refresh();
+        refetchApiResources();
       } else {
         toast.error(res.error);
       }
@@ -144,6 +148,7 @@ export function BillingPlanEditor({ initialPlans }: Props) {
             : `Đã xoá gói "${target.id}"`,
         );
         router.refresh();
+        refetchApiResources();
       } else {
         toast.error(res.error);
       }

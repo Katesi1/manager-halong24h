@@ -1,5 +1,7 @@
 'use client';
 
+import { refetchApiResources } from '@/lib/use-api-resource';
+
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Pencil, UserPlus } from 'lucide-react';
@@ -57,6 +59,7 @@ export function SystemSaleCreateDialog() {
       setOpen(false);
       reset();
       router.refresh();
+      refetchApiResources();
     });
   }
 
@@ -199,6 +202,7 @@ export function SystemSaleEditDialog({
       toast.success(`Đã cập nhật tài khoản ${form.name}`);
       setOpen(false);
       router.refresh();
+      refetchApiResources();
     });
   }
 

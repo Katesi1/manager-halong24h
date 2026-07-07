@@ -1,5 +1,7 @@
 'use client';
 
+import { refetchApiResources } from '@/lib/use-api-resource';
+
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -71,6 +73,7 @@ export function SubscriptionRowActions({
       }
       toast.success('Đã nhận tiền — gói được kích hoạt/gia hạn');
       router.refresh();
+      refetchApiResources();
     });
   }
 
@@ -87,6 +90,7 @@ export function SubscriptionRowActions({
         setShowFreeze(false);
         setReason('');
         router.refresh();
+        refetchApiResources();
       }
     });
   }

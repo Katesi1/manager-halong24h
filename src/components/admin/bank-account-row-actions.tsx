@@ -1,5 +1,7 @@
 'use client';
 
+import { refetchApiResources } from '@/lib/use-api-resource';
+
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, X } from 'lucide-react';
@@ -56,6 +58,7 @@ export function BankAccountRowActions({
         toast.success(`Đã duyệt tài khoản nhận tiền của ${ownerName}`);
         setShowApprove(false);
         router.refresh();
+        refetchApiResources();
       }
     });
   }
@@ -77,6 +80,7 @@ export function BankAccountRowActions({
         setShowReject(false);
         setReason('');
         router.refresh();
+        refetchApiResources();
       }
     });
   }

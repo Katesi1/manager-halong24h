@@ -1,5 +1,7 @@
 'use client';
 
+import { refetchApiResources } from '@/lib/use-api-resource';
+
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { ShieldCheck, ShieldOff } from 'lucide-react';
@@ -39,6 +41,7 @@ export function KycBypassToggle({ userId, kycBypass }: Props) {
         'success',
       );
       router.refresh();
+      refetchApiResources();
     });
   }
 

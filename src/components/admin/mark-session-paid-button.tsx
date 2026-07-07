@@ -1,5 +1,7 @@
 'use client';
 
+import { refetchApiResources } from '@/lib/use-api-resource';
+
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -31,6 +33,7 @@ export function MarkSessionPaidButton({
         toast.success('Đã xác nhận nhận tiền — gói cước được kích hoạt');
         setOpen(false);
         router.refresh();
+        refetchApiResources();
       } else {
         toast.error(res.error);
       }

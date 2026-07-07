@@ -81,6 +81,8 @@ export interface Property {
 export interface PropertyFilters {
   includeInactive?: boolean;
   view?: PropertyView;
+  /** Lọc theo trạng thái duyệt (BE §4.4: `?moderationStatus=pending|...`). */
+  moderationStatus?: ModerationStatus;
 }
 
 export interface CreatePropertyInput {

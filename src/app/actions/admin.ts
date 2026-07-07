@@ -9,6 +9,7 @@ import {
   setPropertyHotUseCase,
   suspendPropertyUseCase,
 } from '@/application/properties/moderate';
+import { listPropertiesUseCase } from '@/application/properties/list';
 import { propertyRepository } from '@/infrastructure/container';
 import { requireAdmin } from '@/lib/auth-guard';
 import { mapApiErrorToDomain } from '@/infrastructure/http/api-error';
@@ -111,6 +112,23 @@ export async function suspendPropertyAction(
     revalidateProperty(propertyId);
     return { ok: true };
   });
+}
+
+/**
+ * Đếm số cơ sở đang chờ duyệt (badge sidebar). BE §4.4:
+ * `GET /properties?moderationStatus=pending`. Lỗi → 0 (không chặn layout).
+ */
+export async function countPendingPropertiesAction(): Promise<number> {
+  try {
+    await requireAdmin();
+    const rows = await listPropertiesUseCase(propertyRepository(), {
+      moderationStatus: 'pending',
+      includeInactive: true,
+    });
+    return rows.length;
+  } catch {
+    return 0;
+  }
 }
 
 /** Bật/tắt badge "Hot" (admin curated). */

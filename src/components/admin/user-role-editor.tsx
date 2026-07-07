@@ -1,5 +1,7 @@
 'use client';
 
+import { refetchApiResources } from '@/lib/use-api-resource';
+
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -68,6 +70,7 @@ export function UserRoleEditor({
       setConfirmOpen(false);
       toast.success(`Đã đổi vai trò sang "${ROLE_LABEL[draftRole]}".`);
       router.refresh();
+      refetchApiResources();
     });
   }
 
