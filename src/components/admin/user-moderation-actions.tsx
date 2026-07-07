@@ -1,5 +1,7 @@
 'use client';
 
+import { refetchApiResources } from '@/lib/use-api-resource';
+
 import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -139,6 +141,7 @@ export function UserModerationActions({
       setShowBan(false);
       setReason('');
       router.refresh();
+      refetchApiResources();
     });
   }
 
@@ -165,6 +168,7 @@ export function UserModerationActions({
         }
         show('✓ Đã mở chặn', 'success');
         router.refresh();
+        refetchApiResources();
       } else if (c.kind === 'revoke') {
         const r = await revokeUserSessionAction(userId);
         if (!r.ok) {
@@ -180,6 +184,7 @@ export function UserModerationActions({
         }
         show(`✓ Đã đổi sang ${PLAN_LABEL[c.plan]}`, 'success');
         router.refresh();
+        refetchApiResources();
       } else if (c.kind === 'reset-pwd') {
         const r = await resetUserPasswordAction(userId);
         if (!r.ok) {

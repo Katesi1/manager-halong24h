@@ -1,5 +1,7 @@
 'use client';
 
+import { refetchApiResources } from '@/lib/use-api-resource';
+
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -84,6 +86,7 @@ export function DisputeResolutionForm({ disputeId, status }: Props) {
       else {
         show('✓ Đã chuyển sang Đang xử lý', 'success');
         router.refresh();
+        refetchApiResources();
       }
     });
   }
@@ -111,6 +114,7 @@ export function DisputeResolutionForm({ disputeId, status }: Props) {
         show('✓ Đã ra phán quyết', 'success');
         setMode('view');
         router.refresh();
+        refetchApiResources();
       }
     });
   }
@@ -131,6 +135,7 @@ export function DisputeResolutionForm({ disputeId, status }: Props) {
         setMode('view');
         setRejectReason('');
         router.refresh();
+        refetchApiResources();
       }
     });
   }

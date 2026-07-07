@@ -21,6 +21,7 @@ export class ApiPropertyRepository implements PropertyRepository {
       query: {
         includeInactive: filters?.includeInactive,
         view: filters?.view,
+        moderationStatus: filters?.moderationStatus,
       },
       cache: 'no-store',
     });

@@ -1,5 +1,7 @@
 'use client';
 
+import { refetchApiResources } from '@/lib/use-api-resource';
+
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -46,6 +48,7 @@ export function ApprovalActions({ propertyId, status }: Props) {
       setModal(null);
       setReason('');
       router.refresh();
+      refetchApiResources();
     });
   }
 

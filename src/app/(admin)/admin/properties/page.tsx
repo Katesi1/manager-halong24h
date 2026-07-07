@@ -1,13 +1,9 @@
 import type { Metadata } from 'next';
 
-import { listPropertiesAction } from '@/app/actions/properties';
-import type { AdminPropertyRow } from '@/components/admin/admin-property-card';
-import {
-  PropertiesBrowser,
-  type PropertiesBrowserInitial,
-} from '@/components/admin/properties-browser';
+import { PropertiesBrowserFetch } from '@/components/admin/properties-browser-fetch';
+import type { PropertiesBrowserInitial } from '@/components/admin/properties-browser';
 import { PageHeader } from '@/components/host/page-header';
-import type { ModerationStatus, Property } from '@/core/entities/property';
+import type { ModerationStatus } from '@/core/entities/property';
 import { parsePage } from '@/lib/pagination';
 
 export const metadata: Metadata = { title: 'Duyệt cơ sở' };
@@ -19,33 +15,6 @@ const STATUS_KEYS: ModerationStatus[] = [
   'suspended',
 ];
 
-/**
- * Map Property (DTO đầy đủ từ BE) → AdminPropertyRow rút gọn. Giảm payload
- * serialize xuống Client Component (bỏ amenities/policies/description/…).
- */
-function toRow(p: Property): AdminPropertyRow {
-  return {
-    id: p.id,
-    name: p.name,
-    code: p.code,
-    type: p.type,
-    address: p.address,
-    ownerId: p.ownerId,
-    ownerName: p.owner?.name ?? null,
-    moderationStatus: p.moderationStatus,
-    isActive: p.isActive,
-    isHot: p.isHot,
-    bedrooms: p.bedrooms,
-    bathrooms: p.bathrooms,
-    maxGuests: p.maxGuests,
-    standardGuests: p.standardGuests,
-    weekdayPrice: p.weekdayPrice,
-    coverUrl:
-      p.images.find((i) => i.isCover)?.imageUrl ?? p.images[0]?.imageUrl ?? null,
-    bookingCount: p.bookingCount,
-  };
-}
-
 export default async function AdminPropertiesPage(props: {
   searchParams: Promise<{
     status?: string;
@@ -56,12 +25,6 @@ export default async function AdminPropertiesPage(props: {
   }>;
 }) {
   const sp = await props.searchParams;
-
-  // Một lần fetch toàn bộ; lọc/tìm/sort/phân trang do Client Component xử lý
-  // in-memory ⇒ thao tác sau đó không gọi lại BE.
-  const result = await listPropertiesAction({ includeInactive: true });
-  const rows: AdminPropertyRow[] = result.ok ? result.data.map(toRow) : [];
-  const apiError = !result.ok ? result.error : null;
 
   const initial: PropertiesBrowserInitial = {
     status: STATUS_KEYS.includes((sp.status ?? '') as ModerationStatus)
@@ -83,7 +46,8 @@ export default async function AdminPropertiesPage(props: {
         description="Duyệt / từ chối cơ sở mới · Tạm ngưng cơ sở vi phạm · Đánh dấu Hot."
       />
 
-      <PropertiesBrowser rows={rows} apiError={apiError} initial={initial} />
+      {/* Dữ liệu fetch phía CLIENT từ /api/admin/properties → hiện endpoint trong Network */}
+      <PropertiesBrowserFetch initial={initial} />
     </div>
   );
 }

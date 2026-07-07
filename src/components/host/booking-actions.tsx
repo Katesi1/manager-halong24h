@@ -1,5 +1,7 @@
 'use client';
 
+import { refetchApiResources } from '@/lib/use-api-resource';
+
 import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -63,6 +65,7 @@ export function BookingActions({
         'success',
       );
       router.refresh();
+      refetchApiResources();
     });
   }
 
@@ -93,6 +96,7 @@ export function BookingActions({
       setShowMarkPaid(false);
       setPaymentAmount('');
       router.refresh();
+      refetchApiResources();
     });
   }
 
@@ -141,6 +145,7 @@ export function BookingActions({
       setCancelReason('');
       setAcceptResponsibility(false);
       router.refresh();
+      refetchApiResources();
     });
   }
 

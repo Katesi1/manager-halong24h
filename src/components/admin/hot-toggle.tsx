@@ -1,5 +1,7 @@
 'use client';
 
+import { refetchApiResources } from '@/lib/use-api-resource';
+
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Flame } from 'lucide-react';
@@ -30,6 +32,7 @@ export function HotToggle({ propertyId, isHot }: Props) {
       }
       toast.success(isHot ? 'Đã bỏ đánh dấu Hot' : 'Đã đánh dấu Hot');
       router.refresh();
+      refetchApiResources();
     });
   }
 

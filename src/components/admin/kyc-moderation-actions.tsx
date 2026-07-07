@@ -1,5 +1,7 @@
 'use client';
 
+import { refetchApiResources } from '@/lib/use-api-resource';
+
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -36,6 +38,7 @@ export function KycModerationActions({ submissionId, status }: Props) {
         toast.success('Đã duyệt hồ sơ KYC');
         setShowApprove(false);
         router.refresh();
+        refetchApiResources();
       }
     });
   }
@@ -56,6 +59,7 @@ export function KycModerationActions({ submissionId, status }: Props) {
         setShowReject(false);
         setReason('');
         router.refresh();
+        refetchApiResources();
       }
     });
   }

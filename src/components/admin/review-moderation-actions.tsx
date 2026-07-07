@@ -1,5 +1,7 @@
 'use client';
 
+import { refetchApiResources } from '@/lib/use-api-resource';
+
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -35,6 +37,7 @@ export function ReviewModerationActions({ reviewId, status }: Props) {
         setShowHide(false);
         setReason('');
         router.refresh();
+        refetchApiResources();
       }
     });
   }

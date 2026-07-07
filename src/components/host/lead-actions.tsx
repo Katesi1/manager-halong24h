@@ -1,5 +1,7 @@
 'use client';
 
+import { refetchApiResources } from '@/lib/use-api-resource';
+
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateLeadStatusAction } from '@/app/actions/lead';
@@ -18,6 +20,7 @@ export function LeadActions({ leadId, currentStatus }: LeadActionsProps) {
     start(async () => {
       await updateLeadStatusAction(leadId, status);
       router.refresh();
+      refetchApiResources();
     });
   }
 

@@ -1,5 +1,7 @@
 'use client';
 
+import { refetchApiResources } from '@/lib/use-api-resource';
+
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Trash2 } from 'lucide-react';
@@ -35,6 +37,7 @@ export function SystemSaleRowActions({
       toast.success(`Đã xoá tài khoản ${sale.name}`);
       setConfirming(false);
       router.refresh();
+      refetchApiResources();
     });
   }
 

@@ -40,7 +40,7 @@ import type { UserProfile } from '@/core/entities/user';
 import { RoleCode } from '@/core/value-objects/role';
 import { cn } from '@/lib/utils';
 
-type BadgeKey = 'kyc' | 'leads' | 'bank';
+type BadgeKey = 'kyc' | 'leads' | 'bank' | 'properties';
 
 interface NavItem {
   href: string;
@@ -78,7 +78,7 @@ const ADMIN_GROUPS: NavGroup[] = [
       { href: '/admin/kyc', label: 'Duyệt KYC', icon: ShieldCheck, badgeKey: 'kyc' },
       { href: '/admin/users', label: 'Người dùng', icon: Users },
       { href: '/admin/system-staff', label: 'Tài khoản Sale hệ thống', icon: UserCog },
-      { href: '/admin/properties', label: 'Toàn bộ cơ sở', icon: Building },
+      { href: '/admin/properties', label: 'Toàn bộ cơ sở', icon: Building, badgeKey: 'properties' },
       { href: '/admin/bookings', label: 'Toàn bộ đặt phòng', icon: BedDouble },
     ],
   },

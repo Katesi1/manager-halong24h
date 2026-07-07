@@ -1,5 +1,7 @@
 'use client';
 
+import { refetchApiResources } from '@/lib/use-api-resource';
+
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -39,6 +41,7 @@ export function StaffRowActions({ kind, id, name }: Props) {
         'success',
       );
       router.refresh();
+      refetchApiResources();
     });
   }
 
