@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from '@/components/ui/toast';
+import { refetchApiResources } from '@/lib/use-api-resource';
 
 interface Props {
   propertyId: string;
@@ -49,6 +50,7 @@ export function PropertyDangerZone({
           ? 'Đã đóng phòng — cơ sở tạm ngưng nhận đặt phòng'
           : 'Đã mở phòng — cơ sở sẵn sàng nhận đặt phòng',
       );
+      refetchApiResources();
       router.refresh();
     });
   }
