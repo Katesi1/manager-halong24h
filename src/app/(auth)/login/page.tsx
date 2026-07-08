@@ -45,21 +45,21 @@ function LoginForm() {
         <input type="hidden" name="redirect" value={redirectTo} />
 
         <div>
-          <Label htmlFor="email" required>
-            Email
+          <Label htmlFor="identifier" required>
+            Email hoặc số điện thoại
           </Label>
           <Input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
+            id="identifier"
+            name="identifier"
+            type="text"
+            autoComplete="username"
             required
-            defaultValue={state.values?.email ?? ''}
-            placeholder="email@example.com"
-            key={`email-${state.values?.email ?? ''}`}
+            defaultValue={state.values?.identifier ?? ''}
+            placeholder="email@example.com hoặc 0901234567"
+            key={`identifier-${state.values?.identifier ?? ''}`}
           />
-          {state.fieldErrors?.email && (
-            <p className="mt-1 text-xs text-red-600">{state.fieldErrors.email}</p>
+          {state.fieldErrors?.identifier && (
+            <p className="mt-1 text-xs text-red-600">{state.fieldErrors.identifier}</p>
           )}
         </div>
 

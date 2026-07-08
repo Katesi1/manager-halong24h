@@ -76,10 +76,18 @@ export class ApiChatRepository implements ChatRepository {
   }
 
   async sendMessage(input: SendMessageInput): Promise<Message> {
-    return apiClient.post<Message>(
+    const raw = await apiClient.post<Message | { message: Message }>(
       `/conversations/${input.conversationId}/messages`,
       { content: input.content, attachments: input.attachments },
     );
+    // BE có thể bọc message trong `{ message }` hoặc trả content/attachments
+    // null — unwrap + normalize để consumer không phải phòng thủ.
+    const msg = (raw as { message?: Message }).message ?? (raw as Message);
+    return {
+      ...msg,
+      content: msg.content ?? '',
+      attachments: msg.attachments ?? [],
+    };
   }
 
   async markRead(conversationId: string): Promise<void> {

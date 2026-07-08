@@ -120,34 +120,39 @@ interface Props {
 }
 
 export function MessageBubble({ message, fromMe, onEdited, onDeleted }: Props) {
+  // BE có thể trả `content`/`attachments` = null (tin chỉ có file, tin đã xoá,
+  // hoặc payload WS tối giản) → normalize trước khi đọc .trim()/.length.
+  const content = message.content ?? '';
+  const attachments = message.attachments ?? [];
+
   const [isEditing, setIsEditing] = useState(false);
-  const [editText, setEditText] = useState(message.content);
+  const [editText, setEditText] = useState(content);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  const isDeleted = message.deletedAt !== null;
-  const isOptimistic = message.id.startsWith('local-');
+  const isDeleted = message.deletedAt != null;
+  const isOptimistic = (message.id ?? '').startsWith('local-');
   const age = Date.now() - new Date(message.createdAt).getTime();
   const withinWindow = age < EDIT_WINDOW_MS;
   const canEdit = fromMe && !isDeleted && !isOptimistic && withinWindow;
   const canDelete = fromMe && !isDeleted && !isOptimistic;
 
   function startEdit() {
-    setEditText(message.content);
+    setEditText(content);
     setError(null);
     setIsEditing(true);
   }
 
   function cancelEdit() {
     setIsEditing(false);
-    setEditText(message.content);
+    setEditText(content);
     setError(null);
   }
 
   async function submitEdit() {
-    const content = editText.trim();
-    if (!content || content === message.content) {
+    const next = editText.trim();
+    if (!next || next === content) {
       cancelEdit();
       return;
     }
@@ -155,7 +160,7 @@ export function MessageBubble({ message, fromMe, onEdited, onDeleted }: Props) {
     setError(null);
     const res = await editMessageAction({
       messageId: message.id,
-      content,
+      content: next,
     });
     setBusy(false);
     if (res.ok) {
@@ -235,18 +240,15 @@ export function MessageBubble({ message, fromMe, onEdited, onDeleted }: Props) {
           </div>
         ) : (
           <>
-            {message.content.trim() && (
+            {content.trim() && (
               <p className="whitespace-pre-wrap">
-                {isDeleted ? '(Tin nhắn đã xoá)' : message.content}
+                {isDeleted ? '(Tin nhắn đã xoá)' : content}
               </p>
             )}
-            {!isDeleted && message.attachments.length > 0 && (
-              <AttachmentList
-                attachments={message.attachments}
-                fromMe={fromMe}
-              />
+            {!isDeleted && attachments.length > 0 && (
+              <AttachmentList attachments={attachments} fromMe={fromMe} />
             )}
-            {isDeleted && !message.content.trim() && (
+            {isDeleted && !content.trim() && (
               <p className="whitespace-pre-wrap">(Tin nhắn đã xoá)</p>
             )}
             <p

@@ -1,15 +1,17 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 
 interface Props {
   displayName: string;
   roleLabel: string;
   initial: string;
+  avatar?: string | null;
 }
 
-export function UserMenu({ displayName, roleLabel, initial }: Props) {
+export function UserMenu({ displayName, roleLabel, initial, avatar }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -42,8 +44,19 @@ export function UserMenu({ displayName, roleLabel, initial }: Props) {
         aria-label="Menu tài khoản"
         aria-expanded={open}
       >
-        <span className="grid h-7 w-7 place-items-center rounded-full bg-navy-900 text-white text-xs font-semibold">
-          {initial}
+        <span className="relative grid h-7 w-7 place-items-center overflow-hidden rounded-full bg-navy-900 text-white text-xs font-semibold">
+          {avatar ? (
+            <Image
+              src={avatar}
+              alt={displayName}
+              fill
+              sizes="28px"
+              unoptimized
+              className="object-cover"
+            />
+          ) : (
+            initial
+          )}
         </span>
         <span className="hidden sm:inline-block pr-2 text-sm font-medium text-ink-900">
           {displayName}

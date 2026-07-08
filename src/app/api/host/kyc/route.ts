@@ -27,7 +27,7 @@ export async function GET() {
     data: {
       isOwner: true,
       kycStatus: r.ok ? r.data.kycStatus : ('none' as KycStatusValue),
-      kycBypass: r.ok ? r.data.kycBypass : false,
+      kycBypass: (r.ok && r.data.kycBypass) || profile.kycBypass,
     },
   });
 }

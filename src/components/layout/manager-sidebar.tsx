@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   AlertTriangle,
   BedDouble,
@@ -36,11 +36,14 @@ import {
   X,
 } from 'lucide-react';
 
+import { getUnreadCountAction } from '@/app/actions/conversations';
+import { useChatConnection } from '@/components/chat/chat-socket-provider';
 import type { UserProfile } from '@/core/entities/user';
 import { RoleCode } from '@/core/value-objects/role';
+import { useChatEvents } from '@/lib/use-chat-socket';
 import { cn } from '@/lib/utils';
 
-type BadgeKey = 'kyc' | 'leads' | 'bank' | 'properties';
+type BadgeKey = 'kyc' | 'leads' | 'bank' | 'properties' | 'messages';
 
 interface NavItem {
   href: string;
@@ -127,7 +130,7 @@ const HOST_GROUPS: NavGroup[] = [
       { href: '/host/calendar', label: 'Lịch phòng', icon: Calendar },
       { href: '/host/bookings', label: 'Đặt phòng', icon: BedDouble },
       { href: '/host/leads', label: 'Yêu cầu khách', icon: Inbox, badgeKey: 'leads' },
-      { href: '/host/messages', label: 'Tin nhắn', icon: MessageSquare },
+      { href: '/host/messages', label: 'Tin nhắn', icon: MessageSquare, badgeKey: 'messages' },
       { href: SALE_CALENDAR_URL, label: 'Lịch CTV (Sale)', icon: CalendarDays, external: true },
     ],
   },
@@ -178,10 +181,47 @@ export function ManagerSidebar({
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // ── Badge tin nhắn chưa đọc (live) ──
+  // Đếm từ GET /conversations/unread-count; cập nhật khi đổi trang (vào hội
+  // thoại → mark-read → đếm lại) và khi có tin mới qua socket dùng chung.
+  const { socket } = useChatConnection();
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const unreadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleUnreadRefresh = useCallback((delayMs: number) => {
+    if (unreadTimerRef.current) clearTimeout(unreadTimerRef.current);
+    unreadTimerRef.current = setTimeout(() => {
+      void getUnreadCountAction().then((r) => {
+        if (r.ok) setUnreadMessages(r.data);
+      });
+    }, delayMs);
+  }, []);
+
+  useEffect(() => {
+    // Trong trang hội thoại chờ mark-read xử lý xong rồi mới đếm lại.
+    scheduleUnreadRefresh(pathname.startsWith('/host/messages/') ? 1500 : 0);
+  }, [pathname, scheduleUnreadRefresh]);
+
+  useEffect(() => {
+    return () => {
+      if (unreadTimerRef.current) clearTimeout(unreadTimerRef.current);
+    };
+  }, []);
+
+  useChatEvents(socket, {
+    onMessage: () => scheduleUnreadRefresh(400),
+    onRead: () => scheduleUnreadRefresh(400),
+  });
+
   const autoTab: TabKey = pathname.startsWith('/admin') ? 'admin' : 'host';
   const [activeTab, setActiveTab] = useState<TabKey>(autoTab);
 
   const closeMobile = useCallback(() => setMobileOpen(false), []);
+
+  const mergedBadges: Partial<Record<BadgeKey, number>> = {
+    ...badges,
+    messages: unreadMessages,
+  };
 
   const currentGroups = activeTab === 'admin' ? ADMIN_GROUPS : HOST_GROUPS;
 
@@ -236,7 +276,7 @@ export function ManagerSidebar({
             key={group.id}
             group={group}
             pathname={pathname}
-            badges={badges}
+            badges={mergedBadges}
             onNavigate={onNavigate}
           />
         ))}

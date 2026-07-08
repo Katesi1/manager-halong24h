@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 
 import { PasswordForm } from '@/components/account/password-form';
@@ -18,6 +19,7 @@ interface SettingsProfile {
   name: string;
   email: string;
   phone: string | null;
+  avatar: string | null;
   role: number;
   bankStatus: BankStatus | null;
 }
@@ -82,8 +84,21 @@ export function SettingsClient() {
         <div className="h-28 bg-gradient-to-r from-navy-950 via-navy-900 to-navy-800" />
         <div className="px-6 pb-6 -mt-8">
           <div className="flex items-start gap-4">
-            <div className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-white text-navy-900 font-display text-2xl font-bold shadow-card ring-4 ring-white">
-              {initials}
+            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-white shadow-card ring-4 ring-white">
+              {profile.avatar ? (
+                <Image
+                  src={profile.avatar}
+                  alt={profile.name}
+                  fill
+                  sizes="80px"
+                  unoptimized
+                  className="object-cover"
+                />
+              ) : (
+                <span className="grid h-full w-full place-items-center font-display text-2xl font-bold text-navy-900">
+                  {initials}
+                </span>
+              )}
             </div>
             <div className="min-w-0 pt-10">
               <h2 className="font-display text-xl font-semibold text-navy-900 truncate">
@@ -114,13 +129,14 @@ export function SettingsClient() {
             </svg>
           }
           title="Hồ sơ cá nhân"
-          description="Cập nhật tên, email và số điện thoại của bạn."
+          description="Cập nhật ảnh đại diện, tên, email và số điện thoại của bạn."
         >
           <ProfileForm
             defaults={{
               full_name: profile.name,
               email: profile.email,
               phone: profile.phone ?? '',
+              avatar: profile.avatar,
             }}
           />
         </SettingsCard>

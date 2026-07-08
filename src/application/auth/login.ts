@@ -4,8 +4,18 @@ import { ValidationError } from '@/core/errors';
 import type { AuthTokens } from '@/core/entities/user';
 import type { AuthRepository } from '../ports/auth-repository';
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_RE = /^0\d{9,10}$/;
+
 export const LoginSchema = z.object({
-  email: z.string().email('Email không hợp lệ'),
+  identifier: z
+    .string()
+    .trim()
+    .min(1, 'Vui lòng nhập email hoặc số điện thoại')
+    .refine((v) => EMAIL_RE.test(v) || PHONE_RE.test(v.replace(/[\s.-]/g, '')), {
+      message: 'Email hoặc số điện thoại không hợp lệ',
+    })
+    .transform((v) => (EMAIL_RE.test(v) ? v : v.replace(/[\s.-]/g, ''))),
   password: z.string().min(6, 'Mật khẩu tối thiểu 6 ký tự'),
 });
 

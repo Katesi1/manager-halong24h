@@ -16,7 +16,7 @@ interface AdminAlerts {
 }
 
 interface TopbarProps {
-  profile: Pick<UserProfile, 'name' | 'email' | 'role'>;
+  profile: Pick<UserProfile, 'name' | 'email' | 'role' | 'avatar'>;
   adminAlerts?: AdminAlerts;
 }
 
@@ -65,6 +65,7 @@ export async function ManagerTopbar({ profile, adminAlerts }: TopbarProps) {
             displayName={profile.name || profile.email}
             roleLabel={roleLabel}
             initial={initial}
+            avatar={profile.avatar}
           />
         </div>
       </div>

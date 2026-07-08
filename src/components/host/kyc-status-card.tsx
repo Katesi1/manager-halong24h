@@ -84,11 +84,12 @@ export function KycStatusCard({ status }: KycStatusCardProps) {
               </span>
             )}
           </p>
-          {s === 'rejected' && status.submission?.rejectedReason && (
-            <p className="mt-2 text-sm text-rose-700">
-              Lý do: {status.submission.rejectedReason}
-            </p>
-          )}
+          {s === 'rejected' &&
+            (status.submission?.rejectedReason ?? status.rejectReason) && (
+              <p className="mt-2 text-sm text-rose-700">
+                Lý do: {status.submission?.rejectedReason ?? status.rejectReason}
+              </p>
+            )}
         </div>
         <span className="text-2xl shrink-0">{tone.icon}</span>
       </div>

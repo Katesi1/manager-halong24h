@@ -1,36 +1,21 @@
 'use client';
 
-import { cn } from '@/lib/utils';
-
 interface Props {
-  connected: boolean;
   peerOnline: boolean;
   someoneTyping: boolean;
   error: string | null;
 }
 
-export function ChatStatusBar({
-  connected,
-  peerOnline,
-  someoneTyping,
-  error,
-}: Props) {
+/**
+ * Thanh tín hiệu trên composer — chỉ render khi có gì đáng nói (peer online /
+ * đang nhập / lỗi). Trạng thái kết nối socket không hiển thị (nhiễu, user
+ * không cần biết; reconnect do Provider tự lo).
+ */
+export function ChatStatusBar({ peerOnline, someoneTyping, error }: Props) {
+  if (!peerOnline && !someoneTyping && !error) return null;
+
   return (
-    <div className="flex items-center justify-between px-4 py-1 text-[10px] text-ink-400">
-      <span
-        className={cn(
-          'inline-flex items-center gap-1',
-          connected ? 'text-emerald-600' : 'text-ink-400',
-        )}
-      >
-        <span
-          className={cn(
-            'inline-block h-1.5 w-1.5 rounded-full',
-            connected ? 'bg-emerald-500' : 'bg-ink-300',
-          )}
-        />
-        {connected ? 'Trực tuyến' : 'Đang kết nối...'}
-      </span>
+    <div className="flex items-center gap-3 px-4 py-1 text-[10px] text-ink-400">
       {peerOnline && (
         <span className="text-emerald-600">
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 mr-1" />

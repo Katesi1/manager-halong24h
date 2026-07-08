@@ -47,6 +47,8 @@ export type KycStatusValue = KycSubmissionStatus | 'none' | 'pending';
 export interface KycStatusResponse {
   kycStatus: KycStatusValue;
   submission: KycSubmission | null;
+  /** BE trả top-level `rejectReason` ở `/kyc/status` (spec §9.1). */
+  rejectReason?: string | null;
   kycBypass: boolean;
 }
 

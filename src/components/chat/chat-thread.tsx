@@ -14,14 +14,10 @@ import {
   markConversationReadAction,
   sendMessageAction,
 } from '@/app/actions/conversations';
-import {
-  AttachmentPicker,
-  type PendingAttachment,
-} from '@/components/chat/attachment-picker';
 import { MessageBubble } from '@/components/chat/message-bubble';
 import { ChatStatusBar } from '@/components/chat/status-bar';
 import { useChatConnection } from '@/components/chat/chat-socket-provider';
-import type { Message, MessageAttachment } from '@/core/entities/chat';
+import type { Message } from '@/core/entities/chat';
 import {
   chatErrorMessage,
   emitChatRead,
@@ -62,9 +58,6 @@ export function ChatThread({
   const [typingUsers, setTypingUsers] = useState<Set<string>>(() => new Set());
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(() => new Set());
   const [atBottom, setAtBottom] = useState(true);
-  const [pendingAttachments, setPendingAttachments] = useState<
-    PendingAttachment[]
-  >([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -86,8 +79,14 @@ export function ChatThread({
       // Bug fix: skip tin nhắn do CHÍNH MÌNH gửi — đã có optimistic + REST
       // response sẽ là authoritative. Nhận lại qua WS chỉ gây duplicate.
       if (p.message.senderId === currentUserId) return;
+      // Normalize payload WS (content/attachments có thể null) trước khi vào state.
+      const incoming: Message = {
+        ...p.message,
+        content: p.message.content ?? '',
+        attachments: p.message.attachments ?? [],
+      };
       setMessages((prev) =>
-        prev.some((m) => m.id === p.message.id) ? prev : [...prev, p.message],
+        prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming],
       );
       lastAppendRef.current = true;
     },
@@ -188,16 +187,6 @@ export function ChatThread({
     };
   }, [socket, conversationId]);
 
-  // Revoke ObjectURL pending khi unmount. Orphan BE cron dọn sau 24h.
-  useEffect(() => {
-    return () => {
-      for (const a of pendingAttachments) {
-        if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   function handleTextKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     // Enter để gửi; Shift+Enter cho dòng mới (chuẩn chat UX).
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -244,22 +233,9 @@ export function ChatThread({
   async function handleSend(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const content = text.trim();
-    const hasAttachments = pendingAttachments.length > 0;
-    // Cho phép gửi nếu có content HOẶC attachments.
-    if ((!content && !hasAttachments) || sending) return;
+    if (!content || sending) return;
     setSending(true);
     setError(null);
-
-    // Snapshot attachments — BE markAttached gắn upload → message.
-    const attachmentsForSend: MessageAttachment[] = pendingAttachments.map(
-      (a) => ({
-        url: a.upload.url,
-        type: a.upload.type,
-        name: a.upload.name,
-        size: a.upload.size,
-      }),
-    );
-    const snapshotAttachments = pendingAttachments;
 
     // Unique id để tránh collision khi gửi 2 tin trong cùng ms.
     const localId =
@@ -271,7 +247,7 @@ export function ChatThread({
       conversationId,
       senderId: currentUserId,
       content,
-      attachments: attachmentsForSend,
+      attachments: [],
       isSystem: false,
       editedAt: null,
       deletedAt: null,
@@ -280,26 +256,26 @@ export function ChatThread({
     lastAppendRef.current = true;
     setMessages((prev) => [...prev, optimistic]);
     setText('');
-    setPendingAttachments([]);
 
-    const res = await sendMessageAction({
-      conversationId,
-      content,
-      attachments: attachmentsForSend.length > 0 ? attachmentsForSend : undefined,
-    });
+    const res = await sendMessageAction({ conversationId, content });
     setSending(false);
     if (res.ok) {
-      // Revoke preview ObjectURLs để giải phóng memory.
-      for (const a of snapshotAttachments) {
-        if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
-      }
+      // Merge response vào optimistic thay vì thay thế nguyên khối — BE có thể
+      // trả thiếu field (id/content/attachments) → giữ giá trị optimistic làm
+      // fallback để không render message hỏng (crash .id/.length).
+      const confirmed: Message = {
+        ...optimistic,
+        ...res.data,
+        id: res.data?.id ?? optimistic.id,
+        content: res.data?.content ?? optimistic.content,
+        attachments: res.data?.attachments ?? optimistic.attachments,
+      };
       setMessages((prev) =>
-        prev.map((m) => (m.id === optimistic.id ? res.data : m)),
+        prev.map((m) => (m.id === optimistic.id ? confirmed : m)),
       );
     } else {
       // Rollback optimistic + restore composer state để user retry.
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
-      setPendingAttachments(snapshotAttachments);
       setText(content);
       setError(res.error);
     }
@@ -365,22 +341,11 @@ export function ChatThread({
 
       <div className="border-t border-ink-200 bg-white">
         <ChatStatusBar
-          connected={connected}
           peerOnline={!!peerUserId && onlineUsers.has(peerUserId)}
           someoneTyping={typingUsers.size > 0}
           error={error}
         />
-        <AttachmentPicker
-          attachments={pendingAttachments}
-          onAdd={(a) => setPendingAttachments((prev) => [...prev, a])}
-          onRemove={(uploadId) =>
-            setPendingAttachments((prev) =>
-              prev.filter((a) => a.upload.id !== uploadId),
-            )
-          }
-          disabled={sending}
-        />
-        <form onSubmit={handleSend} className="flex items-end gap-2 p-3 pt-2">
+        <form onSubmit={handleSend} className="flex items-end gap-2 p-3">
           <textarea
             value={text}
             onChange={handleTextChange}
@@ -393,7 +358,7 @@ export function ChatThread({
           />
           <button
             type="submit"
-            disabled={(!text.trim() && pendingAttachments.length === 0) || sending}
+            disabled={!text.trim() || sending}
             className="h-10 rounded-xl bg-navy-900 px-4 text-sm font-semibold text-white hover:bg-navy-800 disabled:opacity-50"
           >
             {sending ? '...' : 'Gửi'}

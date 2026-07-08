@@ -19,7 +19,8 @@ export async function GET() {
   let kyc: KycStatusResponse | null = null;
   if (isOwner) {
     const r = await getKycStatusAction();
-    if (r.ok) kyc = r.data;
+    // kycBypass lấy thêm từ profile (BE /kyc/status có thể không trả field này).
+    if (r.ok) kyc = { ...r.data, kycBypass: r.data.kycBypass || profile.kycBypass };
   }
 
   return NextResponse.json({
@@ -29,6 +30,7 @@ export async function GET() {
         name: profile.name,
         email: profile.email,
         phone: profile.phone ?? null,
+        avatar: profile.avatar ?? null,
         role: profile.role,
         bankStatus: profile.bankStatus ?? null,
       },

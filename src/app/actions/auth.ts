@@ -58,16 +58,18 @@ export async function loginAction(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const email = String(formData.get('email') ?? '').trim();
+  const identifier = String(
+    formData.get('identifier') ?? formData.get('email') ?? '',
+  ).trim();
   const password = String(formData.get('password') ?? '');
   const redirectTo = String(formData.get('redirect') ?? '/');
 
-  const values = { email };
+  const values = { identifier };
 
   const repo = authRepository();
   let tokens;
   try {
-    tokens = await loginUseCase(repo, { email, password });
+    tokens = await loginUseCase(repo, { identifier, password });
   } catch (raw) {
     const err = raw instanceof ValidationError ? raw : mapApiErrorToDomain(raw);
     if (err instanceof ValidationError) {
@@ -365,6 +367,15 @@ const UpdateProfileSchema = z.object({
     .regex(/^0\d{9}$/, 'Số điện thoại phải gồm 10 số, bắt đầu bằng 0')
     .or(z.literal(''))
     .optional(),
+  // v1.22 — URL https từ POST /uploads (Cloudinary), BE không nhận multipart ở đây.
+  avatar: z
+    .string()
+    .trim()
+    .max(1000, 'URL ảnh quá dài')
+    .url('URL ảnh không hợp lệ')
+    .startsWith('https://', 'Ảnh phải là URL https')
+    .or(z.literal(''))
+    .optional(),
 });
 
 export async function updateProfileAction(
@@ -380,18 +391,21 @@ export async function updateProfileAction(
     fullName: formData.get('full_name'),
     email: formData.get('email'),
     phone: formData.get('phone'),
+    avatar: formData.get('avatar') ?? undefined,
   });
   if (!parsed.success) {
     return { fieldErrors: flattenFieldErrors(parsed.error.flatten().fieldErrors) };
   }
 
   const phone = parsed.data.phone?.trim();
+  const avatar = parsed.data.avatar?.trim();
   try {
     await authRepository().updateProfile({
       fullName: parsed.data.fullName,
       email: parsed.data.email,
-      // Gửi phone chỉ khi có giá trị — tránh BE hiểu nhầm "" là xoá SĐT.
+      // Gửi phone/avatar chỉ khi có giá trị — tránh BE hiểu nhầm "" là xoá.
       ...(phone ? { phone } : {}),
+      ...(avatar ? { avatar } : {}),
     });
     revalidatePath('/host/settings');
     revalidatePath('/admin/settings');

@@ -6,7 +6,8 @@ import type {
 import type { RoleCode } from '@/core/value-objects/role';
 
 export interface LoginCredentials {
-  email: string;
+  /** Email hoặc số điện thoại (spec §2 — BE nhận `{ identifier, password }`). */
+  identifier: string;
   password: string;
 }
 
@@ -23,11 +24,13 @@ export interface ChangePasswordInput {
   newPassword: string;
 }
 
-/** Spec §25.2 — whitelist 3 field, tất cả optional (ít nhất 1). */
+/** Spec §25.2 + v1.22 — whitelist 4 field, tất cả optional (ít nhất 1). */
 export interface UpdateProfileInput {
   fullName?: string;
   email?: string;
   phone?: string;
+  /** URL https (≤1000 ký tự) — upload trước qua `POST /uploads` (§23). */
+  avatar?: string;
 }
 
 export interface AuthRepository {
