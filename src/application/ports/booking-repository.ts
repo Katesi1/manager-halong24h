@@ -38,6 +38,12 @@ export interface BookingRepository {
    * Nếu booking đang HOLD → tự chuyển CONFIRMED.
    */
   markPaid(id: string, amount?: number): Promise<Booking>;
+  /**
+   * Spec §5.5 (v1.31) — PATCH /bookings/:id/checkin. Xác nhận khách nhận phòng
+   * + thu nốt (`amount` cộng dồn vào paidAmount; bỏ trống = thu đủ) → COMPLETED.
+   * Yêu cầu booking CONFIRMED.
+   */
+  checkin(id: string, amount?: number): Promise<Booking>;
   /** Spec §5.1 — PATCH /bookings/:id/cancel (ADMIN/OWNER/SALE). */
   cancel(input: CancelBookingInput): Promise<Booking>;
   /** Spec §5.1 — PATCH /bookings/:id/customer-cancel (Customer huỷ HOLD). */

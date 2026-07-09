@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 
 import {
   cancelBookingAction,
+  checkinBookingAction,
   confirmBookingAction,
   markBookingPaidAction,
 } from '@/app/actions/bookings';
@@ -42,6 +43,8 @@ export function BookingActions({
   const [pending, startTransition] = useTransition();
   const [showCancel, setShowCancel] = useState(false);
   const [showMarkPaid, setShowMarkPaid] = useState(false);
+  const [showCheckin, setShowCheckin] = useState(false);
+  const [checkinAmount, setCheckinAmount] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [acceptResponsibility, setAcceptResponsibility] = useState(false);
@@ -49,6 +52,9 @@ export function BookingActions({
 
   const canCancel =
     status === 'hold' || status === 'confirmed' || status === 'paid';
+  // Check-in: booking đang CONFIRMED ở BE (FE 'confirmed' chờ cọc HOẶC 'paid'
+  // đã ghi cọc). Xác nhận nhận phòng + thu nốt → COMPLETED (spec §5.5).
+  const canCheckin = status === 'confirmed' || status === 'paid';
 
   const remaining = Math.max(0, totalPrice - alreadyPaid);
 
@@ -95,6 +101,32 @@ export function BookingActions({
       );
       setShowMarkPaid(false);
       setPaymentAmount('');
+      router.refresh();
+      refetchApiResources();
+    });
+  }
+
+  function onCheckin() {
+    setError(null);
+    // remaining > 0: số tiền thu thêm (bỏ trống = BE thu đủ). remaining = 0:
+    // chỉ đánh dấu nhận phòng, không gửi amount.
+    let amount: number | undefined;
+    if (remaining > 0) {
+      amount = checkinAmount ? Number(checkinAmount) : undefined;
+      if (amount !== undefined && amount <= 0) {
+        setError('Số tiền phải > 0');
+        return;
+      }
+    }
+    startTransition(async () => {
+      const r = await checkinBookingAction(bookingId, amount);
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      show('✓ Đã xác nhận khách nhận phòng · Booking hoàn tất', 'success');
+      setShowCheckin(false);
+      setCheckinAmount('');
       router.refresh();
       refetchApiResources();
     });
@@ -164,8 +196,8 @@ export function BookingActions({
         </Button>
       )}
 
-      {/* confirmed → markPaid (partial supported) */}
-      {status === 'confirmed' && !showMarkPaid && (
+      {/* confirmed → markPaid (ghi nhận cọc) */}
+      {status === 'confirmed' && !showMarkPaid && !showCheckin && (
         <>
           <Button
             onClick={() => {
@@ -175,7 +207,7 @@ export function BookingActions({
             disabled={pending}
             className="w-full"
           >
-            💰 Ghi nhận khách đã chuyển khoản
+            💰 Ghi nhận khách đã chuyển cọc
           </Button>
           <p className="text-[11px] text-ink-500 text-center">
             Khách còn cần chuyển: <strong>{formatVND(remaining)}</strong>
@@ -228,11 +260,79 @@ export function BookingActions({
         </div>
       )}
 
-      {/* paid → vẫn hiển thị trạng thái đã nhận đủ (action Hủy nằm bên dưới) */}
-      {status === 'paid' && !showCancel && (
-        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-center text-sm text-emerald-700">
-          ✓ Đã nhận đủ · Phiếu check-in đã gửi
-        </p>
+      {/* confirmed/paid → check-in: xác nhận nhận phòng + thu nốt → COMPLETED */}
+      {canCheckin && !showCheckin && !showMarkPaid && (
+        <>
+          <Button
+            variant={status === 'paid' ? 'primary' : 'outline'}
+            onClick={() => {
+              setShowCheckin(true);
+              setCheckinAmount(remaining > 0 ? String(remaining) : '');
+            }}
+            disabled={pending}
+            className="w-full"
+          >
+            🏠 Xác nhận khách nhận phòng
+            {remaining > 0 ? ' + thu nốt' : ''}
+          </Button>
+          {status === 'paid' && remaining > 0 && (
+            <p className="text-[11px] text-ink-500 text-center">
+              Thu nốt khi khách đến: <strong>{formatVND(remaining)}</strong>
+            </p>
+          )}
+        </>
+      )}
+
+      {showCheckin && (
+        <div className="space-y-3 rounded-lg bg-sky-50 p-3 ring-1 ring-sky-200">
+          <p className="text-xs leading-relaxed text-sky-900">
+            Xác nhận khách đã nhận phòng.{' '}
+            {remaining > 0 ? (
+              <>
+                Nhập số tiền thu thêm (còn lại{' '}
+                <strong>{formatVND(remaining)}</strong>) — để trống là thu đủ.
+              </>
+            ) : (
+              'Booking sẽ chuyển sang Hoàn tất.'
+            )}{' '}
+            Sau đó khách có thể đánh giá.
+          </p>
+          {remaining > 0 && (
+            <div>
+              <Label htmlFor="checkin_amount">Số tiền thu thêm (VNĐ)</Label>
+              <Input
+                id="checkin_amount"
+                type="text"
+                inputMode="numeric"
+                value={
+                  checkinAmount
+                    ? Number(checkinAmount).toLocaleString('vi-VN')
+                    : ''
+                }
+                onChange={(e) =>
+                  setCheckinAmount(e.target.value.replace(/\D/g, ''))
+                }
+                placeholder={remaining.toLocaleString('vi-VN')}
+              />
+            </div>
+          )}
+          <div className="flex gap-2">
+            <Button onClick={onCheckin} disabled={pending} className="flex-1">
+              {pending ? 'Đang xử lý…' : 'Xác nhận nhận phòng'}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowCheckin(false);
+                setCheckinAmount('');
+                setError(null);
+              }}
+              disabled={pending}
+            >
+              Huỷ
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* Cancel — available ở hold / confirmed / paid (R3 3-tier policy) */}

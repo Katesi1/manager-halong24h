@@ -84,6 +84,7 @@ function propertyToWizard(p: Property): WizardData {
     bedrooms: p.bedrooms ?? undefined,
     bathrooms: p.bathrooms ?? undefined,
     standardGuests: p.standardGuests ?? undefined,
+    standardChildren: p.standardChildren ?? undefined,
     maxGuests: p.maxGuests ?? undefined,
     amenities: p.amenities,
     services: p.services,
@@ -672,6 +673,13 @@ function Step1({ data, update, fieldErrors }: StepProps) {
           value={data.standardGuests}
           onChange={(v) => update('standardGuests', v)}
           min={1}
+          max={500}
+        />
+        <NumberField
+          label="Trẻ em tiêu chuẩn"
+          value={data.standardChildren}
+          onChange={(v) => update('standardChildren', v)}
+          min={0}
           max={500}
         />
         <NumberField

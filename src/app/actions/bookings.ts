@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import {
   cancelBookingUseCase,
+  checkinBookingUseCase,
   confirmBookingUseCase,
   holdBookingUseCase,
   markBookingPaidUseCase,
@@ -80,6 +81,23 @@ export async function markBookingPaidAction(id: string, amount?: number) {
   if (result.ok) {
     revalidatePath(`/host/bookings/${id}`);
     revalidatePath('/host/bookings');
+  }
+  return result;
+}
+
+/**
+ * Xác nhận khách nhận phòng + thu nốt (spec §5.5). CONFIRMED → COMPLETED.
+ * `amount` cộng dồn vào paidAmount; bỏ trống = thu đủ phần còn lại.
+ */
+export async function checkinBookingAction(id: string, amount?: number) {
+  const result = await toResult(async () => {
+    await requireOwnerOfBooking(id);
+    return checkinBookingUseCase(bookingRepository(), id, amount);
+  });
+  if (result.ok) {
+    revalidatePath(`/host/bookings/${id}`);
+    revalidatePath('/host/bookings');
+    revalidatePath('/host/calendar');
   }
   return result;
 }

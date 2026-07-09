@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 
 import { BookingActions } from '@/components/host/booking-actions';
@@ -69,11 +70,16 @@ export function BookingDetailClient({
   const { booking, estimatedTotal } = data;
   const hasTotal = booking.totalPrice != null;
   const effectiveTotal = booking.totalPrice ?? estimatedTotal;
+  // Tiền THỰC đã thu (khác cọc cần thu). Chưa thu → 0.
+  const paid = booking.paidAmount ?? 0;
+  // Ưu tiên remainingAmount BE trả sẵn; fallback tính từ tổng (thật hoặc tạm tính).
   const remaining =
-    effectiveTotal != null
-      ? Math.max(0, effectiveTotal - (booking.deposit ?? 0))
-      : null;
-  const fullyPaid = hasTotal && remaining === 0 && booking.totalPrice! > 0;
+    booking.remainingAmount != null
+      ? booking.remainingAmount
+      : effectiveTotal != null
+        ? Math.max(0, effectiveTotal - paid)
+        : null;
+  const fullyPaid = hasTotal && booking.totalPrice! > 0 && paid >= booking.totalPrice!;
 
   return (
     <>
@@ -126,7 +132,16 @@ export function BookingDetailClient({
                   )
                 }
               />
-              <Detail label="Số khách" value={`${booking.guestCount} người`} />
+              <Detail
+                label="Số khách"
+                value={
+                  booking.adults != null
+                    ? `${booking.adults} người lớn${
+                        booking.children ? ` + ${booking.children} trẻ em` : ''
+                      }`
+                    : `${booking.guestCount} người`
+                }
+              />
               <Detail label="Số đêm" value={`${booking.nights} đêm`} />
               <Detail label="Nhận phòng" value={formatDate(booking.checkInAt)} />
               <Detail label="Trả phòng" value={formatDate(booking.checkOutAt)} />
@@ -165,7 +180,7 @@ export function BookingDetailClient({
               </h2>
               {fullyPaid && <Badge variant="success">Đã nhận đủ</Badge>}
             </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="mt-4 grid gap-3 grid-cols-2 lg:grid-cols-4">
               <Stat
                 label="Tổng"
                 value={
@@ -177,13 +192,21 @@ export function BookingDetailClient({
                 }
                 hint={
                   !hasTotal && estimatedTotal != null
-                    ? 'Tạm tính theo bảng giá — chốt khi ghi nhận thanh toán'
+                    ? 'Tạm tính theo bảng giá — chốt khi thu tiền'
                     : undefined
                 }
               />
               <Stat
-                label="Khách đã chuyển"
-                value={formatVND(booking.deposit)}
+                label="Cọc cần thu"
+                value={
+                  booking.deposit != null
+                    ? formatVND(booking.deposit)
+                    : 'Chưa yêu cầu'
+                }
+              />
+              <Stat
+                label="Đã thu"
+                value={formatVND(paid)}
                 color="emerald"
               />
               <Stat
@@ -198,6 +221,44 @@ export function BookingDetailClient({
                 color={remaining != null && remaining > 0 ? 'amber' : 'emerald'}
               />
             </div>
+            {booking.priceBreakdown && (
+              <p className="mt-3 text-[11px] text-ink-500">
+                {booking.priceBreakdown.nights} đêm
+                {booking.priceBreakdown.surcharge > 0
+                  ? ` · phụ thu ${formatVND(booking.priceBreakdown.surcharge)}`
+                  : ''}
+              </p>
+            )}
+            {booking.depositProofUrl && (
+              <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50 p-4">
+                <p className="text-sm font-semibold text-sky-900">
+                  🧾 Ảnh bill cọc khách gửi
+                </p>
+                <p className="mt-1 text-xs text-sky-800">
+                  Đối chiếu với STK của bạn trước khi bấm “Ghi nhận khách đã
+                  chuyển cọc”.
+                </p>
+                <a
+                  href={booking.depositProofUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-block"
+                >
+                  <Image
+                    src={booking.depositProofUrl}
+                    alt="Bill chuyển khoản cọc của khách"
+                    width={320}
+                    height={240}
+                    unoptimized
+                    className="max-h-72 w-auto rounded-lg object-contain ring-1 ring-sky-200"
+                  />
+                </a>
+                <p className="mt-2 text-[11px] text-sky-700">
+                  Bấm ảnh để xem kích thước đầy đủ.
+                </p>
+              </div>
+            )}
+
             <div className="mt-4 rounded-lg bg-cream-100 p-4 text-sm text-ink-700">
               <p className="font-semibold text-ink-900">
                 💸 Khách chuyển khoản trực tiếp cho bạn
@@ -252,7 +313,7 @@ export function BookingDetailClient({
                   bookingId={booking.id}
                   status={booking.status}
                   totalPrice={effectiveTotal ?? 0}
-                  alreadyPaid={booking.deposit ?? 0}
+                  alreadyPaid={paid}
                 />
               </div>
             </div>

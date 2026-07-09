@@ -174,15 +174,16 @@ export function BookingsTableClient({ status }: { status?: BookingStatus }) {
                 <td className="px-4 py-3 whitespace-nowrap">
                   <span
                     className={
-                      (b.deposit ?? 0) >= (b.totalPrice ?? 0) &&
-                      b.deposit != null
+                      (b.paidAmount ?? 0) >= (b.totalPrice ?? 0) &&
+                      b.paidAmount != null &&
+                      (b.totalPrice ?? 0) > 0
                         ? 'text-emerald-700 font-medium'
-                        : (b.deposit ?? 0) > 0
+                        : (b.paidAmount ?? 0) > 0
                           ? 'text-amber-700 font-medium'
                           : 'text-ink-500'
                     }
                   >
-                    {formatVND(b.deposit)}
+                    {formatVND(b.paidAmount ?? 0)}
                   </span>
                 </td>
                 <td className="px-4 py-3">

@@ -32,6 +32,7 @@ export const CreatePropertySchema = z.object({
   bedrooms: z.number().int().nonnegative().optional(),
   bathrooms: z.number().int().nonnegative().optional(),
   standardGuests: z.number().int().positive().optional(),
+  standardChildren: z.number().int().nonnegative().optional(),
   maxGuests: z.number().int().positive().optional(),
   amenities: z.array(z.string()).optional(),
   description: z.string().max(5000, 'Mô tả tối đa 5000 ký tự').optional(),

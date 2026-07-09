@@ -53,6 +53,8 @@ export interface Property {
   bedrooms: number | null;
   bathrooms: number | null;
   standardGuests: number | null;
+  /** Sức chứa trẻ em tiêu chuẩn (BE §4.6 v1.27, default 0). */
+  standardChildren: number | null;
   maxGuests: number | null;
   weekdayPrice: VND | null;
   weekendPrice: VND | null;
@@ -95,6 +97,7 @@ export interface CreatePropertyInput {
   bedrooms?: number;
   bathrooms?: number;
   standardGuests?: number;
+  standardChildren?: number;
   maxGuests?: number;
   amenities?: string[];
   description?: string;

@@ -3,11 +3,12 @@ import 'server-only';
 import type {
   Booking,
   BookingFilters,
+  BookingPriceBreakdown,
   BookingStatus,
   CancelBookingInput,
   CreateBookingHoldInput,
 } from '@/core/entities/booking';
-import { vnd } from '@/core/value-objects/vnd';
+import { vnd, type VND } from '@/core/value-objects/vnd';
 import type {
   BookingRepository,
   PropertyMonthCalendarFilters,
@@ -25,6 +26,8 @@ interface SpecBooking {
   customerId?: string | null;
   customerName: string;
   customerPhone: string | null;
+  adults?: number | null;
+  children?: number | null;
   checkinDate: string;
   checkoutDate: string;
   nights?: number;
@@ -34,7 +37,19 @@ interface SpecBooking {
   depositAmount: number | null;
   totalAmount: number | null;
   paidAmount?: number | null;
+  /** BE (đang chờ ship) sẽ trả sẵn `max(0, total − paid)`. */
+  remainingAmount?: number | null;
+  /** Breakdown giá server-side (đang chờ BE ship). */
+  priceBreakdown?: {
+    nights?: number;
+    lineItems?: { date: string; type: string; amount: number }[];
+    surcharge?: number;
+  } | null;
   paidAt?: string | null;
+  /** Ảnh bill CK cọc khách gửi (spec §5.6, v1.31). */
+  depositProofUrl?: string | null;
+  /** Thời điểm owner xác nhận nhận phòng (spec §5.5, v1.31). */
+  checkedInAt?: string | null;
   guestCount: number;
   notes: string | null;
   createdAt: string;
@@ -60,12 +75,39 @@ function nightsBetween(checkin: string, checkout: string): number {
   return Math.max(1, Math.round(ms / 86_400_000));
 }
 
+function mapBreakdown(
+  raw: SpecBooking['priceBreakdown'],
+): BookingPriceBreakdown | null {
+  if (!raw || !Array.isArray(raw.lineItems)) return null;
+  return {
+    nights: raw.nights ?? raw.lineItems.length,
+    lineItems: raw.lineItems.map((li) => ({
+      date: li.date,
+      type: li.type,
+      amount: li.amount,
+    })),
+    surcharge: raw.surcharge ?? 0,
+  };
+}
+
 function mapBooking(s: SpecBooking): Booking {
   const status = mapStatus(s.status);
   // Chỉ promote sang `paid` khi BE đã đánh dấu `paidAt`. Tránh edge case
   // totalAmount=0 (free booking) → (paidAmount ?? 0) >= 0 luôn true sẽ
   // hiển thị sai trạng thái khi user chưa thanh toán.
   const isPaid = s.paidAt != null;
+  // BE trả null cho đơn HOLD (chưa chốt giá) → giữ null, UI hiện "Chưa chốt giá".
+  const totalPrice = s.totalAmount == null ? null : vnd(s.totalAmount);
+  // `paidAmount` = tiền THỰC đã thu (khác depositAmount = cần thu). BE hiện có
+  // thể trả null trước khi fix → giữ null (UI coi như chưa thu).
+  const paidAmount = s.paidAmount == null ? null : vnd(s.paidAmount);
+  // Ưu tiên `remainingAmount` BE trả sẵn; nếu chưa có mà biết total → tự tính.
+  let remainingAmount: VND | null = null;
+  if (s.remainingAmount != null) {
+    remainingAmount = vnd(Math.max(0, s.remainingAmount));
+  } else if (totalPrice != null) {
+    remainingAmount = vnd(Math.max(0, totalPrice - (paidAmount ?? 0)));
+  }
   return {
     id: s.id,
     propertyId: s.propertyId,
@@ -75,13 +117,19 @@ function mapBooking(s: SpecBooking): Booking {
     guestName: s.customerName,
     guestPhone: s.customerPhone,
     guestCount: s.guestCount,
+    adults: s.adults ?? null,
+    children: s.children ?? null,
     checkInAt: s.checkinDate,
     checkOutAt: s.checkoutDate,
     nights: s.nights ?? nightsBetween(s.checkinDate, s.checkoutDate),
     status: isPaid && status === 'confirmed' ? 'paid' : status,
-    // BE trả null cho đơn HOLD (chưa chốt giá) → giữ null, UI hiện "Chưa chốt giá".
-    totalPrice: s.totalAmount == null ? null : vnd(s.totalAmount),
+    totalPrice,
     deposit: s.depositAmount == null ? null : vnd(s.depositAmount),
+    paidAmount,
+    remainingAmount,
+    priceBreakdown: mapBreakdown(s.priceBreakdown),
+    depositProofUrl: s.depositProofUrl ?? null,
+    checkedInAt: s.checkedInAt ?? null,
     holdExpireAt: s.holdExpireAt ?? null,
     holdRemainingSeconds: s.holdRemainingSeconds,
     notes: s.notes,
@@ -156,6 +204,14 @@ export class ApiBookingRepository implements BookingRepository {
   async markPaid(id: string, amount?: number): Promise<Booking> {
     const data = await apiClient.patch<SpecBooking>(
       `/bookings/${id}/paid`,
+      amount !== undefined ? { amount } : undefined,
+    );
+    return mapBooking(data);
+  }
+
+  async checkin(id: string, amount?: number): Promise<Booking> {
+    const data = await apiClient.patch<SpecBooking>(
+      `/bookings/${id}/checkin`,
       amount !== undefined ? { amount } : undefined,
     );
     return mapBooking(data);

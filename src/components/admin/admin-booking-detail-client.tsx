@@ -8,6 +8,7 @@ import {
   StickyNote,
   Users,
 } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 
 import { PageHeader } from '@/components/host/page-header';
@@ -47,10 +48,14 @@ export function AdminBookingDetailClient({ id }: { id: string }) {
 
   const booking = data;
   const hasTotal = booking.totalPrice != null;
-  const remaining = hasTotal
-    ? Math.max(0, booking.totalPrice! - (booking.deposit ?? 0))
-    : null;
-  const fullyPaid = hasTotal && remaining === 0 && booking.totalPrice! > 0;
+  const paid = booking.paidAmount ?? 0;
+  const remaining =
+    booking.remainingAmount != null
+      ? booking.remainingAmount
+      : hasTotal
+        ? Math.max(0, booking.totalPrice! - paid)
+        : null;
+  const fullyPaid = hasTotal && booking.totalPrice! > 0 && paid >= booking.totalPrice!;
 
   return (
     <>
@@ -99,7 +104,17 @@ export function AdminBookingDetailClient({ id }: { id: string }) {
                   )
                 }
               />
-              <Detail icon={Users} label="Số khách" value={`${booking.guestCount} người`} />
+              <Detail
+                icon={Users}
+                label="Số khách"
+                value={
+                  booking.adults != null
+                    ? `${booking.adults} người lớn${
+                        booking.children ? ` + ${booking.children} trẻ em` : ''
+                      }`
+                    : `${booking.guestCount} người`
+                }
+              />
               <Detail icon={CalendarDays} label="Số đêm" value={`${booking.nights} đêm`} />
               <Detail icon={CalendarDays} label="Nhận phòng" value={formatDate(booking.checkInAt)} />
               <Detail icon={CalendarDays} label="Trả phòng" value={formatDate(booking.checkOutAt)} />
@@ -140,15 +155,54 @@ export function AdminBookingDetailClient({ id }: { id: string }) {
               </h2>
               {fullyPaid && <Badge variant="success">Đã nhận đủ</Badge>}
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="mt-4 grid gap-3 grid-cols-2 lg:grid-cols-4">
               <Money label="Tổng" value={formatBookingTotal(booking.totalPrice)} />
-              <Money label="Khách đã chuyển" value={formatVND(booking.deposit)} color="emerald" />
+              <Money
+                label="Cọc cần thu"
+                value={
+                  booking.deposit != null ? formatVND(booking.deposit) : 'Chưa yêu cầu'
+                }
+              />
+              <Money label="Đã thu" value={formatVND(paid)} color="emerald" />
               <Money
                 label="Còn lại"
                 value={remaining == null ? 'Chưa chốt giá' : formatVND(remaining)}
                 color={remaining != null && remaining > 0 ? 'amber' : 'emerald'}
               />
             </div>
+            {booking.priceBreakdown && (
+              <p className="mt-3 text-[11px] text-ink-500">
+                {booking.priceBreakdown.nights} đêm
+                {booking.priceBreakdown.surcharge > 0
+                  ? ` · phụ thu ${formatVND(booking.priceBreakdown.surcharge)}`
+                  : ''}
+              </p>
+            )}
+            {booking.depositProofUrl && (
+              <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50 p-4">
+                <p className="text-sm font-semibold text-sky-900">
+                  🧾 Ảnh bill cọc khách gửi
+                </p>
+                <a
+                  href={booking.depositProofUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-block"
+                >
+                  <Image
+                    src={booking.depositProofUrl}
+                    alt="Bill chuyển khoản cọc của khách"
+                    width={320}
+                    height={240}
+                    unoptimized
+                    className="max-h-72 w-auto rounded-lg object-contain ring-1 ring-sky-200"
+                  />
+                </a>
+                <p className="mt-2 text-[11px] text-sky-700">
+                  Bấm ảnh để xem đầy đủ.
+                </p>
+              </div>
+            )}
             <p className="mt-4 rounded-lg bg-cream-100 p-3 text-xs leading-relaxed text-ink-600">
               Halong24h không giữ tiền. Khách chuyển khoản trực tiếp cho chủ nhà
               (STK đã KYC). Số liệu trên đối soát theo dữ liệu BE ghi nhận.

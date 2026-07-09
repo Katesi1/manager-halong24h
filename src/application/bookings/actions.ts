@@ -73,6 +73,22 @@ export async function markBookingPaidUseCase(
   return repo.markPaid(id, amount);
 }
 
+export async function checkinBookingUseCase(
+  repo: BookingRepository,
+  id: string,
+  amount?: number,
+): Promise<Booking> {
+  if (!id) throw new ValidationError('Thiếu id booking');
+  // amount là số tiền THU THÊM lúc nhận phòng (cộng dồn). Bỏ trống = thu đủ.
+  if (
+    amount !== undefined &&
+    (!Number.isFinite(amount) || amount <= 0 || amount > 10_000_000_000)
+  ) {
+    throw new ValidationError('Số tiền thu nốt không hợp lệ');
+  }
+  return repo.checkin(id, amount);
+}
+
 const CancelSchema = z.object({
   id: z.string().min(1, 'Thiếu id booking'),
   reason: z.string().max(500).optional(),
