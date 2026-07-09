@@ -55,9 +55,13 @@ export class ApiAuthRepository implements AuthRepository {
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
+    // BE yêu cầu cả `confirmPassword` (spec §2.2 ghi body chỉ {token,newPassword}
+    // nhưng DTO thực tế đòi confirmPassword khớp — verify bằng curl 2026-07-09).
+    // Trang FE đã chặn submit khi password !== confirm nên gửi lại chính giá trị
+    // đã xác nhận là hợp lệ.
     await apiClient.post(
       '/auth/reset-password',
-      { token, newPassword },
+      { token, newPassword, confirmPassword: newPassword },
       { skipAuth: true },
     );
   }
