@@ -3,7 +3,7 @@
 > Tài liệu chính thức cho team FE Web (Next.js admin/host) và App Mobile (Android/iOS).
 > Bao gồm tất cả endpoint, schema response, business rule, WebSocket guide và integration checklist.
 >
-> **Cập nhật**: 2026-07-09 (v1.33 — Đánh giá chỉ mở sau 12h trưa ngày trả phòng: BookingDto thêm `canReview` + `reviewUnlockAt`; review 400 `reviewNotYetAllowed` nếu chưa tới mốc. Xem §7, §5.3, changelog §21) · **BE base**: NestJS 11 · **DB**: PostgreSQL + Prisma · **Auth**: JWT · **Real-time**: Socket.IO
+> **Cập nhật**: 2026-07-09 (v1.34 — Email: wire thật `welcome_owner`/`welcome_sale`/`kyc_approved`/`kyc_rejected`; `booking_confirmed` gửi cả tới `customerEmail` trên form; cọc mặc định 50% khi mark-paid không nhập amount; `GET /admin/emails/templates` trim còn 8 key gửi thật. Xem §16, §5.4, changelog §21) · **BE base**: NestJS 11 · **DB**: PostgreSQL + Prisma · **Auth**: JWT · **Real-time**: Socket.IO
 
 ---
 
@@ -1832,7 +1832,17 @@ Field flatten thêm so với list: tất cả field §5.3 mở rộng (`code`, `
 
 ### 5.4 PATCH /bookings/:id/paid
 
-Body optional: `{ amount? }`. Nếu bỏ trống → BE **ghi nhận tiền cọc** (fallback `depositAmount`, rồi `totalAmount`). Ghi `paidAmount = amount` + `paidAt`. Nếu booking đang HOLD → tự chuyển sang CONFIRMED + clear `holdExpireAt`. **KHÔNG** ghi đè `totalAmount`.
+Body optional: `{ amount? }` — số tiền cọc OWNER ghi nhận. Ghi `paidAmount` + `paidAt`. Nếu booking đang HOLD → tự chuyển sang CONFIRMED + clear `holdExpireAt`. **KHÔNG** ghi đè `totalAmount`.
+
+**Số cọc ghi nhận (v1.34 · 2026-07-09)** — thứ tự ưu tiên:
+1. `amount` OWNER nhập trong body.
+2. `depositAmount` đã set lúc tạo booking (staff hold).
+3. **Tự động 50% `totalAmount`** (khi property đã có giá) — mặc định mới.
+4. `0` → 400 `paidAmountRequired` (property chưa cấu hình giá, OWNER phải nhập tay).
+
+> Trước v1.34 fallback bước 3 là `totalAmount` (100%). Nay đổi sang 50% cho đúng nghiệp vụ "ghi nhận **cọc**". OWNER muốn thu khác 50% thì nhập `amount` tường minh; thu nốt phần còn lại ở bước check-in (§5.5).
+
+**Email xác nhận cho khách (v1.34)** — khi ghi nhận cọc thành công, BE gửi email `booking_confirmed` (mã booking + ngày nhận/trả + tổng/cọc/còn lại + liên hệ chủ nhà). Gửi tới **email tài khoản khách HOẶC email liên hệ trên form đặt (`customerEmail`)** — trước đây chỉ gửi khi khách có tài khoản kèm email, nay khách đặt bằng SĐT + điền email liên hệ cũng nhận được. Fire-and-forget.
 
 > **Phân biệt luồng thanh toán** (FE đa nền tảng phải wire đúng):
 > - `PATCH /bookings/:id/paid` — **OWNER/SALE ghi nhận tiền cọc/tiền phòng của KHÁCH** (chuyển khoản tay, tiền mặt, thanh toán offline). Chỉ ảnh hưởng `Booking.paidAmount/paidAt`.
@@ -2205,10 +2215,16 @@ Base path: `/notifications`. Auth required.
 
 | Method | Path | Mô tả |
 |---|---|---|
-| `GET` | `/notifications?type&isRead&page&limit` | List |
+| `GET` | `/notifications?type&isRead&page&limit` | List — **Shape B** (xem dưới) |
 | `GET` | `/notifications/unread-count` | `{ count }` |
 | `PATCH` | `/notifications/:id/read` | Mark 1 read |
 | `PATCH` | `/notifications/read-all` | Mark all read |
+
+> **Response shape `GET /notifications` (Shape B — đính chính 2026-07-09)**: `data` là **MẢNG** `NotificationDto[]`, phân trang ở `meta` top-level (sibling của `data`), KHÔNG bọc trong object `{ items }`:
+> ```jsonc
+> { "success": true, "message": "...", "data": [ /* NotificationDto */ ], "meta": { "total": 120, "page": 1, "limit": 50 } }
+> ```
+> App parse `response.data['data'] as List` → ĐÚNG. Đọc paging ở `response.data['meta']`. (Trước đây §22 C3 liệt kê nhầm endpoint này ở Shape A — đã sửa.)
 
 ### 8.2 NotificationDto
 
@@ -3064,7 +3080,22 @@ Base path: `/admin/emails`. Role: ADMIN.
 | `GET` | `/admin/emails/templates` | — → `{ smtpEnabled, templates: [{ key }] }` |
 | `POST` | `/admin/emails/test` | `{ template, to }` → `{ sent: boolean }` |
 
-15 template keys: `welcome_owner`, `welcome_sale`, `password_reset`, `booking_confirmed`, `booking_cancelled`, `booking_paid`, `kyc_approved`, `kyc_rejected`, `staff_invite`, `subscription_due`, `subscription_overdue`, `subscription_paid`, `dispute_opened`, `review_received`, `property_approved`.
+> **⚠️ Thay đổi (v1.34 · 2026-07-09)** — `GET /admin/emails/templates` giờ **chỉ trả template thực sự được BE gửi tự động** (8 key). Trước đây liệt kê 15 key nhưng 7 key (`booking_paid`, `subscription_due`, `subscription_overdue`, `subscription_paid`, `dispute_opened`, `review_received`, `property_approved`) chỉ là mẫu render — bấm "Gửi test" ra mail nhưng **không có luồng nghiệp vụ nào gửi thật** → gây hiểu nhầm. Đã gỡ khỏi danh sách. FE render UI trực tiếp từ `data.templates` (không hardcode danh sách).
+
+**8 template keys (đều gửi thật):**
+
+| key | Trigger tự động |
+|---|---|
+| `welcome_owner` | Đăng ký OWNER (`/auth/register`, `/auth/google`, `/auth/apple`) + ADMIN tạo OWNER (`POST /users`) |
+| `welcome_sale` | Accept staff invite (`POST /staff/invites/accept`) + ADMIN tạo SALE (`POST /users`) |
+| `password_reset` | `POST /auth/forgot-password` |
+| `booking_confirmed` | `PATCH /bookings/:id/paid` (ghi nhận cọc) + `PATCH /bookings/:id/checkin` (hoàn tất) |
+| `booking_cancelled` | `PATCH /bookings/:id/cancel` |
+| `kyc_approved` | `POST /admin/kyc/submissions/:id/approve` |
+| `kyc_rejected` | `POST /admin/kyc/submissions/:id/reject` (kèm lý do + mục cần bổ sung) |
+| `staff_invite` | `POST /staff/invites` (+ system invite) |
+
+Tất cả email đều **fire-and-forget**: chỉ gửi khi user có email + SMTP cấu hình; lỗi SMTP được log, không chặn response.
 
 ---
 
@@ -3467,6 +3498,22 @@ CONVERSATION_MEMBER_ROLE = 'owner' | 'sale' | 'customer' | 'admin'
 ---
 
 ## 21. Changelog & Bug fixes
+
+### v1.34 — 2026-07-09 (Email: wire 4 template thật + trim danh sách test + cọc mặc định 50%)
+
+Trước đây nhiều template email chỉ có mẫu "Gửi test" ở web admin nhưng **không luồng nào gửi thật**. Nay wire đủ + dọn danh sách test cho khớp thực tế.
+
+| Thay đổi | Chi tiết |
+|---|---|
+| `welcome_owner` (mới gửi thật) | Gửi khi đăng ký OWNER (`/auth/register`, `/auth/google`, `/auth/apple`) + ADMIN tạo OWNER qua `POST /users`. Fire-and-forget. |
+| `welcome_sale` (mới gửi thật) | Gửi khi accept staff invite (`POST /staff/invites/accept`, cả owner-scope + system) + ADMIN tạo SALE qua `POST /users`. |
+| `kyc_approved` (mới gửi thật) | `POST /admin/kyc/submissions/:id/approve` → gửi chủ nhà (kèm gợi ý bước tiếp: quản lý cơ sở ngay / mua gói). |
+| `kyc_rejected` (mới gửi thật) | `POST /admin/kyc/submissions/:id/reject` → gửi chủ nhà kèm lý do + mục cần bổ sung (CCCD trước/sau/selfie). |
+| `booking_confirmed` mở rộng recipient | `PATCH /bookings/:id/paid` + `/checkin` giờ gửi tới **email tài khoản HOẶC `customerEmail` trên form** (trước chỉ gửi khi khách có tài khoản kèm email). Xem §5.4. |
+| **Cọc mặc định 50%** | `PATCH /bookings/:id/paid` không truyền `amount` + không có `depositAmount` → tự động ghi nhận **50% `totalAmount`** (trước là 100%). Xem §5.4. |
+| **Trim danh sách test email** | `GET /admin/emails/templates` chỉ còn **8 key gửi thật** (bỏ `booking_paid`, `subscription_due`, `subscription_overdue`, `subscription_paid`, `dispute_opened`, `review_received`, `property_approved` — chưa wire). FE render từ `data.templates`. Xem §16. |
+
+**Breaking?** Nhẹ cho FE web admin: danh sách template test giảm từ 15 → 8. FE nên render động từ `data.templates` thay vì hardcode. Không đổi schema/DB. Luồng cọc: nếu FE đang dựa vào mark-paid không-amount để ghi nhận full tiền → nay thành 50%; gửi `amount` tường minh nếu muốn số khác.
 
 ### v1.33 — 2026-07-09 (Đánh giá chỉ mở sau 12h trưa ngày trả phòng)
 
@@ -4200,10 +4247,11 @@ ThrottlerModule mặc định **không trả** `X-RateLimit-Remaining` / `Retry-
 **Listing endpoints đều trả 1 trong 2 shape**:
 
 **Shape A** — `{ items, total, page, limit, totalPages }`:
-- `/admin/subscriptions`, `/admin/disputes`, `/admin/audit-log`, `/admin/reviews`, `/conversations`, `/notifications`, `/bookings/my-bookings`, `/leads`
+- `/admin/subscriptions`, `/admin/disputes`, `/admin/audit-log`, `/admin/reviews`, `/conversations`, `/bookings/my-bookings`, `/leads`
 
-**Shape B** — array trực tiếp + `meta`:
+**Shape B** — `data` là array trực tiếp + `meta` ở top-level (sibling của `data`, KHÔNG bọc trong `data`):
 - `/bookings` → `data: BookingDto[], meta: { total, page, limit }`
+- **`/notifications`** → `data: NotificationDto[], meta: { total, page, limit }` — ⚠️ **đính chính 2026-07-09**: trước đây liệt kê nhầm ở Shape A. BE thực tế trả `data` là **MẢNG**; phân trang ở `response.data.meta` (KHÔNG có `items` bên trong `data`). App parse `response.data['data'] as List` là ĐÚNG với thực tế; đọc `response.data['meta']` cho total/page/limit.
 
 **Endpoint trả array plain (không paginate)**:
 - `/users`, `/users/my-staff`, `/users/available-staff`, `/staff`, `/staff/invites`, `/properties`, `/properties/public`, `/billing/plans`, `/notifications/unread-count` (object), `/calendar/properties`, `/devices`, `/admin/emails/templates`
@@ -4352,7 +4400,7 @@ ChatService `sendMessage` đã tự gọi `markAttached`. FE chỉ cần:
 
 ---
 
-> **Phiên bản tài liệu**: v1.16 — 2026-06-27 (Customer web booking detail + similar properties + enriched BookingDto). Mọi thay đổi schema/endpoint vui lòng cập nhật file này và thông báo team FE qua channel chung.
+> **Phiên bản tài liệu**: v1.34 — 2026-07-09 (Email templates wire thật + trim danh sách test + cọc mặc định 50%). Mọi thay đổi schema/endpoint vui lòng cập nhật file này và thông báo team FE qua channel chung.
 >
 > **Lưu ý cho FE Web + Mobile**: trước khi wire bất kỳ endpoint nào, đọc:
 > - **§2.3 + §2.4** — pattern auth chuẩn (tách login và profile)

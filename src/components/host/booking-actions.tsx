@@ -48,7 +48,6 @@ export function BookingActions({
   const [showMarkPaid, setShowMarkPaid] = useState(false);
   const [showCheckin, setShowCheckin] = useState(false);
   const [checkinAmount, setCheckinAmount] = useState('');
-  const [paymentAmount, setPaymentAmount] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [acceptResponsibility, setAcceptResponsibility] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,8 +59,6 @@ export function BookingActions({
   const canCheckin = status === 'confirmed' || status === 'paid';
 
   const remaining = Math.max(0, totalPrice - alreadyPaid);
-  // Prefill form ghi nhận cọc = cọc cần thu (clamp trong phần còn lại).
-  const depositPrefill = Math.min(depositDue ?? remaining, remaining);
 
   function onConfirm() {
     setError(null);
@@ -80,32 +77,18 @@ export function BookingActions({
     });
   }
 
+  // Ghi nhận cọc: KHÔNG truyền amount → BE tự ghi 50% tổng (spec §5.4 v1.34).
+  // Số tiền tuỳ chỉnh để bổ sung sau (theo yêu cầu, hiện chỉ xác nhận đã nhận).
   function onMarkPaid() {
     setError(null);
-    const amount = paymentAmount ? Number(paymentAmount) : remaining;
-    if (amount <= 0) {
-      setError('Số tiền phải > 0');
-      return;
-    }
-    if (amount > remaining + 1000) {
-      setError(`Số tiền vượt quá còn lại (${formatVND(remaining)})`);
-      return;
-    }
     startTransition(async () => {
-      const r = await markBookingPaidAction(bookingId, amount);
+      const r = await markBookingPaidAction(bookingId);
       if (!r.ok) {
         setError(r.error);
         return;
       }
-      const willCompletePay = alreadyPaid + amount >= totalPrice;
-      show(
-        willCompletePay
-          ? '✓ Đã nhận đủ · Email phiếu check-in đã gửi cho khách'
-          : `✓ Đã ghi nhận ${formatVND(amount)} · Vẫn còn chờ ${formatVND(remaining - amount)}`,
-        'success',
-      );
+      show('✓ Đã ghi nhận cọc · Email xác nhận đã gửi cho khách', 'success');
       setShowMarkPaid(false);
-      setPaymentAmount('');
       router.refresh();
       refetchApiResources();
     });
@@ -201,68 +184,46 @@ export function BookingActions({
         </Button>
       )}
 
-      {/* confirmed → markPaid (ghi nhận cọc) */}
+      {/* confirmed → xác nhận đã nhận cọc (BE tự ghi 50% tổng — spec §5.4 v1.34) */}
       {status === 'confirmed' && !showMarkPaid && !showCheckin && (
         <>
           <Button
-            onClick={() => {
-              setShowMarkPaid(true);
-              setPaymentAmount(String(depositPrefill));
-            }}
+            onClick={() => setShowMarkPaid(true)}
             disabled={pending}
             className="w-full"
           >
-            💰 Ghi nhận khách đã chuyển cọc
+            💰 Xác nhận đã nhận cọc
           </Button>
-          <p className="text-[11px] text-ink-500 text-center">
-            {depositDue != null ? (
-              <>
-                Cọc cần thu: <strong>{formatVND(depositDue)}</strong>
-              </>
-            ) : (
-              <>
-                Khách còn cần chuyển: <strong>{formatVND(remaining)}</strong>
-              </>
-            )}
-          </p>
+          {depositDue != null && (
+            <p className="text-[11px] text-ink-500 text-center">
+              Sẽ ghi nhận cọc: <strong>{formatVND(depositDue)}</strong> (50% tổng)
+            </p>
+          )}
         </>
       )}
 
       {showMarkPaid && (
         <div className="space-y-3 rounded-lg bg-emerald-50 p-3 ring-1 ring-emerald-200">
-          <p className="text-xs text-emerald-900 leading-relaxed">
-            Nhập số tiền khách vừa chuyển. Nếu = số còn lại{' '}
-            <strong>{formatVND(remaining)}</strong>, hệ thống sẽ chuyển sang{' '}
-            <strong>Đã nhận tiền</strong> và gửi email phiếu check-in cho khách.
+          <p className="text-xs leading-relaxed text-emerald-900">
+            Xác nhận khách đã chuyển cọc?{' '}
+            {depositDue != null ? (
+              <>
+                Hệ thống ghi nhận cọc <strong>{formatVND(depositDue)}</strong>{' '}
+                (50% tổng)
+              </>
+            ) : (
+              <>Hệ thống ghi nhận cọc 50% tổng</>
+            )}{' '}
+            và gửi email xác nhận cho khách.
           </p>
-          <div>
-            <Label htmlFor="payment_amount">Số tiền (VNĐ)</Label>
-            <Input
-              id="payment_amount"
-              type="text"
-              inputMode="numeric"
-              value={
-                paymentAmount ? Number(paymentAmount).toLocaleString('vi-VN') : ''
-              }
-              onChange={(e) =>
-                setPaymentAmount(e.target.value.replace(/\D/g, ''))
-              }
-              placeholder={remaining.toLocaleString('vi-VN')}
-            />
-          </div>
           <div className="flex gap-2">
-            <Button
-              onClick={onMarkPaid}
-              disabled={pending}
-              className="flex-1"
-            >
-              {pending ? 'Đang ghi nhận…' : 'Xác nhận'}
+            <Button onClick={onMarkPaid} disabled={pending} className="flex-1">
+              {pending ? 'Đang ghi nhận…' : 'Xác nhận đã nhận cọc'}
             </Button>
             <Button
               variant="ghost"
               onClick={() => {
                 setShowMarkPaid(false);
-                setPaymentAmount('');
                 setError(null);
               }}
               disabled={pending}

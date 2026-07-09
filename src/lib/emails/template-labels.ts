@@ -1,5 +1,6 @@
 /**
- * Nhãn tiếng Việt hiển thị cho 15 key email chính thức của BE (spec §16).
+ * Nhãn tiếng Việt hiển thị cho 8 key email chính thức của BE (spec §16, v1.34
+ * rút từ 15 → 8; 7 key kia chỉ là mẫu không gửi thật, BE đã gỡ).
  *
  * ĐÂY KHÔNG PHẢI mapping key — key vẫn là source of truth của BE, gửi nguyên
  * sang `POST /admin/emails/test`. Đây chỉ là lớp i18n hiển thị: biến key kỹ
@@ -35,11 +36,6 @@ export const EMAIL_TEMPLATE_LABELS: Record<string, TemplateLabel> = {
     label: 'Huỷ đặt phòng',
     description: 'Gửi khi đơn đặt phòng bị huỷ.',
   },
-  booking_paid: {
-    label: 'Đã nhận thanh toán',
-    description:
-      'Gửi khách khi chủ nhà xác nhận đã nhận tiền — kèm phiếu check-in.',
-  },
   kyc_approved: {
     label: 'KYC được duyệt',
     description: 'Gửi chủ nhà khi hồ sơ KYC được phê duyệt.',
@@ -51,29 +47,5 @@ export const EMAIL_TEMPLATE_LABELS: Record<string, TemplateLabel> = {
   staff_invite: {
     label: 'Mời nhân viên',
     description: 'Gửi lời mời tham gia làm nhân viên (Sale) cho chủ nhà.',
-  },
-  subscription_due: {
-    label: 'Gói cước đến hạn',
-    description: 'Nhắc chủ nhà gói cước sắp đến hạn thanh toán.',
-  },
-  subscription_overdue: {
-    label: 'Gói cước quá hạn',
-    description: 'Cảnh báo chủ nhà gói cước đã quá hạn.',
-  },
-  subscription_paid: {
-    label: 'Đã thanh toán gói cước',
-    description: 'Xác nhận chủ nhà đã thanh toán gói cước thành công.',
-  },
-  dispute_opened: {
-    label: 'Mở tranh chấp',
-    description: 'Thông báo có tranh chấp mới được mở.',
-  },
-  review_received: {
-    label: 'Nhận đánh giá mới',
-    description: 'Thông báo chủ nhà có đánh giá mới từ khách.',
-  },
-  property_approved: {
-    label: 'Cơ sở được duyệt',
-    description: 'Gửi chủ nhà khi cơ sở mới tạo được duyệt.',
   },
 };
