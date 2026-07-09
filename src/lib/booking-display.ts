@@ -34,6 +34,27 @@ export const BOOKING_STATUS_VARIANT: Record<BookingStatus, BadgeVariant> = {
 };
 
 /**
+ * Tỉ lệ cọc mặc định khi BE chưa set `depositAmount` cụ thể.
+ * Quy tắc nghiệp vụ FE: khách cần cọc 50% tổng để giữ phòng (BE không có field
+ * này — chỉ lưu `depositAmount` khi SALE nhập tay).
+ */
+export const DEFAULT_DEPOSIT_RATE = 0.5;
+
+/**
+ * "Cọc cần thu" hiển thị trên UI:
+ *  - BE có `depositAmount` (SALE nhập cụ thể) → dùng đúng số đó.
+ *  - Không có → suy 50% tổng (khi đã có tổng). Chưa có tổng → `null`.
+ */
+export function requiredDeposit(
+  deposit: number | null | undefined,
+  total: number | null | undefined,
+): number | null {
+  if (deposit != null) return deposit;
+  if (total != null) return Math.round(total * DEFAULT_DEPOSIT_RATE);
+  return null;
+}
+
+/**
  * Hiển thị tổng tiền booking.
  *
  * BE trả `null` cho đơn HOLD vì chưa join bảng giá (chỉ chốt giá khi markPaid).

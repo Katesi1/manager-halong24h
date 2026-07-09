@@ -56,7 +56,17 @@ function mapReview(s: SpecReview): Review {
     ownerId: s.ownerId ?? '',
     ownerName: s.ownerName ?? '',
     customer: s.customer ?? { id: s.customerId, name: '' },
-    rating: Math.round(s.avgRating),
+    rating: Math.round(s.avgRating ?? 0),
+    avgRating: s.avgRating ?? 0,
+    breakdown: {
+      cleanliness: s.cleanliness ?? 0,
+      location: s.location ?? 0,
+      amenities: s.amenities ?? 0,
+      service: s.service ?? 0,
+      value: s.value ?? 0,
+      accuracy: s.accuracy ?? 0,
+    },
+    photos: s.photos ?? [],
     comment: s.comment,
     status: mapStatus(s),
     ownerReply: s.ownerReply,
@@ -92,6 +102,18 @@ export class ApiReviewRepository implements ReviewRepository {
       },
     );
     const arr = Array.isArray(data) ? data : (data.items ?? []);
+    return arr.map(mapReview);
+  }
+
+  async listByProperty(propertyId: string): Promise<Review[]> {
+    // Spec §7.2 — GET /properties/:id/reviews (public, chỉ review visible).
+    const data = await apiClient.get<
+      SpecReview[] | { items?: SpecReview[]; reviews?: SpecReview[] }
+    >(`/properties/${propertyId}/reviews`, {
+      query: { page: 1, pageSize: 100, sort: 'newest' },
+      cache: 'no-store',
+    });
+    const arr = Array.isArray(data) ? data : (data.items ?? data.reviews ?? []);
     return arr.map(mapReview);
   }
 

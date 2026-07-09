@@ -14,6 +14,7 @@ import { useApiResource } from '@/lib/use-api-resource';
 
 interface DashboardData {
   monthlySubscriptionRevenue: number;
+  subscriptionRevenue6m: { month: string; revenue: number }[];
   thisMonthBookings: number;
   totalBookings: number;
   totalOwners: number;
@@ -126,16 +127,13 @@ export function AdminDashboardClient() {
           </h2>
           <p className="mt-1 text-xs text-ink-500">Đơn vị: triệu VNĐ</p>
           <div className="mt-5">
-            <RevenueBarChart
-              data={[
-                { month: 'T12', revenue: 8_200_000 },
-                { month: 'T1', revenue: 9_500_000 },
-                { month: 'T2', revenue: 11_800_000 },
-                { month: 'T3', revenue: 12_400_000 },
-                { month: 'T4', revenue: 13_600_000 },
-                { month: 'T5', revenue: 15_900_000 },
-              ]}
-            />
+            {d.subscriptionRevenue6m.some((m) => m.revenue > 0) ? (
+              <RevenueBarChart data={d.subscriptionRevenue6m} />
+            ) : (
+              <p className="py-8 text-center text-sm text-ink-500">
+                Chưa có doanh thu subscription trong 6 tháng gần đây.
+              </p>
+            )}
           </div>
         </section>
 

@@ -29,7 +29,6 @@ export interface ReportData {
   totalBookings: number;
   adr: number;
   occupancyRate: number;
-  totalDeposit: number;
   confirmedCount: number;
   completedCount: number;
   holdCount: number;
@@ -203,12 +202,6 @@ function ReportTemplate({ data }: { data: ReportData }) {
         <BookingChip label="Hoàn tất" count={data.completedCount} bg="#ecfdf5" color="#059669" />
         <BookingChip label="Đang giữ" count={data.holdCount} bg="#fbf7ee" color="#b08a48" />
         <BookingChip label="Đã huỷ" count={data.cancelledCount} bg="#fef2f2" color="#dc2626" />
-      </div>
-
-      {/* Deposit */}
-      <div style={{ background: '#f4f6fa', borderRadius: 8, padding: '12px 16px', marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 13, color: '#717171' }}>Tổng đặt cọc nhận được</span>
-        <span style={{ fontSize: 18, fontWeight: 700, color: '#1b365d' }}>{formatVND(data.totalDeposit)}</span>
       </div>
 
       {/* Top rooms */}

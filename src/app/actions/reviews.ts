@@ -6,12 +6,13 @@ import {
   countFlaggedReviewsUseCase,
   getReviewUseCase,
   hideReviewUseCase,
+  listPropertyReviewsUseCase,
   listReviewsUseCase,
   restoreReviewUseCase,
 } from '@/application/reviews/actions';
 import type { ReviewFilters } from '@/core/entities/review';
 import { reviewRepository } from '@/infrastructure/container';
-import { requireAdmin } from '@/lib/auth-guard';
+import { requireAdmin, requireOwnerOfProperty } from '@/lib/auth-guard';
 
 import { toResult } from './_helpers';
 
@@ -19,6 +20,17 @@ export async function listReviewsAction(filters?: ReviewFilters) {
   return toResult(async () => {
     await requireAdmin();
     return listReviewsUseCase(reviewRepository(), filters);
+  });
+}
+
+/**
+ * Host xem review 1 cơ sở của mình. `requireOwnerOfProperty` chặn xem chéo
+ * cơ sở owner khác (dù endpoint BE là public — defense-in-depth).
+ */
+export async function listPropertyReviewsAction(propertyId: string) {
+  return toResult(async () => {
+    await requireOwnerOfProperty(propertyId);
+    return listPropertyReviewsUseCase(reviewRepository(), propertyId);
   });
 }
 

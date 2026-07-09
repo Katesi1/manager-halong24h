@@ -29,6 +29,7 @@ import {
   Shield,
   ShieldCheck,
   Sparkles,
+  Star,
   TrendingUp,
   UserCog,
   Users,
@@ -140,6 +141,7 @@ const HOST_GROUPS: NavGroup[] = [
     collapsible: true,
     items: [
       { href: '/host/properties', label: 'Cơ sở của tôi', icon: Building2 },
+      { href: '/host/reviews', label: 'Đánh giá', icon: Star },
       { href: '/host/guests', label: 'Khách hàng', icon: Users },
       { href: '/host/hk', label: 'Dọn phòng', icon: Sparkles },
       { href: '/host/staff', label: 'Nhân viên', icon: UserCog, hideForSale: true },

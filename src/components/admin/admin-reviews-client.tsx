@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { Flag, MessageSquareText, Search, Star } from 'lucide-react';
 
@@ -9,6 +10,7 @@ import { PageHeader } from '@/components/host/page-header';
 import { Badge } from '@/components/ui/badge';
 import { ClientPagination } from '@/components/ui/client-pagination';
 import {
+  REVIEW_CRITERIA,
   REVIEW_FLAG_LABEL,
   REVIEW_STATUS_LABEL,
   type Review,
@@ -208,6 +210,9 @@ function ReviewCard({ review: r }: { review: Review }) {
                     {r.customer.name}
                   </span>
                   <Stars rating={r.rating} />
+                  <span className="text-xs font-semibold text-ink-700">
+                    {r.avgRating.toFixed(1)}
+                  </span>
                   <Badge variant={STATUS_VARIANT[r.status]}>
                     {REVIEW_STATUS_LABEL[r.status]}
                   </Badge>
@@ -236,6 +241,44 @@ function ReviewCard({ review: r }: { review: Review }) {
             <p className="mt-3 text-sm text-ink-800 leading-relaxed whitespace-pre-line">
               {r.comment}
             </p>
+
+            {/* Thang điểm 6 tiêu chí khách chấm (spec §7.3) */}
+            <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1.5 rounded-lg bg-cream-50 px-4 py-3 sm:grid-cols-3">
+              {REVIEW_CRITERIA.map(({ key, label }) => (
+                <div
+                  key={key}
+                  className="flex items-center justify-between text-xs"
+                >
+                  <span className="text-ink-500">{label}</span>
+                  <span className="inline-flex items-center gap-1 font-semibold text-ink-900">
+                    <Star className="h-3 w-3 fill-gold-500 text-gold-500" />
+                    {r.breakdown[key].toFixed(1)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {r.photos.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {r.photos.map((url) => (
+                  <a
+                    key={url}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Image
+                      src={url}
+                      alt="Ảnh đánh giá của khách"
+                      width={80}
+                      height={80}
+                      unoptimized
+                      className="h-20 w-20 rounded-lg object-cover ring-1 ring-ink-200 transition-opacity hover:opacity-90"
+                    />
+                  </a>
+                ))}
+              </div>
+            )}
 
             {r.flags.length > 0 && (
               <div className="mt-3 rounded-lg bg-rose-50 px-4 py-3 ring-1 ring-rose-100">

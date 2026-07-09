@@ -20,6 +20,7 @@ import {
   BOOKING_STATUS_VARIANT,
   formatBookingTotal,
   holdSecondsLeft,
+  requiredDeposit,
 } from '@/lib/booking-display';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { useApiResource } from '@/lib/use-api-resource';
@@ -56,6 +57,8 @@ export function AdminBookingDetailClient({ id }: { id: string }) {
         ? Math.max(0, booking.totalPrice! - paid)
         : null;
   const fullyPaid = hasTotal && booking.totalPrice! > 0 && paid >= booking.totalPrice!;
+  const depositDue = requiredDeposit(booking.deposit, booking.totalPrice);
+  const depositIsEstimated = booking.deposit == null && depositDue != null;
 
   return (
     <>
@@ -159,9 +162,8 @@ export function AdminBookingDetailClient({ id }: { id: string }) {
               <Money label="Tổng" value={formatBookingTotal(booking.totalPrice)} />
               <Money
                 label="Cọc cần thu"
-                value={
-                  booking.deposit != null ? formatVND(booking.deposit) : 'Chưa yêu cầu'
-                }
+                value={depositDue != null ? formatVND(depositDue) : 'Chưa chốt giá'}
+                hint={depositIsEstimated ? '≈ 50% tổng' : undefined}
               />
               <Money label="Đã thu" value={formatVND(paid)} color="emerald" />
               <Money
@@ -288,10 +290,12 @@ function Money({
   label,
   value,
   color = 'navy',
+  hint,
 }: {
   label: string;
   value: string;
   color?: 'navy' | 'emerald' | 'amber';
+  hint?: string;
 }) {
   const colorClass: Record<string, string> = {
     navy: 'text-ink-900',
@@ -302,6 +306,7 @@ function Money({
     <div className="rounded-lg bg-cream-100 p-3">
       <p className="overline muted no-dash text-[10px]">{label}</p>
       <p className={`mt-1 text-lg font-bold ${colorClass[color]}`}>{value}</p>
+      {hint && <p className="mt-0.5 text-[11px] text-ink-500">{hint}</p>}
     </div>
   );
 }

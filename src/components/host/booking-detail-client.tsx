@@ -9,7 +9,11 @@ import { PageHeader } from '@/components/host/page-header';
 import { Badge } from '@/components/ui/badge';
 import type { Booking, BookingStatus } from '@/core/entities/booking';
 import { formatVND } from '@/core/value-objects/vnd';
-import { formatBookingTotal, holdSecondsLeft } from '@/lib/booking-display';
+import {
+  formatBookingTotal,
+  holdSecondsLeft,
+  requiredDeposit,
+} from '@/lib/booking-display';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { useApiResource } from '@/lib/use-api-resource';
 
@@ -80,6 +84,9 @@ export function BookingDetailClient({
         ? Math.max(0, effectiveTotal - paid)
         : null;
   const fullyPaid = hasTotal && booking.totalPrice! > 0 && paid >= booking.totalPrice!;
+  // Cọc cần thu: dùng depositAmount BE set, hoặc suy 50% tổng (BE không có field này).
+  const depositDue = requiredDeposit(booking.deposit, effectiveTotal);
+  const depositIsEstimated = booking.deposit == null && depositDue != null;
 
   return (
     <>
@@ -199,10 +206,9 @@ export function BookingDetailClient({
               <Stat
                 label="Cọc cần thu"
                 value={
-                  booking.deposit != null
-                    ? formatVND(booking.deposit)
-                    : 'Chưa yêu cầu'
+                  depositDue != null ? formatVND(depositDue) : 'Chưa chốt giá'
                 }
+                hint={depositIsEstimated ? '≈ 50% tổng' : undefined}
               />
               <Stat
                 label="Đã thu"
@@ -314,6 +320,7 @@ export function BookingDetailClient({
                   status={booking.status}
                   totalPrice={effectiveTotal ?? 0}
                   alreadyPaid={paid}
+                  depositDue={depositDue}
                 />
               </div>
             </div>

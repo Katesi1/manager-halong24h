@@ -10,12 +10,24 @@ import { listPropertiesAction } from '@/app/actions/properties';
 import { sumPaidSubscriptionsAction } from '@/app/actions/subscriptions';
 import { RoleCode, isAdmin } from '@/core/value-objects/role';
 
-function currentMonthRange(now: Date): { from: string; to: string } {
-  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const to = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999),
-  );
-  return { from: from.toISOString(), to: to.toISOString() };
+/** N tháng gần nhất (cũ→mới), gồm tháng hiện tại. Dùng cho trend doanh thu. */
+function lastMonthRanges(
+  now: Date,
+  count: number,
+): { label: string; from: string; to: string }[] {
+  const out: { label: string; from: string; to: string }[] = [];
+  for (let i = count - 1; i >= 0; i--) {
+    const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    const to = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i + 1, 0, 23, 59, 59, 999),
+    );
+    out.push({
+      label: `T${from.getUTCMonth() + 1}`,
+      from: from.toISOString(),
+      to: to.toISOString(),
+    });
+  }
+  return out;
 }
 
 /** BFF route (ADMIN) — tổng quan hệ thống (7 nguồn, tính sẵn số liệu). */
@@ -25,7 +37,19 @@ export async function GET() {
     return NextResponse.json({ error: 'Không có quyền' }, { status: 401 });
   }
 
-  const { from, to } = currentMonthRange(new Date());
+  const monthRanges = lastMonthRanges(new Date(), 6);
+  // Chạy song song 2 làn: dữ liệu tổng quan + 6 tháng doanh thu subscription.
+  const corePromise = Promise.all([
+    getDashboardStatsAction(),
+    listPropertiesAction({ includeInactive: true }),
+    listBookingsAction(),
+    countPendingKycAdminAction(),
+    listAdminUsersAction(),
+    countActiveDisputesAction(),
+  ]);
+  const revenuePromise = Promise.all(
+    monthRanges.map((r) => sumPaidSubscriptionsAction(r.from, r.to)),
+  );
   const [
     statsResult,
     propertiesResult,
@@ -33,16 +57,16 @@ export async function GET() {
     kycCountResult,
     usersResult,
     activeDisputesResult,
-    monthlyPaidResult,
-  ] = await Promise.all([
-    getDashboardStatsAction(),
-    listPropertiesAction({ includeInactive: true }),
-    listBookingsAction(),
-    countPendingKycAdminAction(),
-    listAdminUsersAction(),
-    countActiveDisputesAction(),
-    sumPaidSubscriptionsAction(from, to),
-  ]);
+  ] = await corePromise;
+  const revenueMonthly = await revenuePromise;
+
+  // Trend 6 tháng (số thật). Tháng cuối = tháng hiện tại → dùng luôn cho card.
+  const subscriptionRevenue6m = monthRanges.map((r, i) => {
+    const res = revenueMonthly[i];
+    return { month: r.label, revenue: res && res.ok ? res.data : 0 };
+  });
+  const monthlySubscriptionRevenue =
+    subscriptionRevenue6m[subscriptionRevenue6m.length - 1]?.revenue ?? 0;
 
   const stats = statsResult.ok
     ? statsResult.data
@@ -53,9 +77,8 @@ export async function GET() {
 
   return NextResponse.json({
     data: {
-      monthlySubscriptionRevenue: monthlyPaidResult.ok
-        ? monthlyPaidResult.data
-        : 0,
+      monthlySubscriptionRevenue,
+      subscriptionRevenue6m,
       thisMonthBookings: stats.thisMonthBookings,
       totalBookings: stats.totalBookings,
       totalOwners: users.filter((u) => u.role === RoleCode.OWNER).length,

@@ -14,6 +14,14 @@ export async function listReviewsUseCase(
   return repo.list(filters);
 }
 
+export async function listPropertyReviewsUseCase(
+  repo: ReviewRepository,
+  propertyId: string,
+): Promise<Review[]> {
+  if (!propertyId) throw new ValidationError('Thiếu mã cơ sở');
+  return repo.listByProperty(propertyId);
+}
+
 export async function getReviewUseCase(
   repo: ReviewRepository,
   id: string,

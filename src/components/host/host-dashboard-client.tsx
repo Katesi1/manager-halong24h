@@ -124,7 +124,6 @@ export function HostDashboardClient() {
         totalBookings: report.totalBookings,
         adr: Number(report.adr),
         occupancyRate: report.occupancyRate,
-        totalDeposit: Number(report.totalDeposit),
         confirmedCount: report.confirmedCount,
         completedCount: report.completedCount,
         holdCount: report.holdCount,
@@ -222,7 +221,7 @@ export function HostDashboardClient() {
       {report && (
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
           <MiniMetric label="Giá trung bình / đêm" value={formatVND(report.adr)} icon="adr" />
-          <MiniMetric label="Tổng đặt cọc" value={formatVND(report.totalDeposit)} icon="deposit" />
+          <MiniMetric label="Doanh thu đã thu" value={formatVND(report.revenue)} icon="deposit" />
           <MiniMetric label="Tỷ lệ Occupancy" value={`${report.occupancyRate.toFixed(1)}%`} icon="occ" />
         </div>
       )}

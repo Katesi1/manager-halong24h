@@ -22,6 +22,8 @@ interface Props {
   status: BookingStatus;
   totalPrice: number;
   alreadyPaid: number;
+  /** Cọc cần thu (BE set hoặc 50% tổng) — prefill cho form ghi nhận cọc. */
+  depositDue?: number | null;
 }
 
 /**
@@ -37,6 +39,7 @@ export function BookingActions({
   status,
   totalPrice,
   alreadyPaid,
+  depositDue,
 }: Props) {
   const router = useRouter();
   const { show } = useToast();
@@ -57,6 +60,8 @@ export function BookingActions({
   const canCheckin = status === 'confirmed' || status === 'paid';
 
   const remaining = Math.max(0, totalPrice - alreadyPaid);
+  // Prefill form ghi nhận cọc = cọc cần thu (clamp trong phần còn lại).
+  const depositPrefill = Math.min(depositDue ?? remaining, remaining);
 
   function onConfirm() {
     setError(null);
@@ -202,7 +207,7 @@ export function BookingActions({
           <Button
             onClick={() => {
               setShowMarkPaid(true);
-              setPaymentAmount(String(remaining));
+              setPaymentAmount(String(depositPrefill));
             }}
             disabled={pending}
             className="w-full"
@@ -210,7 +215,15 @@ export function BookingActions({
             💰 Ghi nhận khách đã chuyển cọc
           </Button>
           <p className="text-[11px] text-ink-500 text-center">
-            Khách còn cần chuyển: <strong>{formatVND(remaining)}</strong>
+            {depositDue != null ? (
+              <>
+                Cọc cần thu: <strong>{formatVND(depositDue)}</strong>
+              </>
+            ) : (
+              <>
+                Khách còn cần chuyển: <strong>{formatVND(remaining)}</strong>
+              </>
+            )}
           </p>
         </>
       )}

@@ -30,7 +30,20 @@ export interface Review {
     name: string;
     avatarUrl?: string | null;
   };
-  rating: number; // 1..5
+  rating: number; // 1..5 (làm tròn avgRating — dùng lọc + sao)
+  /** Điểm trung bình chính xác (vd 4.67) — spec §7.3 `avgRating`. */
+  avgRating: number;
+  /** Thang điểm 6 tiêu chí khách chấm (mỗi tiêu chí 1..5) — spec §7.3. */
+  breakdown: {
+    cleanliness: number;
+    location: number;
+    amenities: number;
+    service: number;
+    value: number;
+    accuracy: number;
+  };
+  /** Ảnh khách đính kèm đánh giá. */
+  photos: string[];
   comment: string;
   status: ReviewStatus;
   /** Owner phản hồi công khai */
@@ -70,6 +83,17 @@ export const REVIEW_STATUS_LABEL: Record<ReviewStatus, string> = {
   hidden: 'Đã ẩn',
   deleted: 'Đã xoá',
 };
+
+/** Nhãn 6 tiêu chí chấm điểm (spec §7.3) — dùng render breakdown. */
+export const REVIEW_CRITERIA: { key: keyof Review['breakdown']; label: string }[] =
+  [
+    { key: 'cleanliness', label: 'Sạch sẽ' },
+    { key: 'location', label: 'Vị trí' },
+    { key: 'amenities', label: 'Tiện nghi' },
+    { key: 'service', label: 'Dịch vụ' },
+    { key: 'value', label: 'Đáng giá tiền' },
+    { key: 'accuracy', label: 'Đúng mô tả' },
+  ];
 
 export const REVIEW_FLAG_LABEL: Record<ReviewFlag, string> = {
   profanity: 'Ngôn ngữ tục',
