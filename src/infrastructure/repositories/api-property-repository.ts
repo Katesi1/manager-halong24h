@@ -15,9 +15,24 @@ import type {
 
 import { apiClient } from '../http/api-client';
 
+/**
+ * BE trả số lượt đặt qua `_count.bookings` (Prisma include, spec §v1.28) —
+ * đôi khi kèm field phẳng `bookingCount`. Chuẩn hoá về `bookingCount` phẳng
+ * để mọi trang phòng (list/detail/sort) đọc thống nhất, không ra `undefined`.
+ */
+type RawProperty = Property & { _count?: { bookings?: number } | null };
+
+function mapProperty(p: RawProperty): Property {
+  const { _count, ...rest } = p;
+  return {
+    ...rest,
+    bookingCount: p.bookingCount ?? _count?.bookings ?? 0,
+  };
+}
+
 export class ApiPropertyRepository implements PropertyRepository {
   async list(filters?: PropertyFilters): Promise<Property[]> {
-    return apiClient.get<Property[]>('/properties', {
+    const data = await apiClient.get<RawProperty[]>('/properties', {
       query: {
         includeInactive: filters?.includeInactive,
         view: filters?.view,
@@ -25,13 +40,15 @@ export class ApiPropertyRepository implements PropertyRepository {
       },
       cache: 'no-store',
     });
+    return data.map(mapProperty);
   }
 
   async getById(id: string): Promise<Property | null> {
     try {
-      return await apiClient.get<Property>(`/properties/${id}`, {
+      const data = await apiClient.get<RawProperty>(`/properties/${id}`, {
         cache: 'no-store',
       });
+      return mapProperty(data);
     } catch (err) {
       // 404 → null thay vì throw, để UI xử lý "không tìm thấy"
       if (err instanceof Error && 'status' in err && (err as { status: number }).status === 404) {

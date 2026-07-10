@@ -42,9 +42,14 @@ interface SpecUserWithStats {
   subscriptionCycle?: 'monthly' | 'yearly' | null;
   createdAt: string;
   updatedAt?: string;
+  /** Legacy flat fields (tolerant) — BE thực tế lồng trong `stats`. */
   propertyCount?: number;
   bookingCount?: number;
-  stats?: { disputeCount?: number } | null;
+  stats?: {
+    propertyCount?: number;
+    bookingCount?: number;
+    disputeCount?: number;
+  } | null;
   lastActiveAt?: string | null;
 }
 
@@ -73,8 +78,10 @@ function mapUser(s: SpecUserWithStats): AdminUser {
     status: mapStatus(s),
     ownerId: s.ownerId,
     scope: s.scope ?? null,
-    bookingCount: s.bookingCount ?? 0,
-    propertyCount: s.propertyCount ?? 0,
+    // BE lồng số liệu trong `stats` (spec §25.7 + A2). Đọc `stats` trước,
+    // fallback field phẳng cho tương thích ngược.
+    bookingCount: s.stats?.bookingCount ?? s.bookingCount ?? 0,
+    propertyCount: s.stats?.propertyCount ?? s.propertyCount ?? 0,
     disputeCount: s.stats?.disputeCount ?? 0,
     kycStatus: s.kycStatus ?? 'none',
     kycBypass: s.kycBypass ?? false,

@@ -7,14 +7,21 @@ import type {
 } from '@/core/entities/staff';
 import type { AuthTokens } from '@/core/entities/user';
 
-/** Spec §11.2 — info hiển thị trên landing accept invite. */
+/**
+ * Spec §11.2 — info hiển thị trên trang accept invite.
+ *
+ * BE trả `owner` lồng (`{ name, avatar, homestayName }`) + `scope` (§26.5),
+ * repo map phẳng cho UI dễ dùng.
+ */
 export interface StaffInviteVerification {
-  token: string;
   email: string;
   ownerName: string;
-  ownerEmail: string;
+  ownerAvatar: string | null;
+  homestayName: string | null;
   status: 'pending' | 'accepted' | 'expired' | 'cancelled';
   expiresAt: string;
+  /** §26.5 — 'owner' (SALE của chủ nhà) hoặc 'system' (SALE hệ thống). */
+  scope?: 'owner' | 'system';
 }
 
 /** Spec §11.2 — body POST /staff/invites/accept. */

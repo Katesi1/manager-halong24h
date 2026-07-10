@@ -3,7 +3,7 @@
 > Tài liệu chính thức cho team FE Web (Next.js admin/host) và App Mobile (Android/iOS).
 > Bao gồm tất cả endpoint, schema response, business rule, WebSocket guide và integration checklist.
 >
-> **Cập nhật**: 2026-07-09 (v1.34 — Email: wire thật `welcome_owner`/`welcome_sale`/`kyc_approved`/`kyc_rejected`; `booking_confirmed` gửi cả tới `customerEmail` trên form; cọc mặc định 50% khi mark-paid không nhập amount; `GET /admin/emails/templates` trim còn 8 key gửi thật. Xem §16, §5.4, changelog §21) · **BE base**: NestJS 11 · **DB**: PostgreSQL + Prisma · **Auth**: JWT · **Real-time**: Socket.IO
+> **Cập nhật**: 2026-07-09 (v1.35 — Customer hold phòng đổi từ 24h → **30 phút** (giống staff hold). Xem §5.2.1, changelog §21) · **BE base**: NestJS 11 · **DB**: PostgreSQL + Prisma · **Auth**: JWT · **Real-time**: Socket.IO
 
 ---
 
@@ -744,7 +744,7 @@ FE flow xử lý 403:
 
 | Endpoint | Mục đích |
 |---|---|
-| `POST /bookings/customer-hold` | Đặt phòng 24h |
+| `POST /bookings/customer-hold` | Đặt phòng (giữ chỗ 30 phút) |
 | `GET /bookings/my-bookings` | Lịch sử đặt |
 | `PATCH /bookings/:id/customer-cancel` | Huỷ HOLD của mình |
 | `POST /properties/:id/reviews` | Review sau khi COMPLETED |
@@ -1592,7 +1592,7 @@ Base path: `/bookings`. Auth required.
 | `GET` | `/bookings/calendar/:propertyId?year&month` | ADMIN/OWNER/SALE | Lịch tháng cho 1 property |
 | `GET` | `/bookings/:id` | Any auth (xem §5.3.1) | ADMIN/OWNER/SALE thấy booking trong scope; **CUSTOMER thấy booking của chính mình** (`booking.customerId === user.id`). Khác → 403 |
 | `POST` | `/bookings/hold` | ADMIN/OWNER/SALE (CUSTOMER bị chặn) | Hold 30 phút |
-| `POST` | `/bookings/customer-hold` | CUSTOMER (+all) | Hold 24h |
+| `POST` | `/bookings/customer-hold` | CUSTOMER (+all) | Hold 30 phút |
 | `PATCH` | `/bookings/:id/confirm` | ADMIN/OWNER/SALE | HOLD → CONFIRMED |
 | `PATCH` | `/bookings/:id/paid` | ADMIN/OWNER/SALE | `{ amount? }` Ghi nhận thu tiền (cọc). Xem §5.4 |
 | `PATCH` | `/bookings/:id/checkin` | ADMIN/OWNER/SALE | `{ amount? }` **(v1.31)** Xác nhận khách nhận phòng + thu nốt tiền → COMPLETED. Xem §5.5 |
@@ -1622,7 +1622,7 @@ Base path: `/bookings`. Auth required.
 
 ### 5.2.1 POST /bookings/customer-hold body (v1.26 · 2026-07-07 — thu đủ thông tin khách)
 
-Khách (CUSTOMER) đặt giữ chỗ 24h. Từ v1.26 **bắt buộc gửi thông tin liên hệ** để booking có đủ dữ liệu (trước đây chỉ lưu `customerId`).
+Khách (CUSTOMER) đặt giữ chỗ **30 phút** (v1.35 · trước là 24h). Từ v1.26 **bắt buộc gửi thông tin liên hệ** để booking có đủ dữ liệu (trước đây chỉ lưu `customerId`). Hết 30 phút không được owner xác nhận → cron tự huỷ (chuyển CANCELLED). Countdown dùng `holdRemainingSeconds` (server-computed).
 
 ```json
 {
@@ -3499,6 +3499,14 @@ CONVERSATION_MEMBER_ROLE = 'owner' | 'sale' | 'customer' | 'admin'
 
 ## 21. Changelog & Bug fixes
 
+### v1.35 — 2026-07-09 (Customer hold phòng: 24h → 30 phút)
+
+| Thay đổi | Chi tiết |
+|---|---|
+| **Customer hold = 30 phút** | `POST /bookings/customer-hold` giờ `holdExpireAt = now + 30 phút` (trước là 24h). Bằng với staff hold. Constant `CUSTOMER_HOLD_DURATION_SECONDS: 86400 → 1800` trong [bookings.service.ts](src/modules/bookings/bookings.service.ts). Cron mỗi phút vẫn auto-huỷ hold quá hạn. |
+
+**Breaking?** Không đổi API/schema. FE khách đọc `holdRemainingSeconds` để countdown → tự động hiển thị ~1800s thay vì ~86400s. Không cần sửa FE. (Đây là lý do trước đây thấy "1438 phút" = 24h countdown; nay còn ~30 phút.)
+
 ### v1.34 — 2026-07-09 (Email: wire 4 template thật + trim danh sách test + cọc mặc định 50%)
 
 Trước đây nhiều template email chỉ có mẫu "Gửi test" ở web admin nhưng **không luồng nào gửi thật**. Nay wire đủ + dọn danh sách test cho khớp thực tế.
@@ -4400,7 +4408,7 @@ ChatService `sendMessage` đã tự gọi `markAttached`. FE chỉ cần:
 
 ---
 
-> **Phiên bản tài liệu**: v1.34 — 2026-07-09 (Email templates wire thật + trim danh sách test + cọc mặc định 50%). Mọi thay đổi schema/endpoint vui lòng cập nhật file này và thông báo team FE qua channel chung.
+> **Phiên bản tài liệu**: v1.35 — 2026-07-09 (Customer hold phòng 24h → 30 phút). Mọi thay đổi schema/endpoint vui lòng cập nhật file này và thông báo team FE qua channel chung.
 >
 > **Lưu ý cho FE Web + Mobile**: trước khi wire bất kỳ endpoint nào, đọc:
 > - **§2.3 + §2.4** — pattern auth chuẩn (tách login và profile)

@@ -107,6 +107,20 @@ function LoginForm() {
 
       <GoogleLoginSection />
 
+      <div className="mt-6 rounded-xl border border-ink-200 bg-cream-100/60 p-4">
+        <p className="text-sm font-medium text-ink-800">Bạn được mời làm nhân viên?</p>
+        <p className="mt-0.5 text-xs text-ink-500">
+          Dùng mã mời (dạng <span className="font-mono">HL-XXXXXX</span>) chủ nhà gửi để
+          tạo tài khoản nhân viên.
+        </p>
+        <Link
+          href="/staff/accept"
+          className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-navy-700 hover:underline"
+        >
+          Tôi có mã mời nhân viên →
+        </Link>
+      </div>
+
       <p className="mt-6 text-center text-sm text-ink-700">
         Chưa có tài khoản?{' '}
         <Link href="/signup" className="font-semibold text-navy-700 hover:underline">

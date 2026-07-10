@@ -54,10 +54,28 @@ export class ApiStaffRepository implements StaffRepository {
   }
 
   async verifyInvite(token: string): Promise<StaffInviteVerification> {
-    return apiClient.get<StaffInviteVerification>(
-      `/staff/invites/verify/${encodeURIComponent(token)}`,
-      { skipAuth: true, cache: 'no-store' },
-    );
+    // Shape thật (spec §11.2 + §26.5): { email, owner:{name,avatar,homestayName},
+    // status, expiresAt, scope }. Map phẳng + đọc tolerant field legacy phẳng.
+    const raw = await apiClient.get<{
+      email?: string;
+      owner?: { name?: string; avatar?: string | null; homestayName?: string | null };
+      ownerName?: string;
+      status?: StaffInviteVerification['status'];
+      expiresAt?: string;
+      scope?: 'owner' | 'system';
+    }>(`/staff/invites/verify/${encodeURIComponent(token)}`, {
+      skipAuth: true,
+      cache: 'no-store',
+    });
+    return {
+      email: raw.email ?? '',
+      ownerName: raw.owner?.name ?? raw.ownerName ?? '',
+      ownerAvatar: raw.owner?.avatar ?? null,
+      homestayName: raw.owner?.homestayName ?? null,
+      status: raw.status ?? 'pending',
+      expiresAt: raw.expiresAt ?? '',
+      scope: raw.scope,
+    };
   }
 
   async acceptInvite(input: AcceptStaffInviteInput): Promise<AuthTokens> {

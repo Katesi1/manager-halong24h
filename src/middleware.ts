@@ -78,6 +78,7 @@ export async function middleware(request: NextRequest) {
     '/forgot-password',
     '/reset-password',
     '/auth/reset-password', // alias khớp link email BE → redirect /reset-password
+    '/staff/accept', // nhân viên nhận lời mời (public, khớp link email BE §11.2)
     '/legal',
   ];
   if (
