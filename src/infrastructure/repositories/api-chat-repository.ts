@@ -30,6 +30,25 @@ export class ApiChatRepository implements ChatRepository {
     return Array.isArray(data) ? data : (data.items ?? []);
   }
 
+  async listYachtConversations(filters?: {
+    customerId?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<Conversation[]> {
+    const data = await apiClient.get<Conversation[] | { items: Conversation[] }>(
+      '/conversations/yacht',
+      {
+        query: {
+          customerId: filters?.customerId,
+          page: filters?.page,
+          limit: filters?.limit,
+        },
+        cache: 'no-store',
+      },
+    );
+    return Array.isArray(data) ? data : (data.items ?? []);
+  }
+
   async unreadCount(): Promise<number> {
     const data = await apiClient.get<number | { count: number }>(
       '/conversations/unread-count',

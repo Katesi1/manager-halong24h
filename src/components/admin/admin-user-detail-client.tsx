@@ -196,7 +196,11 @@ export function AdminUserDetailClient({ id }: { id: string }) {
                   icon={<ShieldCheck className="h-4 w-4" />}
                   label="Quyền bỏ qua KYC"
                   value={
-                    <KycBypassToggle userId={user.id} kycBypass={user.kycBypass} />
+                    <KycBypassToggle
+                      userId={user.id}
+                      kycBypass={user.kycBypass}
+                      kycStatus={user.kycStatus}
+                    />
                   }
                 />
               </div>

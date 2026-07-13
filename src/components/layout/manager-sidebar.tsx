@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   AlertTriangle,
+  Anchor,
   BedDouble,
   Building,
   Building2,
@@ -26,6 +27,7 @@ import {
   Menu,
   MessageSquare,
   Settings,
+  Ship,
   Shield,
   ShieldCheck,
   Sparkles,
@@ -84,6 +86,17 @@ const ADMIN_GROUPS: NavGroup[] = [
       { href: '/admin/system-staff', label: 'Tài khoản Sale hệ thống', icon: UserCog },
       { href: '/admin/properties', label: 'Toàn bộ cơ sở', icon: Building, badgeKey: 'properties' },
       { href: '/admin/bookings', label: 'Toàn bộ đặt phòng', icon: BedDouble },
+    ],
+  },
+  {
+    id: 'admin-yachts',
+    label: 'Du thuyền',
+    collapsible: true,
+    items: [
+      { href: '/admin/yachts', label: 'Quản lý du thuyền', icon: Ship },
+      { href: '/admin/yacht-bookings', label: 'Đơn đặt du thuyền', icon: Anchor },
+      { href: '/admin/yacht-reviews', label: 'Đánh giá du thuyền', icon: Star },
+      { href: '/admin/yacht-messages', label: 'Tin nhắn du thuyền', icon: MessageSquare },
     ],
   },
   {
@@ -152,7 +165,7 @@ const HOST_GROUPS: NavGroup[] = [
 type TabKey = 'admin' | 'host';
 
 interface ManagerSidebarProps {
-  profile: Pick<UserProfile, 'id' | 'role' | 'name' | 'email' | 'ownerId'>;
+  profile: Pick<UserProfile, 'id' | 'role' | 'name' | 'email' | 'ownerId' | 'scope'>;
   badges?: Partial<Record<BadgeKey, number>>;
 }
 
@@ -180,6 +193,12 @@ export function ManagerSidebar({
   const pathname = usePathname();
   const isAdmin = profile.role === RoleCode.ADMIN;
   const isSale = profile.role === RoleCode.SALE;
+  // SALE hệ thống (role=2, scope=system): vào khu quản trị nhưng chỉ mảng du thuyền.
+  const isSystemSale = isSale && profile.scope === 'system';
+  // ADMIN thấy toàn bộ nhóm quản trị; SALE hệ thống chỉ thấy nhóm Du thuyền.
+  const adminGroups = isAdmin
+    ? ADMIN_GROUPS
+    : ADMIN_GROUPS.filter((g) => g.id === 'admin-yachts');
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -225,7 +244,8 @@ export function ManagerSidebar({
     messages: unreadMessages,
   };
 
-  const currentGroups = activeTab === 'admin' ? ADMIN_GROUPS : HOST_GROUPS;
+  const currentGroups =
+    isSystemSale || activeTab === 'admin' ? adminGroups : HOST_GROUPS;
 
   const visibleGroups = currentGroups.map((g) => ({
     ...g,

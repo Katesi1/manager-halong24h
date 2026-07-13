@@ -17,6 +17,9 @@ import type { PlatformBankRepository } from '@/application/ports/platform-bank-r
 import type { PropertyRepository } from '@/application/ports/property-repository';
 import type { ReviewRepository } from '@/application/ports/review-repository';
 import type { SubscriptionRepository } from '@/application/ports/subscription-repository';
+import type { YachtRepository } from '@/application/ports/yacht-repository';
+import type { YachtBookingRepository } from '@/application/ports/yacht-booking-repository';
+import type { YachtReviewRepository } from '@/application/ports/yacht-review-repository';
 import type { AdminUserRepository } from '@/application/ports/admin-user-repository';
 import type { KycAdminRepository } from '@/application/ports/kyc-admin-repository';
 import type { KycRepository } from '@/application/ports/kyc-repository';
@@ -49,6 +52,9 @@ import { ApiReviewRepository } from './repositories/api-review-repository';
 import { ApiStaffRepository } from './repositories/api-staff-repository';
 import { ApiSubscriptionRepository } from './repositories/api-subscription-repository';
 import { ApiSystemStaffRepository } from './repositories/api-system-staff-repository';
+import { ApiYachtRepository } from './repositories/api-yacht-repository';
+import { ApiYachtBookingRepository } from './repositories/api-yacht-booking-repository';
+import { ApiYachtReviewRepository } from './repositories/api-yacht-review-repository';
 
 /**
  * Container — resolve mỗi port về implementation REST API thật.
@@ -166,6 +172,21 @@ export function subscriptionRepository(): SubscriptionRepository {
   // Response là user-level (§A4), mapper trong ApiSubscriptionRepository khớp
   // shape thật + treat Subscription.id === userId.
   return new ApiSubscriptionRepository();
+}
+
+export function yachtRepository(): YachtRepository {
+  // Spec B1 — /yachts/* (ADMIN + SALE hệ thống). CRUD + prices + images.
+  return new ApiYachtRepository();
+}
+
+export function yachtBookingRepository(): YachtBookingRepository {
+  // Spec B2 — /yacht-bookings/* (list/detail + confirm/paid/cancel + staff đặt hộ).
+  return new ApiYachtBookingRepository();
+}
+
+export function yachtReviewRepository(): YachtReviewRepository {
+  // Spec B — /admin/yacht-reviews + /yachts/:id/reviews/:reviewId/reply.
+  return new ApiYachtReviewRepository();
 }
 
 export function reviewRepository(): ReviewRepository {

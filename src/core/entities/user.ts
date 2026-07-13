@@ -71,6 +71,13 @@ export interface AuthUser {
   email: string;
   avatar: string | null;
   role: RoleCode;
+  /**
+   * Phạm vi tài khoản (BE §2.5, luôn có mặt trong `/auth/profile`):
+   *  - 'owner'  — chủ nhà / SALE thuộc 1 chủ nhà (owner-scope)
+   *  - 'system' — tài khoản cấp hệ thống (SALE hệ thống role=2). ADMIN cũng 'owner'/'system' tuỳ BE.
+   * SALE hệ thống = `role === 2 && scope === 'system'` (quản lý du thuyền).
+   */
+  scope: 'owner' | 'system' | null;
   ownerId: string | null;
   isActive: boolean;
   emailVerified: boolean;

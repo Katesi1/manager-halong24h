@@ -3,7 +3,7 @@
 > Tài liệu chính thức cho team FE Web (Next.js admin/host) và App Mobile (Android/iOS).
 > Bao gồm tất cả endpoint, schema response, business rule, WebSocket guide và integration checklist.
 >
-> **Cập nhật**: 2026-07-09 (v1.35 — Customer hold phòng đổi từ 24h → **30 phút** (giống staff hold). Xem §5.2.1, changelog §21) · **BE base**: NestJS 11 · **DB**: PostgreSQL + Prisma · **Auth**: JWT · **Real-time**: Socket.IO
+> **Cập nhật**: 2026-07-09 (v1.40 — Fix `paymentInfo` khách tự đặt: fallback cọc 50% totalAmount, FE bỏ nhánh "chủ nhà chưa cấu hình VietQR". Xem §5.3, changelog §21) · **BE base**: NestJS 11 · **DB**: PostgreSQL + Prisma · **Auth**: JWT · **Real-time**: Socket.IO
 
 ---
 
@@ -36,6 +36,7 @@
 24. [Mobile Profile Endpoints](#24-mobile-profile-endpoints-support--feedback--data-export--consents--notification-prefs)
 25. [FE Web Admin v2 — Bổ sung 2026-06-23](#25-fe-web-admin-v2--bổ-sung-2026-06-23)
 26. [**System SALE — Admin-grade SALE (v1.15)**](#26-system-sale--admin-grade-sale-v115--2026-06-26)
+27. [**Du thuyền (Yachts) — v1.40**](#27-du-thuyền-yachts--v140--2026-07-13)
 
 ---
 
@@ -251,7 +252,7 @@ val okHttp = OkHttpClient.Builder()
 
 #### 1.6.1.4 Hiện tượng khi phiên bị đá + cách handle
 
-Khi 1 device khác cùng loại login → phiên hiện tại bị mark invalid. **Access token cũ vẫn dùng được 15 phút** (không có cách revoke access token đã phát). Nhưng lần refresh tiếp theo:
+Khi 1 device khác cùng loại login → phiên hiện tại bị đá **NGAY** (v1.37+): JWT nhúng `sid` (session id), mỗi request BE so `sid` với phiên hiện tại trong DB — login mới đổi `sid` nên **access token cũ bị 401 ngay ở request kế tiếp**, KHÔNG chờ hết 15 phút. Request đang chạy bị **401** (do phiên bị đá, không phải token hết hạn) → FE thử refresh → refresh token cũ cũng đã bị ghi đè → **403** → logout. Chi tiết refresh:
 
 ```http
 POST /auth/refresh
@@ -598,6 +599,7 @@ state.setUser(user.data);
     "avatar": "https://...",
     "role": 1,
     "ownerId": null,
+    "scope": "owner",
     "isActive": true,
     "emailVerified": true,
     "gender": null,
@@ -632,6 +634,8 @@ state.setUser(user.data);
   }
 }
 ```
+
+> **`scope` (`'owner' | 'system'`)** — profile **luôn trả** field này (đã có sẵn ở runtime). Dùng để FE phân biệt **SALE hệ thống** (`role=2 && scope='system'` → admin-grade, xem §26) với SALE thuộc OWNER (`role=2 && scope='owner'`). Các role khác (ADMIN/OWNER/CUSTOMER) mang `scope='owner'` vô nghĩa — bỏ qua. FE web quản lý muốn mở `/admin/*` cho SALE hệ thống: gate theo `role===0 || (role===2 && scope==='system')` thay vì chặn cứng `role!==0`.
 
 > **Thông tin nhận tiền OWNER** — 4 field `bankBin` / `bankName` / `bankAccountNumber` / `bankAccountName` (đều `string | null`) = **giá trị ĐÃ DUYỆT** (dùng sinh VietQR cho khách trả cọc, xem `paymentInfo` trong BookingDto §5.3). `bankBin` = mã NAPAS 6 số; `bankAccountNumber` = 6–20 số.
 >
@@ -867,7 +871,7 @@ Hết trial mà chưa có thanh toán được duyệt → các endpoint sau **t
 
 | Endpoint | Hành vi |
 |---|---|
-| `POST /properties` | 403 `subscription.featureLocked` |
+| `POST /properties` | Hết trial → 403 `subscription.featureLocked` · Còn trial nhưng đã có 1 cơ sở → 403 `code: "PROPERTY_LIMIT_REACHED"` (xem trial cap bên dưới) |
 | `PUT /properties/:id` | 403 `subscription.featureLocked` |
 | `POST /staff/invites` | 403 `subscription.featureLocked` (thay cho `staff.subscriptionRequired` cũ — không lộ trạng thái) |
 
@@ -876,6 +880,11 @@ SALE inherit entitlement của OWNER được gán (`user.ownerId`). Nếu OWNER
 **Unlock**: khi ADMIN duyệt thanh toán qua `POST /admin/users/:id/subscription/mark-paid` (luồng manual_bank/web/Google Play) → `subscriptionStatus` chuyển `active` → tất cả endpoint trên hoạt động trở lại ngay lập tức, không cần re-login.
 
 **Note**: Các status khác (`past_due`, `cancelled`, `frozen`) cũng làm `isOwnerEntitled` trả false → cùng message `featureLocked`. Riêng `frozen` vẫn giữ logic block ở payment endpoints (existing).
+
+**Trial cap số cơ sở (v1.39)**: OWNER đang ở **trial ngầm chưa mua gói** (`subscriptionStatus="trial"` **và** `subscriptionPlanId=null`) chỉ được đăng **tối đa 1 cơ sở** (1 villa / 1 homestay / 1 khách sạn — mọi `type` tính chung). Khi đã có ≥ 1 cơ sở chưa xoá, `POST /properties` trả **403 `code: "PROPERTY_LIMIT_REACHED"`**, message trung tính (không lộ trial/gói/thanh toán để an toàn Apple review): *"Tài khoản của bạn hiện chỉ có thể đăng tối đa 1 cơ sở. Vui lòng liên hệ hỗ trợ nếu cần đăng thêm."*
+- Gỡ cap ngay khi owner **mua bất kỳ gói nào** (`subscriptionPlanId` khác null) hoặc được ADMIN cấp `kycBypass`.
+- ADMIN tạo hộ (`POST /properties` với `ownerId`) **không** bị cap.
+- SALE tạo cho owner được gán → cap tính theo owner đó.
 
 OWNER xem được subscription detail qua `GET /subscriptions/me` (chỉ Web/Android dùng để hiển thị "Gia hạn ngay"; iOS ẩn).
 
@@ -1510,15 +1519,16 @@ Mỗi item dùng shape `PropertyCardDto` (§4.6). `isFavorited` luôn `false` (p
 
 ### 4.14 Public share detail — `GET /properties/share/:id`
 
-Endpoint **public** (no auth) cho use case "OWNER share thông tin 1 phòng cụ thể qua Zalo/Messenger/Facebook" — link trỏ về `https://preview.halong24h.com/{propertyId}`. Trang preview hiển thị **đầy đủ thông tin phòng** nhưng **CHE 2 nhóm field nhạy cảm**:
+Endpoint **public** (no auth) cho use case "OWNER share thông tin 1 phòng cụ thể qua Zalo/Messenger/Facebook" — link trỏ về `https://preview.halong24h.com/{propertyId}`. Trang preview hiển thị **đầy đủ thông tin phòng** nhưng **CHE giá bán**:
 
-- **KHÔNG** trả thông tin chủ nhà (no `owner` block, no SĐT, no avatar).
+- **CÓ** trả `host` (tên + avatar + KYC + memberSince + totalProperties) — **v1.38**: bổ sung để trang preview hiển thị chủ nhà. **Vẫn KHÔNG** trả SĐT/email chủ nhà (chat-mediated).
+- **CÓ** trả `ratingBreakdown` (6 tiêu chí) + `rating` (alias `ratingAvg`) — **v1.38**: đồng bộ với `GET /properties/public/:slug`.
 - **KHÔNG** trả giá bán phòng (`weekdayPrice`, `weekendPrice`, `holidayPrice` — tuyệt đối không xuất hiện trong response).
 - **CÓ** trả giá phụ thu (`adultSurcharge`, `childSurcharge`) — vì đây là policy phòng, không phải giá bán.
 
 Visibility: tuân theo rule §4.1 (property `isActive=true, deletedAt=null, moderationStatus='approved'` + owner còn entitlement). Sai → **404**.
 
-**Response shape (v1.16.6 — đã bổ sung surcharge + floorArea + city/district + rating + slug + isHot):**
+**Response shape (v1.38 — bổ sung `host` + `ratingBreakdown` + `rating`; v1.16.6 — surcharge + floorArea + city/district + slug + isHot):**
 
 ```json
 {
@@ -1553,16 +1563,38 @@ Visibility: tuân theo rule §4.1 (property `isActive=true, deletedAt=null, mode
     "checkInTime": "14:00",
     "checkOutTime": "12:00",
     "ratingAvg": 4.92,
+    "rating": 4.92,
     "reviewCount": 37,
     "isHot": false,
     "images": [
       { "id": "uuid", "imageUrl": "https://...", "isCover": true, "order": 0 }
-    ]
+    ],
+    "ratingBreakdown": {
+      "overall": 4.92,
+      "cleanliness": 4.9,
+      "location": 4.95,
+      "amenities": 4.8,
+      "service": 4.9,
+      "value": 4.85,
+      "accuracy": 4.95,
+      "count": 37
+    },
+    "host": {
+      "name": "Nguyễn Văn A",
+      "avatarUrl": "https://res.cloudinary.com/.../avatar.jpg",
+      "isKycVerified": true,
+      "memberSince": "2024-01",
+      "totalProperties": 5,
+      "responseRate": null
+    }
   }
 }
 ```
 
 Ghi chú field:
+- `host` (v1.38) — chủ nhà: `name`, `avatarUrl`, `isKycVerified` (`kycBypass || kycStatus='approved'`), `memberSince` (`YYYY-MM` UTC), `totalProperties` (số phòng active), `responseRate` (luôn `null` ở v1). **Không** có SĐT/email.
+- `rating` (v1.38) — alias của `ratingAvg` để đồng bộ tên với public/:slug.
+- `ratingBreakdown` (v1.38) — điểm 6 tiêu chí của review visible; `count=0` khi chưa có review → FE tự ẩn section.
 - `floorArea` (m²) — `null` nếu owner chưa điền. FE tự ẩn dòng diện tích.
 - `adultSurcharge`, `childSurcharge` (VND) — có thể `null` nếu owner chưa cấu hình → FE hiểu là "không thu phụ thu" / "miễn phí".
 - `city`, `district` — display-only (owner điền tay), `null` nếu chưa nhập.
@@ -1573,8 +1605,8 @@ Ghi chú field:
 - `images[]` — đã sort `order` asc; mỗi item có `isCover` để FE chọn ảnh đầu.
 
 **Field cố ý KHÔNG trả** (để FE biết chắc không phải BE quên):
-- `weekdayPrice`, `weekendPrice`, `holidayPrice` — giá bán phòng.
-- `ownerId`, `owner` (name/phone/avatar) — thông tin chủ nhà.
+- `weekdayPrice`, `weekendPrice`, `holidayPrice` — giá bán phòng (vẫn ẩn ở link preview).
+- `ownerId`, SĐT/email chủ nhà — chỉ trả `host` (name/avatar/KYC/memberSince), KHÔNG có liên hệ trực tiếp.
 - `moderationStatus`, `isActive`, `deletedAt` — trạng thái internal.
 
 ---
@@ -1725,11 +1757,13 @@ Status: `0=HOLD, 1=CONFIRMED, 2=CANCELLED, 3=COMPLETED, 4=NO_SHOW`
 | `depositDeadlineAt` | `ISO \| null` | Hạn cọc: HOLD = `holdExpireAt` (countdown khách phải cọc trong cửa sổ này); CONFIRMED/CANCELLED/... = `null` (chưa có business rule riêng cho CONFIRMED) |
 | `paymentInfo` | `object \| null` | **Thông tin chuyển khoản + VietQR động** cho khách trả cọc. Xem shape bên dưới |
 
-**`paymentInfo` (mới)** — CHỈ khác `null` khi **đủ tất cả**: `status = CONFIRMED (1)` **và** `paidAt = null` (chưa thu tiền) **và** OWNER đã cấu hình bank (`bankBin` + `bankAccountNumber`) **và** booking có `depositAmount > 0`. Ngược lại = `null` (khách chưa thấy QR trước khi owner confirm, hoặc đã trả rồi).
+**`paymentInfo`** — khác `null` khi **đủ tất cả**: `status = CONFIRMED (1)` **và** `paidAt = null` (chưa thu tiền) **và** OWNER đã cấu hình bank đã duyệt (`bankBin` + `bankAccountNumber`). Số tiền cọc (`amount`) = `depositAmount` nếu đã set (staff hold), **fallback tự động 50% `totalAmount`** khi khách tự đặt không có `depositAmount` (v1.40). Chỉ `null` khi: chưa CONFIRMED, đã trả (`paidAt`), owner chưa có bank, **hoặc** booking không có cả `depositAmount` lẫn `totalAmount` (không tính được số tiền — chỉ xảy ra khi property chưa có giá).
+
+> ⚠️ **v1.40 fix**: trước đây `paymentInfo` yêu cầu `depositAmount > 0` mới hiện — nhưng khách **tự đặt** (`POST /bookings/customer-hold`) không bao giờ set `depositAmount` (và `confirm` cũng không set) → `paymentInfo` luôn `null` dù owner đã duyệt bank → FE hiện nhầm fallback "Chủ nhà chưa cấu hình VietQR". Nay dùng fallback 50% `totalAmount` (đồng bộ với logic `mark-paid`), nên booking CONFIRMED của khách **luôn** có `paymentInfo` khi owner có bank. **FE web KHÔNG cần nhánh fallback nữa** — nếu vẫn nhận `null` trên booking CONFIRMED thì đó là owner thật sự chưa cấu hình bank (hiếm, vì bank là bắt buộc).
 
 ```json
 {
-  "amount": 500000,                 // = depositAmount (số tiền pre-fill vào QR)
+  "amount": 500000,                 // depositAmount, hoặc 50% totalAmount (fallback khách tự đặt)
   "content": "HL ABC12345",         // nội dung CK = mã booking đã sanitize (owner đối soát)
   "bank": {
     "bin": "970436",
@@ -1741,7 +1775,7 @@ Status: `0=HOLD, 1=CONFIRMED, 2=CANCELLED, 3=COMPLETED, 4=NO_SHOW`
 }
 ```
 
-> FE render `qrPayload` thành QR bằng thư viện QR client-side (vd `qrcode`). Khách quét → app ngân hàng tự điền đúng số tiền + nội dung. Nếu `paymentInfo = null` mà booking đang CONFIRMED chưa trả → nghĩa là OWNER chưa cấu hình bank; FE hiển thị thông tin liên hệ chủ nhà để lấy STK thủ công.
+> FE render `qrPayload` thành QR bằng thư viện QR client-side (vd `qrcode`). Khách quét → app ngân hàng tự điền đúng số tiền + nội dung. Sau v1.40, `paymentInfo` trên booking CONFIRMED của khách **luôn** có khi owner đã duyệt bank → FE web đọc thẳng `paymentInfo`, **không dựng nhánh fallback** ("Chủ nhà chưa cấu hình VietQR") nữa. Nhánh đó chỉ đúng khi owner thật sự chưa có bank (case hiếm) — coi như lỗi cấu hình cần báo, không phải trạng thái bình thường.
 
 > **Bảo mật (mới):** trong mọi booking response (`findAll`, `findOne`, `getMyBookings`), `property.owner` CHỈ gồm `{ id, name, phone }` — **KHÔNG** chứa 4 field bank (`bankBin` / `bankName` / `bankAccountNumber` / `bankAccountName`). Thông tin bank chỉ được lộ qua `paymentInfo` khi đủ điều kiện (CONFIRMED + chưa trả + owner đã cấu hình bank). Trước đây các field bank bị include raw trên mọi row (kể cả HOLD/CANCELLED, và với cả SALE) — nay đã strip khỏi response.
 
@@ -2294,13 +2328,15 @@ BE gửi **hybrid message** — kèm cả `notification` block (tray auto-displa
 - Foreground: đã có event `message:new` từ WebSocket → FE suppress notification tray thủ công.
 - Background/killed: OS tự hiện tray từ `apns.alert` / Android `notification` block. Tap → mở `data.deepLink`.
 
-`pushType` (nằm trong `data.type`): `booking_*` (gồm `booking_created | booking_confirmed | booking_paid | booking_deposit_proof | booking_checkin_reminder | booking_completed`), `payment_*`, `subscription_*`, `chat_message`, `lead_new`, `dispute_opened`, `dispute_resolved`, `subscription_frozen`, `subscription_price_changed`, `kyc_*`, `staff_invite_accepted`, `property_approved | rejected | suspended`, `property_pending_review` (gửi ADMIN khi có phòng mới chờ duyệt, deepLink `/admin/properties/:id`), `property_updated | property_price_updated | property_images_updated`, `calendar_locked | calendar_unlocked | calendar_sold | calendar_bulk_locked | calendar_bulk_unlocked`, ...
+`pushType` (nằm trong `data.type`): `booking_*` (gồm `booking_created | booking_confirmed | booking_paid | booking_deposit_proof | booking_checkin_reminder | booking_completed`), `payment_*`, `subscription_*`, `chat_message`, `lead_new`, `dispute_opened`, `dispute_resolved`, `subscription_frozen`, `subscription_price_changed`, `kyc_*`, `staff_invite_accepted`, `property_approved | rejected | suspended`, `property_pending_review` (gửi ADMIN khi có phòng mới chờ duyệt, deepLink `/admin/properties/:id`), `property_updated | property_price_updated | property_images_updated`, `calendar_locked | calendar_unlocked | calendar_sold | calendar_bulk_locked | calendar_bulk_unlocked`, `review_created` (gửi OWNER khi khách vừa đánh giá property, deepLink `/properties/:id/reviews`, targetType `review`), ...
 
 > **Booking push mới (v1.31)** — `booking_deposit_proof` (gửi OWNER khi khách gửi ảnh bill cọc → mở booking detail đối chiếu + ghi nhận cọc), `booking_checkin_reminder` (gửi OWNER 15h ngày nhận phòng → xác nhận check-in + thu nốt), `booking_completed` (gửi OWNER + khách khi booking hoàn tất). deepLink `/bookings/:id`.
 
 > **Đồng bộ cả TEAM khi sửa phòng / khoá lịch (NEW).** Khi **bất kỳ thành viên team** (owner hoặc SALE thuộc owner) **sửa phòng** (`property_updated` / `property_price_updated` / `property_images_updated`) hoặc **khoá/mở/đánh dấu-bán lịch** (`calendar_locked` / `calendar_unlocked` / `calendar_sold`) → BE tạo notification + push FCM tới **owner + tất cả SALE của owner đó**, **TRỪ người vừa thao tác** (không tự báo cho chính mình). Nhờ vậy mọi thành viên biết **phòng nào** bị lock/unlock, phòng nào sửa (message luôn kèm `Tên phòng (MÃ)`). Bulk lock/unlock (`POST /calendar/bulk`) gộp **1 push tổng mỗi property** (`calendar_bulk_locked/unlocked`) thay vì mỗi ngày. `deepLink = /host/properties/{propertyId}`, `targetType = 'property'`.
 
 > **`kyc_submitted` (NEW) — gửi cho ADMIN, không phải owner.** Khi owner gửi hồ sơ KYC chờ duyệt (đủ 3 ảnh auto-submit, hoặc `POST /kyc/submit` thủ công), BE tạo notification + push tới **toàn bộ admin** để vào duyệt. `deepLink = /admin/kyc/{submissionId}`, `targetType = 'kyc'`. Phân biệt với `kyc_approved` / `kyc_rejected` gửi cho owner.
+
+> **`review_created` (NEW) — gửi cho OWNER của property.** Khi khách tạo review (`POST /properties/:id/reviews`), BE tạo notification (chuông) + push FCM tới owner: `title = 'Đánh giá mới'`, subtitle `Tên property (MÃ) — khách vừa đánh giá {avgRating}★`. `type = SYSTEM`, `targetType = 'review'`, `targetId = review.id`, `deepLink = /properties/{propertyId}/reviews`. Best-effort, không chặn response tạo review.
 
 ---
 
@@ -3093,7 +3129,8 @@ Base path: `/admin/emails`. Role: ADMIN.
 | `booking_cancelled` | `PATCH /bookings/:id/cancel` |
 | `kyc_approved` | `POST /admin/kyc/submissions/:id/approve` |
 | `kyc_rejected` | `POST /admin/kyc/submissions/:id/reject` (kèm lý do + mục cần bổ sung) |
-| `staff_invite` | `POST /staff/invites` (+ system invite) |
+| `staff_invite` | `POST /staff/invites` (+ system invite). Kèm nút tải app từ env `APP_STORE_URL` / `PLAY_STORE_URL` — store nào để trống thì nút đó ẩn. |
+| `review_invitation` (v1.36) | Cron mỗi giờ — gửi khách **tại mốc 12h trưa (VN) ngày trả phòng** (`checkoutDate + 5h`), khi booking COMPLETED + chưa đánh giá + chưa gửi. Link tới trang đánh giá `FRONTEND_BASE_URL/my/bookings/{bookingId}`. Chống gửi trùng qua `Booking.reviewInviteSentAt`. |
 
 Tất cả email đều **fire-and-forget**: chỉ gửi khi user có email + SMTP cấu hình; lỗi SMTP được log, không chặn response.
 
@@ -3498,6 +3535,74 @@ CONVERSATION_MEMBER_ROLE = 'owner' | 'sale' | 'customer' | 'admin'
 ---
 
 ## 21. Changelog & Bug fixes
+
+### v1.40 — 2026-07-09 (Fix: khách tự đặt không thấy thông tin chuyển khoản cọc)
+
+Bug: khách đặt qua `POST /bookings/customer-hold`, owner đã duyệt bank + đã confirm booking, nhưng FE web hiện fallback **"Chủ nhà chưa cấu hình VietQR"** thay vì QR/số tài khoản.
+
+| Mục | Chi tiết |
+|---|---|
+| Root cause | `buildPaymentInfo` yêu cầu `depositAmount > 0` mới dựng `paymentInfo`. Nhưng flow khách tự đặt **không bao giờ set `depositAmount`** (chỉ set `totalAmount`), và `confirm` cũng không set → `paymentInfo` luôn `null` → FE tưởng owner chưa có bank. |
+| Fix | `paymentInfo.amount` = `depositAmount` **hoặc fallback `round(totalAmount × 50%)`** (đồng bộ `DEFAULT_DEPOSIT_RATE` đã dùng ở `mark-paid`). Booking CONFIRMED của khách nay **luôn** có `paymentInfo` khi owner có bank đã duyệt. |
+| FE impact | **Bỏ nhánh fallback** "Chủ nhà chưa cấu hình VietQR" ở luồng bình thường — đọc thẳng `paymentInfo`. `null` trên booking CONFIRMED giờ chỉ nghĩa là owner thật sự chưa có bank (lỗi cấu hình, hiếm). Xem §5.3. |
+| Code | `src/modules/bookings/bookings.service.ts` — `buildPaymentInfo`. Test: `bookings.service.spec.ts` (+2 case: fallback 50%, null khi thiếu cả deposit+total). Bổ sung mock `ConfigService` cho spec (DI đã có sẵn nhưng spec thiếu). |
+
+**Breaking?** Không — chỉ thêm dữ liệu vào `paymentInfo` (trước `null`, nay có giá trị). FE cũ vẫn chạy; FE nên gỡ nhánh fallback.
+
+### v1.39 — 2026-07-09 (Trial ngầm chỉ được đăng tối đa 1 cơ sở)
+
+OWNER đang trial ngầm (chưa mua gói) trước đây đăng **không giới hạn** số cơ sở — chỉ cần còn hạn trial + KYC pass. Nay giới hạn **1 cơ sở** trong suốt trial.
+
+| Thay đổi | Chi tiết |
+|---|---|
+| Trial cap | `POST /properties`: owner `subscriptionStatus="trial"` + `subscriptionPlanId=null` chỉ được có **tối đa 1 cơ sở chưa xoá** (mọi `type` villa/homestay/khách sạn tính chung). Cơ sở thứ 2 → **403 `code: "PROPERTY_LIMIT_REACHED"`**. |
+| Copy trung tính iOS | Message: *"Tài khoản của bạn hiện chỉ có thể đăng tối đa 1 cơ sở. Vui lòng liên hệ hỗ trợ nếu cần đăng thêm."* — không nhắc trial/gói/thanh toán/nâng cấp. |
+| Gỡ cap | Mua **bất kỳ gói nào** (`subscriptionPlanId` ≠ null) hoặc ADMIN cấp `kycBypass` → hết giới hạn. ADMIN tạo hộ không bị cap. SALE tính theo owner được gán. |
+| Code | Constant `TRIAL_MAX_PROPERTIES=1` + `isTrialPropertyCapped()` (`src/common/subscription.ts`), helper `propertyLimitReached()` (`src/common/errors/subscription.errors.ts`), enforce trong `PropertiesService.create()`. i18n `properties.trialPropertyLimit` (vi/en). |
+
+**Breaking?** Về mặt HTTP: owner trial đã có 1 cơ sở sẽ nhận 403 khi cố tạo thêm (trước đây 201). FE match `code: "PROPERTY_LIMIT_REACHED"` → hiển thị message + dẫn về liên hệ hỗ trợ (iOS) / flow thanh toán (Web/Android).
+
+### v1.38 — 2026-07-09 (Enrich `GET /properties/share/:id`: thêm host + ratingBreakdown + rating)
+
+Trang preview `preview.halong24h.com/{id}` cần đủ thông tin hơn — bổ sung 3 nhóm field, **vẫn giữ ẩn giá bán**.
+
+| Thay đổi | Chi tiết |
+|---|---|
+| `host` (mới) | `{ name, avatarUrl, isKycVerified, memberSince, totalProperties, responseRate }` — giống public/:slug. KHÔNG có SĐT/email chủ nhà. |
+| `ratingBreakdown` (mới) | Điểm 6 tiêu chí review visible + `count`. |
+| `rating` (mới) | Alias của `ratingAvg` (đồng bộ tên với public/:slug). |
+| Giữ nguyên | Vẫn **KHÔNG** trả `weekdayPrice/weekendPrice/holidayPrice` (giá bán). Surcharge, floorArea, city/district… như cũ. |
+| Refactor | Tách helper dùng chung `buildRatingBreakdown` + `buildHostBlock` cho cả `public/:slug` và `share/:id` (không đổi output public/:slug). |
+
+**Breaking?** Không — chỉ thêm field. FE preview đọc thêm `host` + `ratingBreakdown` + `rating` nếu cần. Xem §4.14.
+
+### v1.37 — 2026-07-09 (Đá phiên NGAY khi đăng nhập thiết bị khác — single active session enforce)
+
+Trước đây giới hạn "1 phiên mobile + 1 phiên web" chỉ dựa refresh token → thiết bị cũ vẫn dùng được **tới 15 phút** (hết hạn access token) mới bị đá. Nay đá **ngay lập tức**.
+
+| Thay đổi | Chi tiết |
+|---|---|
+| Schema `User` | Thêm 2 cột nullable `sessionIdMobile`, `sessionIdWeb` (migration `20260709060000_add_user_session_id`, additive). |
+| JWT payload | Thêm `sid` (session id) — sinh mới mỗi lần **đăng nhập** (`/auth/login|register|google|apple`, staff accept), giữ nguyên khi `/auth/refresh`. |
+| Guard mỗi request | `JwtStrategy` so `payload.sid` với `sessionId{Mobile,Web}` trong DB. Đăng nhập thiết bị khác (cùng loại) đổi `sid` → access token thiết bị cũ **401 ngay request kế tiếp** (không chờ 15'). |
+| Logout / ban / revoke-sessions / reset-password / xoá account | Clear luôn `sid` → vô hiệu access token tức thì (trước chỉ clear refresh token). |
+| Backward-compat | Token phát trước v1.37 (không có `sid`) → bỏ qua check, tự hết hạn ≤15 phút. User đăng nhập lại → có `sid`, enforce đầy đủ. |
+
+**Hành vi**: 2 điện thoại cùng đăng nhập OWNER → máy đăng nhập sau đá máy trước **ngay** (máy trước 401 → refresh → 403 → logout). Web quản lý tương tự (slot web riêng). Mobile + web vẫn song song (2 slot khác nhau) — không đổi.
+
+**Breaking?** Không cần FE đổi code — luồng 401 → refresh → 403 → logout (đã mô tả §1.6.1.4) tự xử lý. Chỉ khác: cú đá xảy ra ngay thay vì trễ ≤15'. Toast vẫn "Tài khoản đã đăng nhập ở thiết bị khác".
+
+### v1.36 — 2026-07-09 (Email mời đánh giá lúc 12h trưa ngày trả phòng)
+
+Tự động nhắc khách đánh giá cơ sở ngay khi kỳ lưu trú kết thúc.
+
+| Thay đổi | Chi tiết |
+|---|---|
+| Email `review_invitation` (mới) | Cron `sendReviewInvitations` chạy **mỗi giờ**: quét booking `COMPLETED` đã qua mốc **12h trưa (VN) ngày trả phòng** (`checkoutDate + 5h`), **chưa đánh giá** + **chưa gửi mail** + **có email khách** (email tài khoản HOẶC `customerEmail` trên form) → gửi email mời đánh giá. Link tới **`FRONTEND_BASE_URL/my/bookings/{bookingId}`** (trang này tự hiện form đánh giá khi `canReview=true`). Bắt cả booking auto-complete lẫn owner check-in sớm. |
+| Schema `Booking` | Thêm cột `reviewInviteSentAt DateTime?` (migration `20260709120000_add_booking_review_invite_sent_at`, additive) — đánh dấu đã gửi, chống gửi trùng (cron chạy lặp mỗi giờ). |
+| `GET /admin/emails/templates` | Danh sách template test tăng từ 8 → **9** (thêm `review_invitation`). Xem §16. |
+
+**Breaking?** Không — additive column + cron mới + 1 email. FE không cần đổi gì (mail chứa link tới trang `/my/bookings/{id}` đã có sẵn).
 
 ### v1.35 — 2026-07-09 (Customer hold phòng: 24h → 30 phút)
 
@@ -4408,7 +4513,7 @@ ChatService `sendMessage` đã tự gọi `markAttached`. FE chỉ cần:
 
 ---
 
-> **Phiên bản tài liệu**: v1.35 — 2026-07-09 (Customer hold phòng 24h → 30 phút). Mọi thay đổi schema/endpoint vui lòng cập nhật file này và thông báo team FE qua channel chung.
+> **Phiên bản tài liệu**: v1.36 — 2026-07-09 (Email mời đánh giá lúc 12h trưa ngày trả phòng). Mọi thay đổi schema/endpoint vui lòng cập nhật file này và thông báo team FE qua channel chung.
 >
 > **Lưu ý cho FE Web + Mobile**: trước khi wire bất kỳ endpoint nào, đọc:
 > - **§2.3 + §2.4** — pattern auth chuẩn (tách login và profile)
@@ -5183,3 +5288,118 @@ curl -X PUT https://api.halong24h.com/permissions/<system-sale-id> \
 - **2026-06-29 (v1.16.3)** — **Thêm `?moderationStatus` cho `GET /properties`** (§4.2): query server-side `pending | approved | rejected | suspended` để admin FE list theo tab gọn hơn (thay vì lấy hết `includeInactive=true` rồi lọc client-side). Bổ sung `isHot`, `ratingAvg`, `reviewCount` vào sample JSON §4.5 (response thực tế đã có sẵn — Prisma `include` tự trả mọi scalar field). FE web quản lý đọc `isHot` từ list/detail để hiển thị toggle Hot, không cần gọi endpoint riêng.
 - **2026-06-29 (v1.16.4)** — **Chốt business rule: GIỮ auto-approve khi tạo property + sweep legacy `pending`**. Sau v1.16.2 fix visibility leak, property legacy `moderationStatus='pending'` (tạo thời code cũ trước v1.9) bị filter ẩn khỏi mọi public endpoint, bao gồm `/properties/public/by-owner/:ownerId`. Migration `20260629104500_legacy_pending_approve_sweep` đã apply prod: UPDATE mọi property `pending` của OWNER active + KYC approved (hoặc `kycBypass`) → `approved + moderationReviewedAt=NOW()`. Property của OWNER bị banned/inactive hoặc chưa KYC giữ nguyên `pending`. Property `rejected`/`suspended` không động vào. **Tác động FE**: (1) `/properties/public/by-owner/:ownerId` giờ trả đủ danh sách phòng của OWNER cho use case Zalo. (2) Admin FE web quản lý: tab "Chờ duyệt" về cơ bản sẽ trống vì auto-approve khi tạo. Có thể giữ tab cho legacy edge case (property của owner chưa KYC bị stuck pending) nhưng nếu UI rỗng là bình thường. Tab "Đã duyệt / Từ chối / Tạm ngưng" mới là tab chính dùng. (3) FE web khách hàng KHÔNG đổi gì — visibility rule §4.1 vẫn enforce `approved`.
 - **2026-06-29 (v1.16.5)** — **Owner-level entitlement filter cho 6 public endpoint**. Trước đây visibility rule chỉ check property-level (`isActive + deletedAt + moderationStatus`). Nếu OWNER hết trial / bị admin freeze subscription / KYC bị thu hồi / bị banned sau khi đã tạo phòng → phòng vẫn lộ ra customer web (lỗi nghiệp vụ — owner không còn quyền dùng platform mà vẫn nhận khách qua đó). v1.16.5 bổ sung **owner-level filter** mirror đúng entitlement gate lúc tạo phòng (xem helper `ownerVisibleFilter` trong [properties.service.ts](src/modules/properties/properties.service.ts)): owner phải `isActive + bannedAt=null + deletedAt=null` **VÀ** (`kycBypass=true` HOẶC (`kycStatus='approved'` AND subscription entitled)). Áp dụng cho cả 6 endpoint public: `/properties/public`, `/properties/search`, `/properties/public/:slug`, `/properties/public/:slug/similar`, `/properties/public/by-owner/:ownerId`, `/properties/share/:id`. **Tác động FE**: web khách hàng và link Zalo tự động ẩn phòng của owner không còn quyền — không cần FE check thêm. Khi owner mark-paid trở lại → phòng tự xuất hiện ngay (không cần re-index, filter là live query). Slug/ownerId không thoả entitlement → **404 NotFound** (giống behaviour của moderationStatus filter — không leak trạng thái).
+
+---
+
+## 27. Du thuyền (Yachts) — v1.40 · 2026-07-13
+
+Module du thuyền là thực thể **của hệ thống** (không thuộc OWNER). Khách xem công khai + đặt; sau khi đặt có thể nhắn tin với hệ thống; ADMIN + SALE hệ thống xác nhận → khách thanh toán FULL → hệ thống gửi **mã code** + thông tin qua email.
+
+> **Loại tour (v1.40.2)**: du thuyền bán **tour TRONG NGÀY** — tour tham quan vịnh (ban ngày) và tour ăn tối & ngắm pháo hoa (buổi tối) — **KHÔNG qua đêm**. Mỗi tour = 1 sản phẩm (1 record `Yacht`) với `durationText` mô tả (vd "Tour trong ngày · 6–8 giờ" / "Tour buổi tối · 3–4 giờ"), `checkInTime`/`checkOutTime` = giờ đón/trả khách. Đặt tour chỉ cần **1 ngày** (xem §27.3: `checkoutDate` optional).
+
+### 27.1 Phân quyền
+
+| Thao tác | Ai được phép |
+|----------|--------------|
+| Xem danh sách/chi tiết/lịch công khai | Tất cả (không cần auth) |
+| Tạo / sửa / xoá / set giá / ảnh du thuyền | **CHỈ ADMIN + SALE hệ thống** (`scope=system`) |
+| Khách đặt du thuyền, xem đơn của mình, huỷ đơn PENDING | CUSTOMER (mọi user auth) |
+| Staff tạo đơn hộ, xem tất cả đơn, xác nhận, ghi nhận thanh toán | **ADMIN + SALE hệ thống** |
+| Đọc/trả lời toàn bộ tin nhắn khách ↔ hệ thống | **ADMIN + SALE hệ thống** |
+
+> Guard: route write dùng `@Roles(ADMIN, SALE)`; service assert `isAdminOrSystemSale(user)` → SALE owner-scope bị **403** `yachts.forbidden`. Không cần cấp `@Permission` lẻ — MỌI SALE hệ thống đều thao tác được.
+
+### 27.2 Yacht endpoints
+
+| Method | Endpoint | Auth | Mô tả |
+|--------|----------|------|-------|
+| GET | `/yachts/public` | Public | List công khai (paginated). Query: `page,limit,q,minPrice,maxPrice,sort(price_asc\|price_desc\|newest)` |
+| GET | `/yachts/public/:slug` | Public | Chi tiết theo slug (full data + itinerary + ảnh) |
+| GET | `/yachts/public/:id/calendar?year=&month=` | Public | Lịch theo tháng — `days[]` mỗi ngày `{ date, status(available\|locked\|hold\|booked), price, childPrice, priceType(weekday\|weekend\|holiday), bookingId, note }`. `price` = giá NGƯỜI LỚN/khách theo ngày, `childPrice` = giá TRẺ EM/khách (null = miễn phí) — FE hiển thị giá trên từng ô lịch |
+| GET | `/yachts?includeInactive=&page=&limit=` | ADMIN+SALE hệ thống | List quản trị |
+| GET | `/yachts/:id` | ADMIN+SALE hệ thống | Chi tiết quản trị |
+| POST | `/yachts` | ADMIN+SALE hệ thống | Tạo du thuyền |
+| PUT | `/yachts/:id` | ADMIN+SALE hệ thống | Cập nhật (partial, kèm `isActive`) |
+| DELETE | `/yachts/:id` | ADMIN+SALE hệ thống | Xoá mềm |
+| PUT | `/yachts/:id/prices` | ADMIN+SALE hệ thống | Set giá (5 field bắt buộc) |
+| POST | `/yachts/:id/images` | ADMIN+SALE hệ thống | Upload ảnh (multipart, field `images`, ≤20 ảnh/lần) |
+| DELETE | `/yachts/:id/images/:imageId` | ADMIN+SALE hệ thống | Xoá ảnh |
+| PATCH | `/yachts/:id/images/:imageId/cover` | ADMIN+SALE hệ thống | Đặt ảnh bìa |
+
+**CreateYachtDto** (POST/PUT): `name*`, `code*` (unique, không đổi được sau tạo), `description?`, `cabins?`, `maxGuests?`, `lengthMeters?`, `shipType?`, `departurePoint?`, `durationText?`, `itinerary?` (mảng `{ order, title, time?, description? }`), `amenities?[]`, `services?[]`, `rules?`, `cancellationPolicy?(0\|1\|2)`, `checkInTime?`, `checkOutTime?` (= giờ đón/trả), **giá NGƯỜI LỚN/khách**: `weekdayPrice?`/`weekendPrice?`/`holidayPrice?`, **giá TRẺ EM/khách**: `weekdayChildPrice?`/`weekendChildPrice?`/`holidayChildPrice?`. `slug` do BE tự sinh từ `name+code`.
+
+**Giá — BÁN THEO ĐẦU NGƯỜI (v1.40.3)**, giá người lớn và trẻ em **RIÊNG**:
+- Mỗi ngày chọn holiday > weekend (T6/T7/CN) > weekday cho cả 2 bảng giá.
+- `totalAmount = adults × giá NGƯỜI LỚN(ngày đi) + children × giá TRẺ EM(ngày đi)`. **KHÔNG** nhân số đêm (tour trong ngày).
+- Chưa cấu hình giá người lớn (`weekdayPrice=null`) → `totalAmount = null`. Chưa cấu hình giá trẻ em → **trẻ em tính 0đ (miễn phí)**.
+- `PUT /yachts/:id/prices`: 3 giá người lớn **bắt buộc**, 3 giá trẻ em **tuỳ chọn** (bỏ trống → miễn phí).
+
+### 27.3 Yacht Booking — vòng đời
+
+`status`: `0=PENDING · 1=CONFIRMED · 2=PAID · 3=COMPLETED · 4=CANCELLED`
+
+```
+Khách đặt (PENDING) ──> ADMIN/SALE hệ thống confirm (CONFIRMED, sinh VietQR)
+   ──> khách CK FULL ──> ADMIN/SALE mark paid (PAID) ──> gửi mã code + email
+```
+
+| Method | Endpoint | Auth | Mô tả |
+|--------|----------|------|-------|
+| POST | `/yacht-bookings/customer` | CUSTOMER | Khách đặt → tạo đơn PENDING + mở kênh nhắn tin |
+| GET | `/yacht-bookings/my?page=&limit=` | CUSTOMER | Đơn của khách hiện tại |
+| POST | `/yacht-bookings` | ADMIN+SALE hệ thống | Staff đặt hộ (có thể truyền `customerId`) |
+| GET | `/yacht-bookings?status=&page=&limit=` | ADMIN+SALE hệ thống | Toàn bộ đơn |
+| GET | `/yacht-bookings/:id` | Chủ đơn hoặc ADMIN+SALE hệ thống | Chi tiết đơn (kèm `yacht` + itinerary) |
+| PATCH | `/yacht-bookings/:id/confirm` | ADMIN+SALE hệ thống | PENDING→CONFIRMED, trả `data.payment` (VietQR + STK) |
+| PATCH | `/yacht-bookings/:id/paid` | ADMIN+SALE hệ thống | CONFIRMED→PAID, gửi email mã code. Body `{ amount? }` (bỏ trống = totalAmount) |
+| PATCH | `/yacht-bookings/:id/cancel` | Staff (đơn chưa thanh toán) / khách (đơn PENDING của mình) | Body `{ reason? }` |
+
+**CreateYachtBookingDto**: `yachtId*`, `checkinDate*` (YYYY-MM-DD — ngày đi tour), `checkoutDate?` (**BỎ TRỐNG cho tour trong ngày** → BE tự lấy = `checkinDate`), `adults*`, `children?`, `customerName?`, `customerPhone?`, `customerEmail?`, `notes?`, `customerId?` (chỉ staff). Khách tự đặt: contact fallback từ profile. Tour trong ngày cho phép **nhiều đơn cùng 1 ngày** (không chặn lịch như thuê nguyên tàu).
+
+**Booking response** (`data`): `id, code(YC-XXXXXXXX), yachtId, yachtName, status, adults, children, guestCount, checkinDate, checkoutDate, totalAmount, paidAmount, remainingAmount, paidAt, confirmedAt, customerName/Phone/Email, notes, createdAt` + **field đánh giá**: `hasReview(boolean)`, `reviewUnlockAt(ISO — mốc mở đánh giá = checkout + 12h trưa VN)`, `canReview(boolean — đã thanh toán/hoàn tất + đã qua mốc + chưa đánh giá)`. `PATCH /confirm` thêm `payment: { bankBin, bankName, accountNumber, accountName, amount, content, qrCode }`. **`GET /yacht-bookings/:id` (chi tiết) cũng trả `payment` cho KHÁCH khi đơn `CONFIRMED` + chưa thanh toán (`paidAt=null` + `totalAmount>0`)** → FE khách render QR/số TK để chuyển khoản FULL; `payment=null` ở các trạng thái khác. Mark-paid thêm `bookingCode`.
+
+`payment.qrCode` = chuỗi EMV VietQR → render QR client-side (không phải URL ảnh). `payment.content` = nội dung CK (mã đơn bỏ dấu gạch). `payment.amount` = số tiền FULL (= `totalAmount`). STK là STK nền tảng (admin cấu hình §10.7).
+
+Cron **mỗi giờ** tự chuyển đơn `PAID → COMPLETED` sau khi qua 12h trưa ngày kết thúc hành trình.
+
+**Mã code**: derive `YC-` + 8 hex đầu của UUID (không lưu cột riêng). Là nội dung CK + mã gửi email khách khi PAID (email template `yacht_booking_confirmed`).
+
+**Thanh toán FULL**: chuyển khoản thủ công qua **VietQR động** sinh từ STK nền tảng (`payment_bank_account` singleton, fallback ENV `BANK_*`). Không tích hợp cổng online. ADMIN/SALE bấm mark-paid để ghi nhận.
+
+### 27.4 Nhắn tin khách ↔ hệ thống
+
+Tái dùng hệ chat sẵn có với `Conversation.type='yacht'`, `bookingId = YachtBooking.id`. Khi khách đặt (có tài khoản) → BE tạo hội thoại + 1 tin nhắn hệ thống chào. Các mốc confirm/paid/cancel cũng post tin hệ thống (`isSystem=true`).
+
+- Khách dùng lại endpoint chat chuẩn: `POST /conversations {type:'yacht', bookingId}` (idempotent), `GET /conversations/:id/messages`, `POST /conversations/:id/messages`, WebSocket `/chat`.
+- **ADMIN + SALE hệ thống** đọc/trả lời mọi hội thoại du thuyền dù không phải member (bypass theo role/scope; chỉ áp dụng type `yacht`/`support`, không đụng chat booking homestay).
+- **`GET /conversations/yacht?customerId=&page=&limit=`** (ADMIN + SALE hệ thống): liệt kê toàn bộ hội thoại du thuyền, lọc `customerId` để xem "toàn bộ tin nhắn của 1 khách với hệ thống".
+
+> Lưu ý real-time: ADMIN/SALE hệ thống không phải member nên không nhận WS push của hội thoại yacht — họ dùng endpoint list + `GET /conversations/:id/messages` để theo dõi. Khách vẫn nhận real-time bình thường.
+
+### 27.5 Đánh giá du thuyền (Reviews)
+
+Khách đánh giá **sau khi qua ngày kết thúc hành trình** (đơn `PAID`/`COMPLETED` + đã qua **12h trưa VN ngày `checkoutDate`** + chưa đánh giá). 6 tiêu chí 1-5 **giống hệt PropertyReview** → FE tái dùng component đánh giá homestay.
+
+| Method | Endpoint | Auth | Mô tả |
+|--------|----------|------|-------|
+| GET | `/yachts/:id/reviews?page=&pageSize=&sort=&minRating=` | Public | List review + `summary` (avg, distribution, breakdown 6 tiêu chí). `sort`: `newest\|oldest\|highest\|lowest` |
+| POST | `/yachts/:id/reviews` | CUSTOMER | Tạo đánh giá |
+| POST | `/yachts/:id/reviews/:reviewId/reply` | ADMIN+SALE hệ thống | Hệ thống phản hồi `{ reply }` |
+| GET | `/admin/yacht-reviews?status=&page=&pageSize=` | ADMIN+SALE hệ thống | Moderation list. `status`: `visible\|hidden\|all` |
+| DELETE | `/admin/yacht-reviews/:id` | ADMIN+SALE hệ thống | Ẩn `{ reason? }` |
+| POST | `/admin/yacht-reviews/:id/restore` | ADMIN+SALE hệ thống | Khôi phục |
+
+**CreateYachtReviewDto**: `bookingId*`, `cleanliness*, location*, amenities*, service*, value*, accuracy*` (mỗi field 1-5), `comment?`, `photos?[]` (URL, ≤10).
+
+- Điều kiện: đơn thuộc khách + đúng du thuyền + `status ∈ {PAID, COMPLETED}` + `now >= checkout + 12h trưa VN` + chưa đánh giá. Sai → `403 notYourBooking` / `400 notReviewable` / `400 reviewNotYetAllowed` / `409 alreadyReviewed`.
+- FE dùng `booking.canReview` / `booking.reviewUnlockAt` (§27.3) để bật nút "Đánh giá" — **không** tự suy từ `status`.
+- `avgRating = (6 điểm)/6`; BE tự cập nhật `yacht.ratingAvg` + `reviewCount` (denormalized, đồng bộ card list/detail).
+
+**Response list** (`data`): `{ summary: { avgRating, totalReviews, distribution{5..1}, breakdown{6 tiêu chí} }, items: [{ id, customer{id,name,avatar}, cleanliness, location, amenities, service, value, accuracy, avgRating, comment, photos[], reply, replyAt, createdAt }], page, pageSize, total }`.
+
+### 27.6 Changelog
+
+- **2026-07-13 (v1.40)** — Thêm module Du thuyền: 4 bảng (`yachts`, `yacht_images`, `yacht_bookings`, `yacht_calendar_locks`, migration `20260713000000_add_yachts`). CRUD + giá (tái dùng `booking-pricing`) + ảnh Cloudinary + lịch công khai. Luồng đặt PENDING→CONFIRMED(VietQR)→PAID(email mã code). Nhắn tin khách ↔ hệ thống qua `Conversation.type='yacht'`; mở quyền đọc/gửi cho SALE hệ thống trên hội thoại `yacht`/`support`; thêm `GET /conversations/yacht`. Email template `yacht_booking_confirmed`. i18n namespaces `yachts` + `yachtBookings`.
+- **2026-07-13 (v1.40.1)** — Lịch du thuyền trả thêm `price` + `priceType` mỗi ngày (giá đêm theo ngày thường/cuối tuần/lễ). Thêm **đánh giá du thuyền** (§27.5): bảng `yacht_reviews` (migration `20260713010000_add_yacht_reviews`), 6 tiêu chí giống PropertyReview, mở sau khi qua ngày kết thúc hành trình; booking trả thêm `hasReview`/`canReview`/`reviewUnlockAt`; cron auto-complete PAID→COMPLETED; i18n namespace `yachtReviews`.
+- **2026-07-13 (v1.40.2)** — **Tour trong ngày** (không qua đêm): `checkoutDate` optional, bỏ trống → = `checkinDate`; giá tính 1 buổi (không nhân đêm); cho phép nhiều đơn cùng ngày. `GET /yacht-bookings/:id` trả `payment` (VietQR) cho khách khi đơn CONFIRMED + chưa thanh toán. Không đổi schema. FE khách gửi 1 ngày cho tour ngày/dinner.
+- **2026-07-13 (v1.40.3)** — **Giá du thuyền BÁN THEO ĐẦU NGƯỜI, giá người lớn ≠ trẻ em**. Bỏ mô hình per-booking + phụ thu. Thêm 3 cột `weekdayChildPrice`/`weekendChildPrice`/`holidayChildPrice` (migration `20260713020000_add_yacht_child_prices`); `weekdayPrice`/`weekendPrice`/`holidayPrice` giờ = **giá người lớn/khách**. `totalAmount = adults × giá NL(ngày) + children × giá TE(ngày)`. `PUT /yachts/:id/prices` nhận 3 giá NL (bắt buộc) + 3 giá TE (tuỳ chọn, null=miễn phí). Calendar trả thêm `childPrice`/ngày. Bỏ `adultSurcharge`/`childSurcharge`/`standardGuests`/`standardChildren` khỏi form (cột giữ cho tương thích, không dùng).

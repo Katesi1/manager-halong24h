@@ -10,6 +10,16 @@ import type {
 export interface ChatRepository {
   /** GET /conversations */
   listConversations(filters?: ConversationFilters): Promise<Conversation[]>;
+  /**
+   * GET /conversations/yacht?customerId=&page=&limit= — spec B3.
+   * Liệt kê mọi hội thoại du thuyền (ADMIN + SALE hệ thống đọc được dù không
+   * phải thành viên). Truyền `customerId` để xem toàn bộ hội thoại của 1 khách.
+   */
+  listYachtConversations(filters?: {
+    customerId?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<Conversation[]>;
   /** GET /conversations/unread-count */
   unreadCount(): Promise<number>;
   /** POST /conversations (idempotent với booking-type) */

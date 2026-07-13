@@ -14,19 +14,39 @@ import { useToast } from '@/components/ui/toast';
 interface Props {
   userId: string;
   kycBypass: boolean;
+  /** Trạng thái KYC của chủ nhà — 'approved' ⇒ khoá phần bỏ qua KYC. */
+  kycStatus?: 'none' | 'pending' | 'approved' | 'rejected';
 }
 
 /**
  * Toggle quyền "bỏ qua KYC" cho OWNER (spec §2A.7 — ADMIN-only).
  * bypass=true ⇒ OWNER tạo/sửa phòng mà không cần KYC approved.
+ *
+ * Khi KYC đã được nộp & duyệt (kycStatus='approved') thì chủ nhà đã xác minh
+ * danh tính đầy đủ — quyền "bỏ qua KYC" không còn ý nghĩa nên bị vô hiệu hoá.
  */
-export function KycBypassToggle({ userId, kycBypass }: Props) {
+export function KycBypassToggle({ userId, kycBypass, kycStatus }: Props) {
   const router = useRouter();
   const { show } = useToast();
   const [pending, startTransition] = useTransition();
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const next = !kycBypass;
+  const kycApproved = kycStatus === 'approved';
+
+  if (kycApproved) {
+    return (
+      <div className="space-y-2">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-medium text-emerald-800">
+          <ShieldCheck className="h-3.5 w-3.5" />
+          Đã xác minh KYC
+        </span>
+        <p className="text-[11px] text-ink-500">
+          Chủ nhà đã hoàn tất xác minh KYC — không cần cấp quyền bỏ qua.
+        </p>
+      </div>
+    );
+  }
 
   function onConfirm() {
     setConfirmOpen(false);

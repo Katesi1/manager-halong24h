@@ -8,6 +8,7 @@ import type { UserProfile } from '@/core/entities/user';
 import type { Booking } from '@/core/entities/booking';
 import { bookingRepository, propertyRepository } from '@/infrastructure/container';
 import { RoleCode, isAdmin, isManagerRole } from '@/core/value-objects/role';
+import { canManageYachts } from '@/lib/yacht-access';
 
 /**
  * Server-side auth guards — gọi trong Server Component (layout, page) hoặc Server Action.
@@ -43,6 +44,21 @@ export async function requireAdmin(): Promise<UserProfile> {
   if (!isAdmin(profile.role)) {
     throw new ForbiddenError(
       'Tính năng này chỉ dành cho tài khoản ADMIN của Halong24h',
+    );
+  }
+  return profile;
+}
+
+/**
+ * Yêu cầu user quản lý được du thuyền: ADMIN hoặc SALE hệ thống (role=2,
+ * scope=system) — spec B. SALE owner-scope / OWNER / CUSTOMER → Forbidden.
+ * BE enforce độc lập (@Roles + scope); đây là lớp FE defense-in-depth.
+ */
+export async function requireYachtManager(): Promise<UserProfile> {
+  const profile = await requireProfile();
+  if (!canManageYachts(profile)) {
+    throw new ForbiddenError(
+      'Tính năng du thuyền chỉ dành cho ADMIN và SALE hệ thống',
     );
   }
   return profile;

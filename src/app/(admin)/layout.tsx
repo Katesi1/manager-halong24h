@@ -9,6 +9,7 @@ import { ChatSocketProvider } from '@/components/chat/chat-socket-provider';
 import { ManagerSidebar } from '@/components/layout/manager-sidebar';
 import { ManagerTopbar } from '@/components/layout/topbar';
 import { isAdmin } from '@/core/value-objects/role';
+import { canManageYachts } from '@/lib/yacht-access';
 import { readTokens } from '@/infrastructure/http/token-storage';
 
 const cachedCountPendingKyc = unstable_cache(
@@ -39,7 +40,9 @@ export default async function AdminLayout({
     readTokens(),
   ]);
   if (!profile) redirect('/login');
-  if (!isAdmin(profile.role)) redirect('/host');
+  // ADMIN dùng toàn bộ khu quản trị; SALE hệ thống (role=2, scope=system) được
+  // vào để quản lý du thuyền (sidebar tự giới hạn về mảng du thuyền cho họ).
+  if (!isAdmin(profile.role) && !canManageYachts(profile)) redirect('/host');
 
   const [kycCountResult, bankCountResult, propertiesPending] = await Promise.all([
     cachedCountPendingKyc(),
