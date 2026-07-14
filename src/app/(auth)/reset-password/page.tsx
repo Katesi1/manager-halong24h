@@ -103,8 +103,10 @@ function ResetPasswordForm() {
             minLength={6}
             placeholder="Nhập lại mật khẩu mới"
           />
-          {confirmError && (
-            <p className="mt-1 text-xs text-red-600">{confirmError}</p>
+          {(confirmError ?? state.fieldErrors?.confirm) && (
+            <p className="mt-1 text-xs text-red-600">
+              {confirmError ?? state.fieldErrors?.confirm}
+            </p>
           )}
         </div>
 

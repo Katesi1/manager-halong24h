@@ -308,6 +308,31 @@ export async function watchOverdueSubscriptions(api, state) {
   ];
 }
 
+// ---------- 7. Chủ nhà đăng ký mới (/users?role=1) — ADMIN ----------
+
+export async function watchNewOwners(api, state) {
+  const list = asItems(await api.get('/users?role=1'));
+  const first = !state.newOwners;
+  const st = (state.newOwners ??= { seen: [] });
+  const seen = new Set(st.seen);
+
+  const messages = [];
+  for (const u of [...list].reverse()) {
+    if (seen.has(u.id)) continue;
+    seen.add(u.id);
+    if (first) continue;
+    messages.push(
+      `🆕 <b>Chủ nhà mới đăng ký</b>\n` +
+        `👤 Tên: ${esc(u.name)}\n` +
+        `📧 Email: ${esc(u.email ?? '—')}\n` +
+        `📞 SĐT: ${esc(u.phone ?? '—')}\n` +
+        `📅 Ngày tạo: ${fmtDate(u.createdAt)}`,
+    );
+  }
+  st.seen = [...seen].slice(-500);
+  return messages;
+}
+
 // ---------- registry ----------
 
 export const WATCHERS = [
@@ -318,4 +343,6 @@ export const WATCHERS = [
   { key: 'kyc', label: 'KYC chờ duyệt (admin)', run: watchKyc },
   { key: 'paymentSessions', label: 'Đối soát CK (admin)', run: watchPaymentSessions },
   { key: 'overdue', label: 'Subscription quá hạn (admin)', run: watchOverdueSubscriptions },
+  { key: 'newOwners', label: 'Chủ nhà mới đăng ký (admin)', run: watchNewOwners },
 ];
+

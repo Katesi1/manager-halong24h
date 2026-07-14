@@ -15,8 +15,9 @@ thông báo mới vào nhóm/kênh Telegram.
 | KYC *(ADMIN)* | `GET /admin/kyc/queue?filter=pending` | Hồ sơ KYC mới chờ duyệt 🪪 |
 | Đối soát CK *(ADMIN)* | `GET /admin/payments?status=pending` | Phiên thanh toán mới chờ duyệt 💸 |
 | Gói quá hạn *(ADMIN)* | `GET /admin/subscriptions/count-overdue` | Cảnh báo khi số subscription quá hạn tăng ⚠️ |
+| Chủ nhà mới *(ADMIN)* | `GET /users?role=1` | Thông báo khi có chủ nhà đăng ký tài khoản mới 🆕 |
 
-Tài khoản không phải ADMIN → 4 watcher admin tự tắt (log cảnh báo 1 lần), bot vẫn
+Tài khoản không phải ADMIN → 5 watcher admin tự tắt (log cảnh báo 1 lần), bot vẫn
 chạy bình thường với notifications + bookings trong scope tài khoản đó.
 
 ## Cài đặt

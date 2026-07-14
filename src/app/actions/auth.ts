@@ -259,10 +259,16 @@ export async function forgotPasswordAction(
   return { ok: true };
 }
 
-const ResetPasswordSchema = z.object({
-  token: z.string().min(8, 'Token không hợp lệ'),
-  password: z.string().min(6, 'Mật khẩu tối thiểu 6 ký tự'),
-});
+const ResetPasswordSchema = z
+  .object({
+    token: z.string().min(8, 'Token không hợp lệ'),
+    password: z.string().min(6, 'Mật khẩu tối thiểu 6 ký tự'),
+    confirm: z.string().min(6, 'Xác nhận mật khẩu tối thiểu 6 ký tự'),
+  })
+  .refine((d) => d.password === d.confirm, {
+    path: ['confirm'],
+    message: 'Mật khẩu xác nhận không khớp',
+  });
 
 export async function resetPasswordAction(
   _prev: ActionResult,
@@ -271,6 +277,7 @@ export async function resetPasswordAction(
   const parsed = ResetPasswordSchema.safeParse({
     token: formData.get('token'),
     password: formData.get('password'),
+    confirm: formData.get('confirm'),
   });
   if (!parsed.success) {
     return { fieldErrors: flattenFieldErrors(parsed.error.flatten().fieldErrors) };
