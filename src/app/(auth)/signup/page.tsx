@@ -61,16 +61,22 @@ export default function SignupPage() {
         </div>
 
         <div>
-          <Label htmlFor="phone">Số điện thoại</Label>
+          <Label htmlFor="phone" required>
+            Số điện thoại
+          </Label>
           <Input
             id="phone"
             name="phone"
             type="tel"
             autoComplete="tel"
+            required
             defaultValue={v?.phone ?? ''}
             placeholder="0912 345 678"
             key={`phone-${v?.phone ?? ''}`}
           />
+          {state.fieldErrors?.phone && (
+            <p className="mt-1 text-xs text-red-600">{state.fieldErrors.phone}</p>
+          )}
         </div>
 
         <div>

@@ -179,9 +179,8 @@ const SignupSchema = z.object({
   password: z.string().min(6, 'Mật khẩu tối thiểu 6 ký tự'),
   phone: z
     .string()
-    .regex(/^0\d{9,10}$/, 'Số điện thoại 10-11 số bắt đầu bằng 0')
-    .optional()
-    .or(z.literal('')),
+    .min(1, 'Vui lòng nhập số điện thoại')
+    .regex(/^0\d{9,10}$/, 'Số điện thoại 10-11 số bắt đầu bằng 0'),
   role: z.enum(['owner', 'sale']).default('owner'),
 });
 
@@ -201,7 +200,7 @@ export async function signupAction(
     name: nameVal,
     email: emailVal,
     password: formData.get('password'),
-    phone: phoneVal || undefined,
+    phone: phoneVal,
     role: schemaRole,
   });
   if (!parsed.success) {
