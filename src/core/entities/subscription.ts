@@ -158,9 +158,39 @@ export interface SubscriptionCallLog {
 }
 
 export interface MarkPaidInput {
+  /** = OWNER userId (spec §A5 Option A: 1 user = 1 subscription). */
   subscriptionId: string;
-  /** Số tiền thực thu — phải bằng amount */
+  /** Số tiền thực nhận từ chủ nhà (VND). Phải > 0. */
   paidAmount: number;
+  /**
+   * Gói muốn nâng/đổi (id danh mục `rooms_10`, `enterprise`...). Bỏ trống ⇒ BE
+   * giữ gói hiện tại. Dùng khi admin nâng gói thủ công (tiền mặt / CK ngoài).
+   */
+  planId?: string;
+  /** Chu kỳ. Bỏ trống ⇒ BE giữ chu kỳ hiện tại. */
+  cycle?: SubscriptionCycle;
+  /** Số phòng kỳ này (≥ 1). Bỏ trống ⇒ BE dùng số phòng cũ / 1. */
+  rooms?: number;
+  /** Số ngày gia hạn (1–3650). Bỏ trống ⇒ BE mặc định 30 (monthly) / 365 (yearly). */
+  days?: number;
+  /** Mã biên nhận (vd "TIEN_MAT", mã CK). */
+  reference?: string;
+  /** Ghi chú của admin. */
+  note?: string;
+}
+
+/**
+ * Kết quả nâng gói (`POST /admin/users/:id/subscription/mark-paid`).
+ * BE trả gói mới đã kích hoạt + mốc hiệu lực.
+ */
+export interface MarkPaidResult {
+  userId: string;
+  amount: number;
+  planId: string;
+  cycle: SubscriptionCycle;
+  rooms: number;
+  startsAt: string;
+  endsAt: string;
 }
 
 export interface FreezeInput {

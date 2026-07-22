@@ -29,8 +29,13 @@ export interface AdminUser {
   kycStatus: 'none' | 'pending' | 'approved' | 'rejected';
   /** ADMIN cấp quyền bỏ qua KYC (chỉ OWNER) — tạo phòng không cần KYC approved */
   kycBypass: boolean;
-  /** Subscription status (chỉ OWNER) */
+  /** Bucket gói (coarse, chỉ OWNER) — dùng cho màu/badge nội bộ. */
   subscriptionPlan: 'free' | 'basic' | 'standard' | 'pro' | null;
+  /**
+   * Id gói cước THẬT từ danh mục (`rooms_5`, `enterprise`...) — nguồn chuẩn để
+   * hiển thị tên gói. `null` nếu chưa có gói. Dùng `planLabel()` để render.
+   */
+  subscriptionPlanId: string | null;
   createdAt: string;
   lastActiveAt: string | null;
 }

@@ -69,6 +69,10 @@ interface SpecSubscription {
   provider?: Subscription['provider'];
   frozenAt?: string | null;
   frozenReason?: string | null;
+  // ── mark-paid (nâng gói) response ────────────────────────────────────────
+  userId?: string;
+  startsAt?: string | null;
+  endsAt?: string | null;
   // ── chung ───────────────────────────────────────────────────────────────
   nextChargeAt?: string | null;
   trialEndsAt?: string | null;
@@ -171,15 +175,16 @@ function mapSubscription(s: SpecSubscription): Subscription {
       ? priceOverride
       : calcSubscriptionAmount(plan, roomCount, cycle));
   const status = s.subscriptionStatus ?? s.status ?? 'none';
-  const nextChargeAt = s.nextChargeAt ?? null;
+  const nextChargeAt = s.nextChargeAt ?? s.endsAt ?? null;
   const trialEndsAt = s.trialEndsAt ?? null;
-  const createdAt = s.createdAt ?? '';
+  const createdAt = s.createdAt ?? s.startsAt ?? '';
   const expireAt = nextChargeAt ?? trialEndsAt ?? s.updatedAt ?? createdAt;
   const frozenReason = s.subscriptionFrozenReason ?? s.frozenReason ?? null;
   // §A4: list response không có `ownerId` riêng — `id` chính là userId.
-  const ownerId = s.ownerId ?? s.id;
+  // mark-paid response dùng `userId` thay `id`.
+  const ownerId = s.ownerId ?? s.userId ?? s.id ?? '';
   return {
-    id: s.id,
+    id: s.id ?? s.userId ?? '',
     ownerId,
     ownerName: s.ownerName ?? s.name ?? '',
     ownerEmail: s.ownerEmail ?? s.email ?? null,
@@ -189,7 +194,7 @@ function mapSubscription(s: SpecSubscription): Subscription {
     roomCount,
     amount,
     status,
-    startAt: createdAt,
+    startAt: s.startsAt ?? createdAt,
     expireAt,
     nextChargeAt,
     trialEndsAt,
@@ -294,9 +299,19 @@ export class ApiSubscriptionRepository implements SubscriptionRepository {
 
   async markPaid(input: MarkPaidInput): Promise<Subscription> {
     // Spec §10.4 — identify theo userId. Giả định subscriptionId === userId.
+    // Body tối thiểu chỉ { amount } (đối soát gia hạn); nâng gói thủ công gửi
+    // thêm planId/cycle/rooms/days/reference/note (chỉ đính field có giá trị để
+    // BE tự dùng default cho phần bỏ trống).
+    const body: Record<string, unknown> = { amount: input.paidAmount };
+    if (input.planId) body.planId = input.planId;
+    if (input.cycle) body.cycle = input.cycle;
+    if (input.rooms != null) body.rooms = input.rooms;
+    if (input.days != null) body.days = input.days;
+    if (input.reference) body.reference = input.reference;
+    if (input.note) body.note = input.note;
     const data = await apiClient.post<SpecSubscription>(
       `/admin/users/${input.subscriptionId}/subscription/mark-paid`,
-      { amount: input.paidAmount },
+      body,
     );
     return mapSubscription(data);
   }

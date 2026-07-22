@@ -54,7 +54,18 @@ export async function sumPaidBetweenUseCase(
 
 const MarkPaidSchema = z.object({
   subscriptionId: z.string().min(1),
-  paidAmount: z.number().int().nonnegative(),
+  paidAmount: z
+    .number({ invalid_type_error: 'Số tiền không hợp lệ' })
+    .int('Số tiền phải là số nguyên')
+    .positive('Số tiền phải lớn hơn 0')
+    .max(10_000_000_000, 'Số tiền quá lớn'),
+  // Nâng gói thủ công (optional — bỏ trống thì BE giữ giá trị hiện tại).
+  planId: z.string().trim().min(1).max(64).optional(),
+  cycle: z.enum(['monthly', 'yearly']).optional(),
+  rooms: z.number().int().min(1).max(10_000).optional(),
+  days: z.number().int().min(1).max(3650).optional(),
+  reference: z.string().trim().max(200).optional(),
+  note: z.string().trim().max(2000).optional(),
 });
 
 export async function markSubscriptionPaidUseCase(

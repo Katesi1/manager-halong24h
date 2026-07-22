@@ -86,6 +86,7 @@ function mapUser(s: SpecUserWithStats): AdminUser {
     kycStatus: s.kycStatus ?? 'none',
     kycBypass: s.kycBypass ?? false,
     subscriptionPlan: mapPlan(s),
+    subscriptionPlanId: s.subscriptionPlanId ?? null,
     createdAt: s.createdAt,
     // `null` cho user chỉ dùng web (chỉ track từ mobile FCM) — giữ nullable.
     lastActiveAt: s.lastActiveAt ?? null,

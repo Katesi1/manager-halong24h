@@ -93,6 +93,43 @@ export async function markSubscriptionPaidAction(
   return result;
 }
 
+/**
+ * Admin nâng/đổi gói cho OWNER (ghi nhận tiền mặt / CK ngoài app).
+ * `userId` = OWNER userId. BE tự đổi gói → status ACTIVE + gia hạn + push noti.
+ */
+export async function upgradeOwnerSubscriptionAction(
+  userId: string,
+  input: {
+    amount: number;
+    planId?: string;
+    cycle?: 'monthly' | 'yearly';
+    rooms?: number;
+    days?: number;
+    reference?: string;
+    note?: string;
+  },
+) {
+  const result = await toResult(async () => {
+    await requireAdmin();
+    const id = z.string().uuid('userId không hợp lệ').parse(userId);
+    return markSubscriptionPaidUseCase(subscriptionRepository(), {
+      subscriptionId: id,
+      paidAmount: input.amount,
+      planId: input.planId,
+      cycle: input.cycle,
+      rooms: input.rooms,
+      days: input.days,
+      reference: input.reference,
+      note: input.note,
+    });
+  });
+  if (result.ok) {
+    revalidatePath('/admin/payments');
+    revalidatePath(`/admin/users/${userId}`);
+  }
+  return result;
+}
+
 export async function freezeSubscriptionAction(
   subscriptionId: string,
   reason: string,

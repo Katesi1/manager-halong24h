@@ -16,10 +16,12 @@ import {
 } from 'lucide-react';
 
 import { KycBypassToggle } from '@/components/admin/kyc-bypass-toggle';
+import { SubscriptionUpgradeButton } from '@/components/admin/subscription-upgrade-button';
 import { UserModerationActions } from '@/components/admin/user-moderation-actions';
 import { UserRoleEditor } from '@/components/admin/user-role-editor';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { planLabel } from '@/core/entities/billing-plan';
 import type { AdminUser, AdminUserStatus } from '@/core/entities/admin-user';
 import { RoleCode } from '@/core/value-objects/role';
 import { formatDateTime, relativeTime } from '@/lib/format';
@@ -183,9 +185,9 @@ export function AdminUserDetailClient({ id }: { id: string }) {
                   icon={<CreditCard className="h-4 w-4" />}
                   label="Gói cước hiện tại"
                   value={
-                    user.subscriptionPlan ? (
+                    user.subscriptionPlanId ? (
                       <span className="font-semibold text-navy-900">
-                        {planLabel(user.subscriptionPlan)}
+                        {planLabel(user.subscriptionPlanId)}
                       </span>
                     ) : (
                       '—'
@@ -204,15 +206,16 @@ export function AdminUserDetailClient({ id }: { id: string }) {
                   }
                 />
               </div>
-              {user.kycStatus === 'pending' && (
-                <div className="px-6 py-4">
+              <div className="flex flex-wrap items-center gap-3 px-6 py-4">
+                <SubscriptionUpgradeButton userId={user.id} ownerName={user.name} />
+                {user.kycStatus === 'pending' && (
                   <Link href={`/admin/kyc?q=${user.id}`}>
                     <Button variant="outline" size="sm">
                       → Vào trang duyệt KYC
                     </Button>
                   </Link>
-                </div>
-              )}
+                )}
+              </div>
             </section>
           )}
 
@@ -260,7 +263,6 @@ export function AdminUserDetailClient({ id }: { id: string }) {
                   userId={user.id}
                   role={user.role}
                   status={user.status}
-                  subscriptionPlan={user.subscriptionPlan}
                 />
               </div>
             </div>
@@ -357,13 +359,4 @@ function KycPill({
       {label[status]}
     </span>
   );
-}
-
-function planLabel(plan: 'free' | 'basic' | 'standard' | 'pro'): string {
-  return {
-    free: 'Miễn phí',
-    basic: 'Cơ bản',
-    standard: 'Tiêu chuẩn',
-    pro: 'Chuyên nghiệp',
-  }[plan];
 }

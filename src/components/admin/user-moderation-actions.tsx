@@ -10,7 +10,6 @@ import {
   resetUserPasswordAction,
   revokeUserSessionAction,
   unbanAdminUserAction,
-  updateUserSubscriptionAction,
 } from '@/app/actions/admin-users';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -29,15 +28,7 @@ interface Props {
   userId: string;
   role: RoleCode;
   status: AdminUserStatus;
-  subscriptionPlan: 'free' | 'basic' | 'standard' | 'pro' | null;
 }
-
-const PLAN_LABEL: Record<'free' | 'basic' | 'standard' | 'pro', string> = {
-  free: 'Miễn phí',
-  basic: 'Cơ bản',
-  standard: 'Tiêu chuẩn',
-  pro: 'Chuyên nghiệp',
-};
 
 const PENDING_DELETION_STORAGE = 'halong24h-pending-deletion';
 
@@ -75,12 +66,7 @@ function hardDeleteDateString(): string {
   return d.toISOString().slice(0, 10);
 }
 
-export function UserModerationActions({
-  userId,
-  role,
-  status,
-  subscriptionPlan,
-}: Props) {
+export function UserModerationActions({ userId, role, status }: Props) {
   const router = useRouter();
   const { show } = useToast();
   const [pending, startTransition] = useTransition();
@@ -90,7 +76,6 @@ export function UserModerationActions({
   type Confirm =
     | { kind: 'unban' }
     | { kind: 'revoke' }
-    | { kind: 'change-plan'; plan: 'free' | 'basic' | 'standard' | 'pro' }
     | { kind: 'reset-pwd' };
   const [pendingConfirm, setPendingConfirm] = useState<Confirm | null>(null);
 
@@ -151,9 +136,6 @@ export function UserModerationActions({
   function onRevoke() {
     setPendingConfirm({ kind: 'revoke' });
   }
-  function onChangePlan(plan: 'free' | 'basic' | 'standard' | 'pro') {
-    setPendingConfirm({ kind: 'change-plan', plan });
-  }
 
   function executeConfirm() {
     const c = pendingConfirm;
@@ -176,15 +158,6 @@ export function UserModerationActions({
           return;
         }
         show('✓ Đã revoke session', 'success');
-      } else if (c.kind === 'change-plan') {
-        const r = await updateUserSubscriptionAction(userId, c.plan);
-        if (!r.ok) {
-          show(r.error || 'Có lỗi', 'error');
-          return;
-        }
-        show(`✓ Đã đổi sang ${PLAN_LABEL[c.plan]}`, 'success');
-        router.refresh();
-        refetchApiResources();
       } else if (c.kind === 'reset-pwd') {
         const r = await resetUserPasswordAction(userId);
         if (!r.ok) {
@@ -204,11 +177,6 @@ export function UserModerationActions({
         return {
           title: 'Force logout?',
           description: 'Đá người dùng khỏi mọi phiên đang active. Họ phải đăng nhập lại.',
-        };
-      case 'change-plan':
-        return {
-          title: `Đổi sang "${PLAN_LABEL[c.plan]}"?`,
-          description: 'Đổi gói cước người dùng. Áp dụng ngay.',
         };
       case 'reset-pwd':
         return {
@@ -312,39 +280,6 @@ export function UserModerationActions({
         >
           🔓 Buộc đăng xuất tất cả thiết bị
         </Button>
-      )}
-
-      {/* Subscription override (chỉ OWNER) */}
-      {isOwner && (
-        <div className="rounded-lg bg-cream-100 p-3 ring-1 ring-ink-200">
-          <p className="overline muted no-dash text-[10px] mb-2">
-            Đổi gói cước
-          </p>
-          <p className="text-[11px] text-ink-700 mb-2">
-            Hiện tại:{' '}
-            <strong>
-              {subscriptionPlan ? PLAN_LABEL[subscriptionPlan] : 'Chưa có'}
-            </strong>
-          </p>
-          <div className="grid grid-cols-2 gap-1.5">
-            {(['free', 'basic', 'standard', 'pro'] as const).map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => onChangePlan(p)}
-                disabled={pending || subscriptionPlan === p}
-                className={
-                  'rounded-md border px-2 py-1.5 text-xs font-medium transition-all ' +
-                  (subscriptionPlan === p
-                    ? 'border-navy-900 bg-navy-900 text-white'
-                    : 'border-ink-200 bg-white hover:border-navy-700 disabled:opacity-50')
-                }
-              >
-                {PLAN_LABEL[p]}
-              </button>
-            ))}
-          </div>
-        </div>
       )}
 
       {/* Reset password */}
@@ -460,9 +395,7 @@ export function UserModerationActions({
             ? 'Mở chặn'
             : pendingConfirm?.kind === 'revoke'
               ? 'Force logout'
-              : pendingConfirm?.kind === 'reset-pwd'
-                ? 'Gửi email'
-                : 'Đổi gói'
+              : 'Gửi email'
         }
         variant={
           pendingConfirm?.kind === 'revoke' ? 'danger' : 'primary'
