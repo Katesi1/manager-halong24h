@@ -54,7 +54,7 @@ export function PropertyImagesClient({ id }: { id: string }) {
             động được set làm ảnh bìa.
           </p>
           <div className="mt-4">
-            <ImageUploader kind="property" parentId={property.id} maxFiles={20} />
+            <ImageUploader kind="property" parentId={property.id} maxFiles={20} existingCount={property.images.length} />
           </div>
         </section>
 

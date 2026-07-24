@@ -5,25 +5,22 @@ import { useRef, useState } from 'react';
 import { uploadPropertyImagesAction } from '@/app/actions/properties';
 import { toast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
-
+import { refetchApiResources } from '@/lib/use-api-resource';
 interface ImageUploaderProps {
-  /** Property ID — chỉ hỗ trợ property images. Room image không có endpoint BE. */
   parentId: string;
-  /** Tối đa số ảnh upload cùng lúc */
   maxFiles?: number;
-  /**
-   * Legacy props giữ chữ ký để các page cũ truyền vào không vỡ. Bị bỏ qua.
-   * @deprecated
-   */
+  existingCount?: number;
   kind?: 'property';
 }
 
 const MAX_SIZE_BYTES = 10 * 1024 * 1024;
+const MAX_TOTAL_SIZE_BYTES = 100 * 1024 * 1024; // 100MB
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 export function ImageUploader({
   parentId,
   maxFiles = 20,
+  existingCount = 0,
 }: ImageUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState<{ name: string; pct: number }[]>([]);
@@ -33,12 +30,20 @@ export function ImageUploader({
   async function handleFiles(files: FileList | File[]) {
     setError(null);
     const incoming = Array.from(files);
-    if (incoming.length > maxFiles) {
+
+    const allowedNew = Math.max(0, maxFiles - existingCount);
+    if (allowedNew === 0) {
+      setError(`Giới hạn tối đa là ${maxFiles} ảnh. Vui lòng xóa bớt ảnh trước khi tải thêm.`);
+      toast.error(`Giới hạn tối đa là ${maxFiles} ảnh. Vui lòng xóa bớt ảnh trước khi tải thêm.`);
+      return;
+    }
+
+    if (incoming.length > allowedNew) {
       toast.warning(
-        `Đã giới hạn tối đa ${maxFiles} ảnh. Bỏ qua ${incoming.length - maxFiles} ảnh thừa.`,
+        `Chỉ được tải lên tối đa ${allowedNew} ảnh nữa (giới hạn ${maxFiles} ảnh). Bỏ qua ${incoming.length - allowedNew} ảnh thừa.`,
       );
     }
-    const arr = incoming.slice(0, maxFiles);
+    const arr = incoming.slice(0, allowedNew);
     if (arr.length === 0) return;
 
     for (const f of arr) {
@@ -52,14 +57,22 @@ export function ImageUploader({
       }
     }
 
+    const totalSize = arr.reduce((acc, f) => acc + f.size, 0);
+    if (totalSize > MAX_TOTAL_SIZE_BYTES) {
+      setError("Tổng dung lượng ảnh vượt quá 100MB. Vui lòng chọn ít ảnh hơn.");
+      return;
+    }
+
     setUploading(arr.map((f) => ({ name: f.name, pct: 30 })));
 
     try {
       const fd = new FormData();
+      fd.append('propertyId', parentId);
       for (const f of arr) fd.append('images', f);
-      const result = await uploadPropertyImagesAction(parentId, fd);
+      const result = await uploadPropertyImagesAction(fd);
       if (!result.ok) throw new Error(result.error);
       setUploading((prev) => prev.map((u) => ({ ...u, pct: 100 })));
+      refetchApiResources();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload thất bại');
       setUploading([]);

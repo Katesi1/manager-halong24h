@@ -22,6 +22,7 @@ export default async function AdminPropertiesPage(props: {
     type?: string;
     sort?: string;
     page?: string;
+    ownerId?: string;
   }>;
 }) {
   const sp = await props.searchParams;
@@ -36,6 +37,7 @@ export default async function AdminPropertiesPage(props: {
       ? (sp.sort as string)
       : 'name',
     page: parsePage(sp.page),
+    ownerId: sp.ownerId ?? '',
   };
 
   return (

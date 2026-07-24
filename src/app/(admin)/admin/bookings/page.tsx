@@ -12,7 +12,12 @@ const VALID_STATUS: ReadonlySet<string> = new Set<BookingStatus>([
 ]);
 
 export default async function AdminBookingsPage(props: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    ownerId?: string;
+    saleId?: string;
+    customerId?: string;
+  }>;
 }) {
   const sp = await props.searchParams;
   const status =
@@ -29,7 +34,12 @@ export default async function AdminBookingsPage(props: {
       />
 
       {/* Dữ liệu fetch phía CLIENT từ /api/admin/bookings → hiện endpoint trong Network */}
-      <AdminBookingsClient status={status} />
+      <AdminBookingsClient
+        status={status}
+        ownerId={sp.ownerId}
+        saleId={sp.saleId}
+        customerId={sp.customerId}
+      />
     </div>
   );
 }

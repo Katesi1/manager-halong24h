@@ -87,9 +87,16 @@ export class ApiPropertyRepository implements PropertyRepository {
   }
 
   async uploadImages(id: string, files: File[]): Promise<PropertyImage[]> {
-    const fd = new FormData();
-    for (const f of files) fd.append('images', f);
-    return apiClient.post<PropertyImage[]>(`/properties/${id}/images`, fd);
+    const results: PropertyImage[] = [];
+    for (const f of files) {
+      const fd = new FormData();
+      fd.append('images[]', f);
+      const res = await apiClient.post<PropertyImage[]>(`/properties/${id}/images`, fd);
+      if (res && res.length > 0) {
+        results.push(...res);
+      }
+    }
+    return results;
   }
 
   async deleteImage(propertyId: string, imageId: string): Promise<void> {

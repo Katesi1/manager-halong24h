@@ -125,7 +125,24 @@ export class ApiAdminUserRepository implements AdminUserRepository {
         query: { withStats: 'true' },
         cache: 'no-store',
       });
-      return mapUser(data);
+      const user = mapUser(data);
+
+      // FALLBACK: Backend /users/:id doesn't return statistics, but /users does.
+      // If all statistics are 0, we verify and fetch correct stats from the list endpoint.
+      if (user.propertyCount === 0 && user.bookingCount === 0 && user.disputeCount === 0) {
+        const queryTerm = user.email?.trim() || user.phone?.trim() || user.name?.trim() || id;
+        if (queryTerm) {
+          const listData = await this.list({ search: queryTerm });
+          const matched = listData.find((u) => u.id === id);
+          if (matched) {
+            user.propertyCount = matched.propertyCount;
+            user.bookingCount = matched.bookingCount;
+            user.disputeCount = matched.disputeCount;
+          }
+        }
+      }
+
+      return user;
     } catch (err) {
       if (
         err instanceof Error &&

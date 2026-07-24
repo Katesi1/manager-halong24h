@@ -10,6 +10,7 @@ import {
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { PropertyImage } from '@/core/entities/property';
 import { cn } from '@/lib/utils';
+import { refetchApiResources } from '@/lib/use-api-resource';
 
 interface ImageGridProps {
   propertyId: string;
@@ -42,7 +43,11 @@ export function ImageGrid({ propertyId, images }: ImageGridProps) {
     setError(null);
     startTransition(async () => {
       const result = await deletePropertyImageAction(propertyId, imageId);
-      if (!result.ok) setError(result.error);
+      if (!result.ok) {
+        setError(result.error);
+      } else {
+        refetchApiResources();
+      }
       setBusyId(null);
     });
   }
@@ -52,7 +57,11 @@ export function ImageGrid({ propertyId, images }: ImageGridProps) {
     setError(null);
     startTransition(async () => {
       const result = await setPropertyCoverImageAction(propertyId, imageId);
-      if (!result.ok) setError(result.error);
+      if (!result.ok) {
+        setError(result.error);
+      } else {
+        refetchApiResources();
+      }
       setBusyId(null);
     });
   }

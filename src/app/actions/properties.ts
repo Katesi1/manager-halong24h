@@ -93,9 +93,9 @@ export async function deletePropertyAction(id: string) {
 }
 
 export async function uploadPropertyImagesAction(
-  id: string,
   formData: FormData,
 ) {
+  const id = formData.get('propertyId') as string;
   const files = formData
     .getAll('images')
     .filter((f): f is File => f instanceof File);

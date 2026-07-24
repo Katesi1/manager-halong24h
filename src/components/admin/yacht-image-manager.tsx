@@ -15,6 +15,7 @@ import type { YachtImage } from '@/core/entities/yacht';
 import { cn } from '@/lib/utils';
 
 const MAX_SIZE = 10 * 1024 * 1024;
+const MAX_TOTAL_SIZE = 100 * 1024 * 1024; // 100MB
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILES = 20;
 
@@ -34,7 +35,21 @@ export function YachtImageManager({ yachtId, images }: Props) {
 
   async function handleFiles(files: FileList | File[]) {
     setError(null);
-    const arr = Array.from(files).slice(0, MAX_FILES);
+    const incoming = Array.from(files);
+
+    const allowedNew = Math.max(0, MAX_FILES - images.length);
+    if (allowedNew === 0) {
+      setError(`Giới hạn tối đa là ${MAX_FILES} ảnh. Vui lòng xóa bớt ảnh trước khi tải thêm.`);
+      toast.error(`Giới hạn tối đa là ${MAX_FILES} ảnh. Vui lòng xóa bớt ảnh trước khi tải thêm.`);
+      return;
+    }
+
+    if (incoming.length > allowedNew) {
+      toast.warning(
+        `Chỉ được tải lên tối đa ${allowedNew} ảnh nữa (giới hạn ${MAX_FILES} ảnh).`,
+      );
+    }
+    const arr = incoming.slice(0, allowedNew);
     if (arr.length === 0) return;
     for (const f of arr) {
       if (!ACCEPTED.includes(f.type)) {
@@ -46,11 +61,18 @@ export function YachtImageManager({ yachtId, images }: Props) {
         return;
       }
     }
+
+    const totalSize = arr.reduce((acc, f) => acc + f.size, 0);
+    if (totalSize > MAX_TOTAL_SIZE) {
+      setError("Tổng dung lượng ảnh vượt quá 100MB. Vui lòng chọn ít ảnh hơn.");
+      return;
+    }
     setUploading(true);
     try {
       const fd = new FormData();
+      fd.append('yachtId', yachtId);
       for (const f of arr) fd.append('images', f);
-      const res = await uploadYachtImagesAction(yachtId, fd);
+      const res = await uploadYachtImagesAction(fd);
       if (!res.ok) throw new Error(res.error);
       toast.success(`Đã tải lên ${arr.length} ảnh`);
       refetchApiResources();

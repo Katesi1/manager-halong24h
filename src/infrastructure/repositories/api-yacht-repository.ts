@@ -103,9 +103,16 @@ export class ApiYachtRepository implements YachtRepository {
   }
 
   async uploadImages(id: string, files: File[]): Promise<YachtImage[]> {
-    const fd = new FormData();
-    for (const f of files) fd.append('images', f);
-    return apiClient.post<YachtImage[]>(`/yachts/${id}/images`, fd);
+    const results: YachtImage[] = [];
+    for (const f of files) {
+      const fd = new FormData();
+      fd.append('images', f);
+      const res = await apiClient.post<YachtImage[]>(`/yachts/${id}/images`, fd);
+      if (res && res.length > 0) {
+        results.push(...res);
+      }
+    }
+    return results;
   }
 
   async deleteImage(yachtId: string, imageId: string): Promise<void> {

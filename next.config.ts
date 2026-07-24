@@ -14,8 +14,9 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     serverActions: {
-      bodySizeLimit: "10mb",
+      bodySizeLimit: "100mb",
     },
+    middlewareClientMaxBodySize: "100mb",
   },
   // CSP shipped in Report-Only mode for telemetry. Enforcing CSP requires
   // per-request nonce wiring through middleware/script tags; deferred to a

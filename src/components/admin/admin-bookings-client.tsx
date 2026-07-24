@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { CalendarRange, ClipboardList } from 'lucide-react';
 
@@ -30,13 +30,70 @@ const TABS: { key: TabKey; label: string }[] = [
  * Toàn bộ booking fetch từ `/api/admin/bookings` PHÍA CLIENT → endpoint hiện
  * trong F12 Network. Stats + filter theo tab (URL) + phân trang in-memory.
  */
-export function AdminBookingsClient({ status }: { status?: BookingStatus }) {
+export function AdminBookingsClient({
+  status,
+  ownerId,
+  saleId,
+  customerId,
+}: {
+  status?: BookingStatus;
+  ownerId?: string;
+  saleId?: string;
+  customerId?: string;
+}) {
   const { loading, error, data } = useApiResource<Booking[]>(
     '/api/admin/bookings',
   );
   const [page, setPage] = useState(1);
   // Đổi tab (status) → về trang 1.
   useEffect(() => setPage(1), [status]);
+
+  const all = data ?? [];
+
+  // Lọc theo vai trò (chủ nhà, sale, khách hàng)
+  const filteredByRole = useMemo(() => {
+    return all.filter((b) => {
+      if (ownerId && (b as any).ownerId !== ownerId) return false;
+      if (saleId && b.saleId !== saleId) return false;
+      if (customerId && b.customerId !== customerId) return false;
+      return true;
+    });
+  }, [all, ownerId, saleId, customerId]);
+
+  // Thông tin hiển thị banner khi lọc
+  const filterInfo = useMemo(() => {
+    if (ownerId) {
+      return { label: 'chủ nhà', value: `Chủ nhà (ID: ${ownerId})` };
+    }
+    if (saleId) {
+      return { label: 'nhân viên SALE', value: `SALE (ID: ${saleId})` };
+    }
+    if (customerId) {
+      const found = filteredByRole.find((b) => b.customerId === customerId);
+      const name = found?.guestName ? `${found.guestName} (ID: ${customerId})` : `Khách (ID: ${customerId})`;
+      return { label: 'khách hàng', value: name };
+    }
+    return null;
+  }, [filteredByRole, ownerId, saleId, customerId]);
+
+  const activeTab: TabKey = status ?? 'all';
+  const bookings =
+    activeTab === 'all'
+      ? filteredByRole
+      : filteredByRole.filter((b) => b.status === activeTab);
+
+  const countOf = (key: TabKey) =>
+    key === 'all'
+      ? filteredByRole.length
+      : filteredByRole.filter((b) => b.status === key).length;
+  const holdCount = countOf('hold');
+  const confirmedCount = countOf('confirmed');
+  const revenue = filteredByRole
+    .filter((b) => b.status === 'paid' || b.status === 'completed')
+    .reduce((sum, b) => sum + (b.totalPrice ?? 0), 0);
+
+  const totalPages = Math.ceil(bookings.length / PAGE_SIZE);
+  const pageItems = bookings.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   if (loading) {
     return <div className="py-12 text-center text-sm text-ink-500">Đang tải…</div>;
@@ -50,26 +107,24 @@ export function AdminBookingsClient({ status }: { status?: BookingStatus }) {
     );
   }
 
-  const all = data ?? [];
-  const activeTab: TabKey = status ?? 'all';
-  const bookings =
-    activeTab === 'all' ? all : all.filter((b) => b.status === activeTab);
-
-  const countOf = (key: TabKey) =>
-    key === 'all' ? all.length : all.filter((b) => b.status === key).length;
-  const holdCount = countOf('hold');
-  const confirmedCount = countOf('confirmed');
-  const revenue = all
-    .filter((b) => b.status === 'paid' || b.status === 'completed')
-    .reduce((sum, b) => sum + (b.totalPrice ?? 0), 0);
-
-  const totalPages = Math.ceil(bookings.length / PAGE_SIZE);
-  const pageItems = bookings.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
   return (
     <>
+      {filterInfo && (
+        <div className="mb-4 flex items-center justify-between rounded-lg bg-navy-50 px-4 py-2.5 text-sm text-navy-900 ring-1 ring-navy-200">
+          <span>
+            Đang lọc theo {filterInfo.label}: <strong>{filterInfo.value}</strong>
+          </span>
+          <Link
+            href="/admin/bookings"
+            className="text-xs font-semibold text-navy-700 hover:text-navy-900 underline"
+          >
+            Bỏ lọc
+          </Link>
+        </div>
+      )}
+
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Tổng booking" value={String(all.length)} hint="trên toàn hệ thống" />
+        <StatCard label="Tổng booking" value={String(filteredByRole.length)} hint="trên toàn hệ thống" />
         <StatCard label="Đang giữ chỗ" value={String(holdCount)} hint="chờ chủ nhà xác nhận" />
         <StatCard label="Chờ khách cọc" value={String(confirmedCount)} hint="đã xác nhận, chờ chuyển tiền" />
         <StatCard label="Doanh thu ghi nhận" value={formatVND(revenue)} hint="booking đã nhận tiền / hoàn tất" />
@@ -78,8 +133,14 @@ export function AdminBookingsClient({ status }: { status?: BookingStatus }) {
       <div className="mb-4 flex flex-wrap gap-2">
         {TABS.map((tab) => {
           const isActive = tab.key === activeTab;
-          const href =
-            tab.key === 'all' ? '/admin/bookings' : `/admin/bookings?status=${tab.key}`;
+          const params = new URLSearchParams();
+          if (tab.key !== 'all') params.set('status', tab.key);
+          if (ownerId) params.set('ownerId', ownerId);
+          if (saleId) params.set('saleId', saleId);
+          if (customerId) params.set('customerId', customerId);
+          const qs = params.toString();
+          const href = qs ? `/admin/bookings?${qs}` : '/admin/bookings';
+
           return (
             <Link
               key={tab.key}

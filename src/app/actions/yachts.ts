@@ -83,7 +83,8 @@ export async function deleteYachtAction(id: string) {
   return result;
 }
 
-export async function uploadYachtImagesAction(id: string, formData: FormData) {
+export async function uploadYachtImagesAction(formData: FormData) {
+  const id = formData.get('yachtId') as string;
   const files = formData
     .getAll('images')
     .filter((f): f is File => f instanceof File);

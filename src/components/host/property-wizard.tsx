@@ -2,15 +2,19 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
 import {
   createPropertyAction,
   updatePropertyAction,
+  uploadPropertyImagesAction,
 } from '@/app/actions/properties';
 import { Button } from '@/components/ui/button';
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
+import { ImageUploader } from './image-uploader';
+import { ImageGrid } from './image-grid';
 import {
   SUBSCRIPTION_SETTINGS_PATH,
   isFeatureLockedError,
@@ -27,6 +31,7 @@ import {
   propertyTypeLabel,
 } from '@/core/value-objects/property-type';
 import { cn } from '@/lib/utils';
+import { refetchApiResources } from '@/lib/use-api-resource';
 
 type WizardData = Partial<CreatePropertyInput> & {
   weekdayPrice?: number;
@@ -38,22 +43,50 @@ type WizardData = Partial<CreatePropertyInput> & {
 
 interface PropertyWizardProps {
   property?: Property | null;
+  selectedFiles?: File[];
+  onClearFiles?: () => void;
 }
 
 const AMENITIES = [
-  { key: 'wifi', label: 'Wi-Fi' },
-  { key: 'pool', label: 'Hồ bơi' },
-  { key: 'parking', label: 'Bãi đỗ' },
+  { key: 'wifi', label: 'Wifi' },
+  { key: 'pool', label: 'Bể bơi' },
+  { key: 'parking', label: 'Đỗ xe' },
   { key: 'ac', label: 'Điều hòa' },
   { key: 'kitchen', label: 'Bếp đầy đủ' },
-  { key: 'kitchenette', label: 'Bếp nhỏ' },
-  { key: 'bbq', label: 'BBQ' },
+  { key: 'bbq', label: 'BBQ ngoài trời' },
   { key: 'balcony', label: 'Ban công' },
+  { key: 'seaview', label: 'View biển' },
+  { key: 'tv', label: 'TV' },
+  { key: 'washer', label: 'Máy giặt' },
+  { key: 'karaoke', label: 'Karaoke' },
+  { key: 'portable_speaker', label: 'Loa di động' },
+  { key: 'refrigerator', label: 'Tủ lạnh' },
+  { key: 'microwave', label: 'Lò vi sóng' },
+  { key: 'induction_stove', label: 'Bếp từ' },
+  { key: 'dishes', label: 'Bát đũa' },
+  { key: 'free_water', label: 'Nước lọc free' },
+  { key: 'bathtub', label: 'Bồn tắm' },
+  { key: 'shower', label: 'Vòi sen' },
+  { key: 'hot_water', label: 'Nước nóng' },
+  { key: 'hair_dryer', label: 'Máy sấy tóc' },
+  { key: 'heating_lamp', label: 'Đèn sưởi' },
+  { key: 'towels', label: 'Khăn tắm' },
+  { key: 'toiletries', label: 'Dầu gội/Sữa tắm' },
+  { key: 'garden', label: 'Sân vườn' },
+  { key: 'rooftop', label: 'Sân thượng' },
+  { key: 'iron', label: 'Bàn là' },
+  { key: 'wardrobe', label: 'Tủ quần áo' },
+  { key: 'safe', label: 'Két sắt' },
+  { key: 'elevator', label: 'Thang máy' },
+  { key: 'billiards', label: 'Bida' },
+  { key: 'pingpong', label: 'Bàn bóng bàn' },
+  { key: 'swing', label: 'Xích đu' },
+  { key: 'playground', label: 'Khu vui chơi trẻ em' },
+  // Legacy / Other amenities to maintain compatibility
+  { key: 'kitchenette', label: 'Bếp nhỏ' },
   { key: 'breakfast', label: 'Bữa sáng' },
   { key: 'gym', label: 'Gym' },
   { key: 'spa', label: 'Spa' },
-  { key: 'tv', label: 'TV' },
-  { key: 'washer', label: 'Máy giặt' },
   { key: 'workspace', label: 'Bàn làm việc' },
 ];
 
@@ -147,7 +180,11 @@ interface DraftEnvelope {
   step: number;
 }
 
-export function PropertyWizard({ property }: PropertyWizardProps) {
+export function PropertyWizard({
+  property,
+  selectedFiles = [],
+  onClearFiles,
+}: PropertyWizardProps) {
   const router = useRouter();
   const isEdit = !!property;
   const [step, setStep] = useState(0);
@@ -157,6 +194,7 @@ export function PropertyWizard({ property }: PropertyWizardProps) {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState(false);
+
   const [pending, startTransition] = useTransition();
   const restoredRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -216,6 +254,7 @@ export function PropertyWizard({ property }: PropertyWizardProps) {
     } catch {
       // ignore
     }
+    if (onClearFiles) onClearFiles();
   }
 
   function discardDraft() {
@@ -308,39 +347,95 @@ export function PropertyWizard({ property }: PropertyWizardProps) {
     setStep((s) => Math.max(s - 1, 0));
   }
 
+  function jumpTo(targetStep: number) {
+    // Validate all steps from 0 up to targetStep - 1
+    for (let i = 0; i < targetStep; i++) {
+      const err = validateStep(i);
+      if (err) {
+        setError(err);
+        setStep(i); // Move to the first invalid step
+        return;
+      }
+    }
+    setError(null);
+    setStep(targetStep);
+  }
+
   function submit() {
-    const err = validateStep(step);
-    if (err) {
-      setError(err);
+    // Validate all steps from 0 to last step
+    for (let i = 0; i < STEPS.length; i++) {
+      const err = validateStep(i);
+      if (err) {
+        setError(err);
+        setStep(i);
+        return;
+      }
+    }
+
+    // Validate tổng dung lượng ảnh trước khi gọi API tạo phòng (100MB limit)
+    if (selectedFiles.length > 0) {
+      const totalSize = selectedFiles.reduce((acc, f) => acc + f.size, 0);
+      if (totalSize > 100 * 1024 * 1024) {
+        setError("Tổng dung lượng ảnh vượt quá giới hạn 100MB. Vui lòng giảm số lượng ảnh hoặc chọn ảnh nhẹ hơn để tránh lỗi.");
+        toast.error("Tổng dung lượng ảnh vượt quá giới hạn 100MB.");
+        return;
+      }
+    } else if (!isEdit) {
+      setError("Vui lòng tải lên ít nhất 1 hình ảnh cho cơ sở trong phần 'Quản lý ảnh' ở góc dưới.");
+      toast.error("Vui lòng tải lên ít nhất 1 hình ảnh cho cơ sở.");
       return;
     }
+
     setError(null);
     setFieldErrors({});
     setSuccess(false);
 
     startTransition(async () => {
-      const payload = stripEmpty(data);
-      const result = isEdit
-        ? await updatePropertyAction(property!.id, payload)
-        : await createPropertyAction(payload);
+      try {
+        const payload = stripEmpty(data);
+        const result = isEdit
+          ? await updatePropertyAction(property!.id, payload)
+          : await createPropertyAction(payload);
 
-      if (!result.ok) {
-        setError(result.error);
-        if (result.fieldErrors) {
-          const flat: Record<string, string> = {};
-          for (const [k, v] of Object.entries(result.fieldErrors)) {
-            if (v[0]) flat[k] = v[0];
+        if (!result.ok) {
+          setError(result.error);
+          if (result.fieldErrors) {
+            const flat: Record<string, string> = {};
+            for (const [k, v] of Object.entries(result.fieldErrors)) {
+              if (v[0]) flat[k] = v[0];
+            }
+            setFieldErrors(flat);
           }
-          setFieldErrors(flat);
+          return;
         }
-        return;
-      }
 
-      if (!isEdit) {
-        clearDraft();
-        router.push(`/host/properties/${result.data.id}?created=1`);
-      } else {
-        setSuccess(true);
+        if (!isEdit) {
+          if (selectedFiles.length > 0) {
+            const fd = new FormData();
+            fd.append('propertyId', result.data.id);
+            for (const f of selectedFiles) {
+              fd.append('images', f);
+            }
+            try {
+              const uploadResult = await uploadPropertyImagesAction(fd);
+              if (!uploadResult.ok) {
+                toast.error(`Tạo cơ sở thành công nhưng không upload được ảnh: ${uploadResult.error}`);
+              }
+            } catch (uploadErr) {
+              toast.error("Có lỗi xảy ra khi tải ảnh lên. Vui lòng kiểm tra lại dung lượng ảnh.");
+              console.error(uploadErr);
+            }
+          }
+          clearDraft();
+          router.push(`/host/properties/${result.data.id}?created=1`);
+        } else {
+          setSuccess(true);
+          refetchApiResources();
+        }
+      } catch (err) {
+        setError("Đã xảy ra lỗi hệ thống hoặc kết nối mạng khi tạo cơ sở. Vui lòng kiểm tra lại dung lượng ảnh và thử lại.");
+        toast.error("Không thể hoàn tất yêu cầu. Vui lòng thử lại.");
+        console.error(err);
       }
     });
   }
@@ -349,7 +444,7 @@ export function PropertyWizard({ property }: PropertyWizardProps) {
 
   return (
     <div className="space-y-6">
-      <Stepper current={step} onJump={isEdit ? setStep : undefined} />
+      <Stepper current={step} onJump={jumpTo} />
 
       {error && (
         <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100">

@@ -25,6 +25,7 @@ export interface PropertiesBrowserInitial {
   type: string;
   sort: string;
   page: number;
+  ownerId?: string;
 }
 
 interface Props {
@@ -45,6 +46,7 @@ export function PropertiesBrowser({ rows, apiError, initial }: Props) {
   const [type, setType] = useState(initial.type);
   const [sort, setSort] = useState(initial.sort);
   const [page, setPage] = useState(initial.page);
+  const [ownerId, setOwnerId] = useState(initial.ownerId ?? '');
 
   // Đồng bộ URL không gây re-render server (history.replaceState, không router).
   useEffect(() => {
@@ -54,35 +56,46 @@ export function PropertiesBrowser({ rows, apiError, initial }: Props) {
     if (type) params.set('type', type);
     if (sort && sort !== 'name') params.set('sort', sort);
     if (page > 1) params.set('page', String(page));
+    if (ownerId) params.set('ownerId', ownerId);
     const qs = params.toString();
     window.history.replaceState(
       null,
       '',
       qs ? `${window.location.pathname}?${qs}` : window.location.pathname,
     );
-  }, [status, q, type, sort, page]);
+  }, [status, q, type, sort, page, ownerId]);
+
+  const filteredByOwner = useMemo(() => {
+    return ownerId ? rows.filter((r) => r.ownerId === ownerId) : rows;
+  }, [rows, ownerId]);
+
+  const ownerName = useMemo(() => {
+    if (!ownerId) return '';
+    const found = rows.find((r) => r.ownerId === ownerId);
+    return found?.ownerName ?? ownerId;
+  }, [rows, ownerId]);
 
   const counts = useMemo(
     () => ({
-      total: rows.length,
-      pending: rows.filter((r) => r.moderationStatus === 'pending').length,
-      approved: rows.filter((r) => r.moderationStatus === 'approved').length,
-      rejected: rows.filter((r) => r.moderationStatus === 'rejected').length,
-      suspended: rows.filter((r) => r.moderationStatus === 'suspended').length,
+      total: filteredByOwner.length,
+      pending: filteredByOwner.filter((r) => r.moderationStatus === 'pending').length,
+      approved: filteredByOwner.filter((r) => r.moderationStatus === 'approved').length,
+      rejected: filteredByOwner.filter((r) => r.moderationStatus === 'rejected').length,
+      suspended: filteredByOwner.filter((r) => r.moderationStatus === 'suspended').length,
     }),
-    [rows],
+    [filteredByOwner],
   );
 
   const filtered = useMemo(() => {
     const qlc = q.trim().toLowerCase();
-    const list = rows.filter(
+    const list = filteredByOwner.filter(
       (r) =>
         (status === '' || r.moderationStatus === status) &&
         (type === '' || String(r.type) === type) &&
         (qlc === '' || rowHaystack(r).includes(qlc)),
     );
     return sortRows(list, sort);
-  }, [rows, status, type, q, sort]);
+  }, [filteredByOwner, status, type, q, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -113,6 +126,7 @@ export function PropertiesBrowser({ rows, apiError, initial }: Props) {
     setType('');
     setSort('name');
     setPage(1);
+    setOwnerId('');
   }
 
   const statusOptions: StatusOption[] = [
@@ -148,6 +162,20 @@ export function PropertiesBrowser({ rows, apiError, initial }: Props) {
         >
           <span className="font-semibold">Không tải được cơ sở: </span>
           {apiError}
+        </div>
+      )}
+
+      {ownerId && (
+        <div className="mb-4 flex items-center justify-between rounded-lg bg-navy-50 px-4 py-2.5 text-sm text-navy-900 ring-1 ring-navy-200">
+          <span>
+            Đang lọc cơ sở của chủ nhà: <strong>{ownerName}</strong> (ID: {ownerId})
+          </span>
+          <button
+            onClick={() => setOwnerId('')}
+            className="text-xs font-semibold text-navy-700 hover:text-navy-900 underline"
+          >
+            Bỏ lọc
+          </button>
         </div>
       )}
 

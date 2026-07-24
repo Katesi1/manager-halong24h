@@ -289,11 +289,11 @@ function InfoCell({
       <span className="mt-0.5 shrink-0 text-ink-400">{icon}</span>
       <div className="min-w-0">
         <p className="text-xs font-medium text-ink-400">{label}</p>
-        <p
+        <div
           className={`mt-0.5 text-sm text-ink-900 ${mono ? 'font-mono break-all' : ''}`}
         >
           {value}
-        </p>
+        </div>
       </div>
     </div>
   );
